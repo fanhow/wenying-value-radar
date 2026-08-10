@@ -44,7 +44,7 @@ type SecCompanyFacts = {
 type SecTickerRow = { cik_str: number; ticker: string; title: string };
 
 const SEC_HEADERS = {
-  "User-Agent": "WenYingValueRadar/1.0 213328508+fanhow@users.noreply.github.com",
+  "User-Agent": "WenYing Value Radar fanhow@hotmail.com",
   Accept: "application/json",
 };
 

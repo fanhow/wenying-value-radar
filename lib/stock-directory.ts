@@ -6,6 +6,12 @@ export type StockDirectoryEntry = {
   aliases: string[];
 };
 
+export type MarketSymbol = {
+  ticker: string;
+  market: "TW" | "US";
+  name: string;
+};
+
 const stockDirectory: StockDirectoryEntry[] = [
   {
     ticker: "2330",
@@ -30,6 +36,24 @@ export function findStockDirectoryEntries(query: string, limit = 4) {
   return stockDirectory
     .filter((entry) => [entry.ticker, entry.nameZh, entry.nameEn, ...entry.aliases]
       .some((value) => value.toLowerCase().includes(normalized)))
+    .slice(0, limit);
+}
+
+export function rankMarketSymbols(entries: MarketSymbol[], query: string, limit = 6) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+
+  return entries
+    .filter((entry, index, all) => entry.ticker && entry.name
+      && all.findIndex((candidate) => candidate.ticker === entry.ticker) === index
+      && (entry.ticker.toLowerCase().includes(normalized) || entry.name.toLowerCase().includes(normalized)))
+    .sort((left, right) => {
+      const leftTicker = left.ticker.toLowerCase();
+      const rightTicker = right.ticker.toLowerCase();
+      const leftScore = leftTicker === normalized ? 0 : leftTicker.startsWith(normalized) ? 1 : 2;
+      const rightScore = rightTicker === normalized ? 0 : rightTicker.startsWith(normalized) ? 1 : 2;
+      return leftScore - rightScore || leftTicker.localeCompare(rightTicker);
+    })
     .slice(0, limit);
 }
 

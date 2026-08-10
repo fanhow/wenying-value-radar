@@ -9,6 +9,12 @@ import { SiteHeader } from "./site-header";
 type Filter = "all" | "undervalued" | "quality" | "risk";
 type SortKey = "upside" | "quality" | "price";
 
+type RemoteSymbol = {
+  ticker: string;
+  market: Market;
+  name: string;
+};
+
 type ImportCandidate = {
   id: string;
   ticker: string;
@@ -95,7 +101,9 @@ export default function Home() {
   const [importMessage, setImportMessage] = useState("尚未上傳截圖");
   const [isImporting, setIsImporting] = useState(false);
   const [isLookupLoading, setIsLookupLoading] = useState(false);
+  const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
+  const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const [form, setForm] = useState({
     ticker: "",
@@ -141,6 +149,30 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (normalized.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsSuggestionLoading(true);
+      try {
+        const response = await fetch(`/api/symbols?q=${encodeURIComponent(normalized)}`, { signal: controller.signal });
+        const payload = await response.json() as { symbols?: RemoteSymbol[] };
+        if (response.ok) setRemoteSymbols(Array.isArray(payload.symbols) ? payload.symbols : []);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setRemoteSymbols([]);
+      } finally {
+        if (!controller.signal.aborted) setIsSuggestionLoading(false);
+      }
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
   useEffect(() => {
     if (hasLoadedStorage) localStorage.setItem("wenying-value-radar-stocks-v1", JSON.stringify(stockInputs));
@@ -213,13 +245,18 @@ export default function Home() {
         upside: null,
         isLoaded: false,
       }));
+    const remote = remoteSymbols
+      .filter((entry) => !loaded.some((stock) => stock.ticker === entry.ticker)
+        && !directory.some((stock) => stock.ticker === entry.ticker))
+      .map((entry) => ({ ...entry, upside: null, isLoaded: false }));
 
-    return [...loaded, ...directory].slice(0, 4);
-  }, [language, query, stocks]);
+    return [...loaded, ...directory, ...remote].slice(0, 4);
+  }, [language, query, remoteSymbols, stocks]);
 
   function handleQueryChange(value: string) {
     setQuery(value);
     setLookupError("");
+    setRemoteSymbols([]);
     const match = stocks.find((stock) => stock.ticker.toLowerCase() === value.trim().toLowerCase());
     if (match) setSelectedTicker(match.ticker);
   }
@@ -481,7 +518,12 @@ export default function Home() {
                 ))}
               </div>
             )}
-            {query && !exactMatch && searchSuggestions.length === 0 && (
+            {query && !exactMatch && searchSuggestions.length === 0 && isSuggestionLoading && (
+              <div className="search-empty search-loading" aria-live="polite">
+                <span>{t("正在查詢股票名稱…", "Looking up the company name…")}</span>
+              </div>
+            )}
+            {query && !exactMatch && searchSuggestions.length === 0 && !isSuggestionLoading && (
               <div className="search-empty">
                 <span>{lookupError || t(`尚未收錄「${query}」`, `“${query}” is not in your list yet`)}</span>
                 <button type="button" disabled={isLookupLoading} onClick={() => void lookupTicker()}>{isLookupLoading ? t("查詢中…", "Searching…") : t("查詢公開資料 →", "Search public data →")}</button>
