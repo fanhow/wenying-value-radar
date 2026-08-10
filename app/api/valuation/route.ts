@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clamp, valuationTargets } from "../../../lib/valuation";
 import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
+import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 
 type Market = "TW" | "US";
 
@@ -300,11 +301,14 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     ]);
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
-  const yahoo = !twseRatio || !twseQuote ? await yahooTaiwanSnapshot(ticker) : null;
+  const snapshot = tpexSnapshot.find((row) => row.ticker === ticker);
+  const yahoo = !twseRatio && !tpexRatio && !snapshot ? await yahooTaiwanSnapshot(ticker) : null;
   const ratio = twseRatio
     ? { date: twseRatio.Date, name: twseRatio.Name, pe: twseRatio.PEratio, pb: twseRatio.PBratio, exchange: "TWSE" }
     : tpexRatio
       ? { date: tpexRatio.Date, name: tpexRatio.CompanyName, pe: tpexRatio.PriceEarningRatio, pb: tpexRatio.PriceBookRatio, exchange: "TPEx" }
+      : snapshot
+        ? { date: snapshot.date, name: snapshot.name, pe: snapshot.pe, pb: snapshot.pb, exchange: "TPEx" }
       : yahoo
         ? {
           date: yahoo.updatedAt,
@@ -318,6 +322,8 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     ? { date: twseQuote.Date, name: twseQuote.Name, close: twseQuote.ClosingPrice, exchange: "TWSE" }
     : tpexQuote
       ? { date: tpexQuote.Date, name: tpexQuote.CompanyName, close: tpexQuote.Close, exchange: "TPEx" }
+      : snapshot
+        ? { date: snapshot.date, name: snapshot.name, close: snapshot.close, exchange: "TPEx" }
       : yahoo
         ? { date: yahoo.updatedAt, name: yahoo.name, close: String(yahoo.price), exchange: "TPEx" }
       : null;

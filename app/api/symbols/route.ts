@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
+import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 
 type TwseSymbolRow = { Code?: string; Name?: string };
 type TpexSymbolRow = { SecuritiesCompanyCode?: string; CompanyName?: string };
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
         name: row.CompanyAbbreviation?.trim() || row.CompanyName?.trim() || "",
         market: "TW" as const,
       })),
+      ...tpexSnapshot.map((row) => ({ ticker: row.ticker, name: row.name, market: "TW" as const })),
     ];
   } else {
     const secRows = await optionalJson<Record<string, SecTickerRow>>("https://www.sec.gov/files/company_tickers.json");
