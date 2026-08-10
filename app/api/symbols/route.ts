@@ -3,6 +3,11 @@ import { rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directo
 
 type TwseSymbolRow = { Code?: string; Name?: string };
 type TpexSymbolRow = { SecuritiesCompanyCode?: string; CompanyName?: string };
+type TpexCompanyRow = {
+  SecuritiesCompanyCode?: string;
+  CompanyAbbreviation?: string;
+  CompanyName?: string;
+};
 type SecTickerRow = { ticker?: string; title?: string };
 
 const DIRECTORY_HEADERS = {
@@ -29,13 +34,19 @@ export async function GET(request: NextRequest) {
 
   let entries: MarketSymbol[] = [];
   if (/^\d/.test(query)) {
-    const [twseRows, tpexRows] = await Promise.all([
+    const [twseRows, tpexRows, tpexCompanies] = await Promise.all([
       optionalJson<TwseSymbolRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
       optionalJson<TpexSymbolRow[]>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes"),
+      optionalJson<TpexCompanyRow[]>("https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"),
     ]);
     entries = [
       ...(twseRows ?? []).map((row) => ({ ticker: row.Code?.trim() ?? "", name: row.Name?.trim() ?? "", market: "TW" as const })),
       ...(tpexRows ?? []).map((row) => ({ ticker: row.SecuritiesCompanyCode?.trim() ?? "", name: row.CompanyName?.trim() ?? "", market: "TW" as const })),
+      ...(tpexCompanies ?? []).map((row) => ({
+        ticker: row.SecuritiesCompanyCode?.trim() ?? "",
+        name: row.CompanyAbbreviation?.trim() || row.CompanyName?.trim() || "",
+        market: "TW" as const,
+      })),
     ];
   } else {
     const secRows = await optionalJson<Record<string, SecTickerRow>>("https://www.sec.gov/files/company_tickers.json");
