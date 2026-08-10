@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
+import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
 import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 
@@ -189,6 +190,32 @@ export default function Home() {
   const undervaluedCount = stocks.filter((stock) => stock.upside >= 0.1).length;
   const qualityCount = stocks.filter((stock) => stock.qualityAvailable !== false && stock.qualityScore >= 75).length;
   const exactMatch = stocks.find((stock) => stock.ticker.toLowerCase() === query.trim().toLowerCase());
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    const loaded = stocks
+      .filter((stock) => stock.ticker.toLowerCase().includes(normalizedQuery)
+        || stock.name.toLowerCase().includes(normalizedQuery))
+      .map((stock) => ({
+        ticker: stock.ticker,
+        market: stock.market,
+        name: stock.name,
+        upside: stock.upside,
+        isLoaded: true,
+      }));
+    const directory = findStockDirectoryEntries(query)
+      .filter((entry) => !loaded.some((stock) => stock.ticker === entry.ticker))
+      .map((entry) => ({
+        ticker: entry.ticker,
+        market: entry.market,
+        name: language === "zh" ? entry.nameZh : entry.nameEn,
+        upside: null,
+        isLoaded: false,
+      }));
+
+    return [...loaded, ...directory].slice(0, 4);
+  }, [language, query, stocks]);
 
   function handleQueryChange(value: string) {
     setQuery(value);
@@ -236,7 +263,7 @@ export default function Home() {
       setQuery(stock.ticker);
       window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     } catch (error) {
-      setLookupError(error instanceof Error ? error.message : "暫時無法取得資料");
+      setLookupError(safeLookupError(error instanceof Error ? error.message : "", language));
     } finally {
       setIsLookupLoading(false);
     }
@@ -427,8 +454,9 @@ export default function Home() {
                 onChange={(event) => handleQueryChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
-                    if (filteredStocks[0]) selectStock(filteredStocks[0].ticker);
-                    else void lookupTicker();
+                    const suggestion = searchSuggestions[0];
+                    if (suggestion?.isLoaded) selectStock(suggestion.ticker);
+                    else void lookupTicker(suggestion?.ticker ?? query);
                   }
                 }}
                 placeholder={t("輸入 2330、3508 或 AAPL", "Enter 2330, 3508, or AAPL")}
@@ -441,78 +469,25 @@ export default function Home() {
               <span>{t("快速查看", "Quick access")}</span>
               {watchlist.slice(0, 4).map((ticker) => <button key={ticker} type="button" onClick={() => selectStock(ticker)}>{ticker}</button>)}
             </div>
-            {query && !exactMatch && filteredStocks.length > 0 && (
+            {query && !exactMatch && searchSuggestions.length > 0 && (
               <div className="search-results-popover">
-                {filteredStocks.slice(0, 4).map((stock) => (
-                  <button type="button" key={stock.ticker} onClick={() => selectStock(stock.ticker)}>
-                    <span><strong>{stock.ticker}</strong> {stock.name}</span><span className={stock.upside >= 0 ? "text-positive" : "text-negative"}>{formatSignedPercent(stock.upside)}</span>
+                {searchSuggestions.map((suggestion) => (
+                  <button type="button" key={suggestion.ticker} onClick={() => suggestion.isLoaded ? selectStock(suggestion.ticker) : void lookupTicker(suggestion.ticker)}>
+                    <span><strong>{suggestion.ticker}</strong> <span className="suggestion-name">{suggestion.name}</span></span>
+                    {suggestion.upside === null
+                      ? <span className="suggestion-market">{suggestion.market === "TW" ? t("台股", "Taiwan") : t("美股", "U.S.")}</span>
+                      : <span className={suggestion.upside >= 0 ? "text-positive" : "text-negative"}>{formatSignedPercent(suggestion.upside)}</span>}
                   </button>
                 ))}
               </div>
             )}
-            {query && filteredStocks.length === 0 && (
+            {query && !exactMatch && searchSuggestions.length === 0 && (
               <div className="search-empty">
                 <span>{lookupError || t(`尚未收錄「${query}」`, `“${query}” is not in your list yet`)}</span>
                 <button type="button" disabled={isLookupLoading} onClick={() => void lookupTicker()}>{isLookupLoading ? t("查詢中…", "Searching…") : t("查詢公開資料 →", "Search public data →")}</button>
               </div>
             )}
           </div>
-        </section>
-
-        <section id="ark-import" className="ark-import-section" aria-labelledby="ark-import-title">
-          <div className="ark-import-copy">
-            <div className="ark-brand-row"><span className="ark-brand-logo" aria-hidden="true" /><div><span>ARKER {t("方舟運算", "Strategy")}</span><small>{t("外部策略工具", "External strategy tool")}</small></div></div>
-            <p className="section-kicker">ARK SCREENSHOT / 02</p>
-            <h2 id="ark-import-title">{t("把每天的方舟名單，", "Turn your daily ARKER list")}<br />{t("直接變成估值清單", "into a valuation watchlist")}</h2>
-            <p>{t("一次可選多張手機截圖。原始圖片只在你的瀏覽器中辨識、不會上傳；辨識出的文字代碼會送往伺服器，與 TWSE、TPEx 及 SEC 名錄核對後建立估值。ETF 則採用畫面中的即時淨值。", "Select multiple mobile screenshots at once. Images are recognized only in your browser and are never uploaded; extracted tickers are checked against TWSE, TPEx, and SEC records to build valuations. ETFs use the iNAV shown in the screenshot.")}</p>
-            <div className="ark-flow" aria-label={t("匯入步驟", "Import steps")}><span>{t("上傳截圖", "Upload")}</span><b>→</b><span>{t("辨識代碼", "Recognize")}</span><b>→</b><span>{t("計算公允價值", "Calculate fair value")}</span></div>
-          </div>
-          <div className="ark-upload-card">
-            <label className={`ark-dropzone ${isImporting ? "is-busy" : ""}`}>
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isImporting} onChange={(event) => void handleArkUpload(event)} />
-              <span className="upload-icon">⇧</span>
-              <strong>{isImporting ? t("正在處理截圖", "Processing screenshots") : t("選擇方舟 App 截圖", "Choose ARKER App screenshots")}</strong>
-              <small>{t("支援 PNG、JPG、WebP，可一次上傳多張", "PNG, JPG, and WebP supported; select multiple files")}</small>
-            </label>
-            <div className="import-status" aria-live="polite">
-              <div><span>{language === "zh" ? importMessage : translateImportMessage(importMessage)}</span><b>{importProgress}%</b></div>
-              <span className="import-progress"><i style={{ width: `${importProgress}%` }} /></span>
-            </div>
-            {importCandidates.length > 0 && (
-              <div className="import-results">
-                {importCandidates.map((candidate) => (
-                  <div className="import-row" key={candidate.id}>
-                    <span className={`ticker-badge market-${candidate.market.toLowerCase()}`}>{candidate.market}</span>
-                    <span><strong>{candidate.ticker}</strong><small>{candidate.capturedPrice ? `${t("截圖價", "Screenshot price")} ${candidate.capturedPrice}` : candidate.fileName}</small></span>
-                    <span className={`import-state state-${candidate.status === "已加入" ? "done" : candidate.status === "需要確認" ? "warn" : "working"}`} title={candidate.message}>{language === "zh" ? candidate.status : translateImportStatus(candidate.status)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section id="overview" className="overview-grid" aria-label={t("估值摘要", "Valuation summary")}>
-          <article className="metric-card accent-card">
-            <div className="metric-card-top"><span>{t("追蹤標的", "Tracked Stocks")}</span><span className="metric-icon">◉</span></div>
-            <strong>{stocks.length}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("台股", "Taiwan")} {stocks.filter((stock) => stock.market === "TW").length} · {t("美股", "U.S.")} {stocks.filter((stock) => stock.market === "US").length}</p>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon green">↗</span></div>
-            <strong>{undervaluedCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("公允價值上行空間 ≥ 10%", "Fair value upside ≥ 10%")}</p>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-top"><span>{t("高品質標的", "High Quality")}</span><span className="metric-icon blue">✦</span></div>
-            <strong>{qualityCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("品質分數 ≥ 75 / 100", "Quality score ≥ 75 / 100")}</p>
-          </article>
-          <article className="metric-card muted-card">
-            <div className="metric-card-top"><span>{t("資料狀態", "Data Status")}</span><span className="live-label"><span className="status-dot" />{t("公開資料", "Public data")}</span></div>
-            <strong className="date-value">{t("自動＋手動", "Auto + Manual")}</strong>
-            <p>{t("SEC／TWSE／方舟截圖，可追溯來源", "SEC, TWSE, and ARKER sources are traceable")}</p>
-          </article>
         </section>
 
         <section className="main-grid">
@@ -576,6 +551,62 @@ export default function Home() {
               <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
             </aside>
           )}
+        </section>
+
+        <section id="ark-import" className="ark-import-section" aria-labelledby="ark-import-title">
+          <div className="ark-import-copy">
+            <div className="ark-brand-row"><span className="ark-brand-logo" aria-hidden="true" /><div><span>ARKER {t("方舟運算", "Strategy")}</span><small>{t("外部策略工具", "External strategy tool")}</small></div></div>
+            <p className="section-kicker">ARK SCREENSHOT / 02</p>
+            <h2 id="ark-import-title">{t("把每天的方舟名單，", "Turn your daily ARKER list")}<br />{t("直接變成估值清單", "into a valuation watchlist")}</h2>
+            <p>{t("一次可選多張手機截圖。原始圖片只在你的瀏覽器中辨識、不會上傳；辨識出的文字代碼會送往伺服器，與 TWSE、TPEx 及 SEC 名錄核對後建立估值。ETF 則採用畫面中的即時淨值。", "Select multiple mobile screenshots at once. Images are recognized only in your browser and are never uploaded; extracted tickers are checked against TWSE, TPEx, and SEC records to build valuations. ETFs use the iNAV shown in the screenshot.")}</p>
+            <div className="ark-flow" aria-label={t("匯入步驟", "Import steps")}><span>{t("上傳截圖", "Upload")}</span><b>→</b><span>{t("辨識代碼", "Recognize")}</span><b>→</b><span>{t("計算公允價值", "Calculate fair value")}</span></div>
+          </div>
+          <div className="ark-upload-card">
+            <label className={`ark-dropzone ${isImporting ? "is-busy" : ""}`}>
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isImporting} onChange={(event) => void handleArkUpload(event)} />
+              <span className="upload-icon">⇧</span>
+              <strong>{isImporting ? t("正在處理截圖", "Processing screenshots") : t("選擇方舟 App 截圖", "Choose ARKER App screenshots")}</strong>
+              <small>{t("支援 PNG、JPG、WebP，可一次上傳多張", "PNG, JPG, and WebP supported; select multiple files")}</small>
+            </label>
+            <div className="import-status" aria-live="polite">
+              <div><span>{language === "zh" ? importMessage : translateImportMessage(importMessage)}</span><b>{importProgress}%</b></div>
+              <span className="import-progress"><i style={{ width: `${importProgress}%` }} /></span>
+            </div>
+            {importCandidates.length > 0 && (
+              <div className="import-results">
+                {importCandidates.map((candidate) => (
+                  <div className="import-row" key={candidate.id}>
+                    <span className={`ticker-badge market-${candidate.market.toLowerCase()}`}>{candidate.market}</span>
+                    <span><strong>{candidate.ticker}</strong><small>{candidate.capturedPrice ? `${t("截圖價", "Screenshot price")} ${candidate.capturedPrice}` : candidate.fileName}</small></span>
+                    <span className={`import-state state-${candidate.status === "已加入" ? "done" : candidate.status === "需要確認" ? "warn" : "working"}`} title={candidate.message}>{language === "zh" ? candidate.status : translateImportStatus(candidate.status)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="overview" className="overview-grid" aria-label={t("估值摘要", "Valuation summary")}>
+          <article className="metric-card accent-card">
+            <div className="metric-card-top"><span>{t("追蹤標的", "Tracked Stocks")}</span><span className="metric-icon">◉</span></div>
+            <strong>{stocks.length}<small> {t("檔", "stocks")}</small></strong>
+            <p>{t("台股", "Taiwan")} {stocks.filter((stock) => stock.market === "TW").length} · {t("美股", "U.S.")} {stocks.filter((stock) => stock.market === "US").length}</p>
+          </article>
+          <article className="metric-card">
+            <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon green">↗</span></div>
+            <strong>{undervaluedCount}<small> {t("檔", "stocks")}</small></strong>
+            <p>{t("公允價值上行空間 ≥ 10%", "Fair value upside ≥ 10%")}</p>
+          </article>
+          <article className="metric-card">
+            <div className="metric-card-top"><span>{t("高品質標的", "High Quality")}</span><span className="metric-icon blue">✦</span></div>
+            <strong>{qualityCount}<small> {t("檔", "stocks")}</small></strong>
+            <p>{t("品質分數 ≥ 75 / 100", "Quality score ≥ 75 / 100")}</p>
+          </article>
+          <article className="metric-card muted-card">
+            <div className="metric-card-top"><span>{t("資料狀態", "Data Status")}</span><span className="live-label"><span className="status-dot" />{t("公開資料", "Public data")}</span></div>
+            <strong className="date-value">{t("自動＋手動", "Auto + Manual")}</strong>
+            <p>{t("SEC／TWSE／方舟截圖，可追溯來源", "SEC, TWSE, and ARKER sources are traceable")}</p>
+          </article>
         </section>
 
         <section id="watchlist" className="watchlist-section">

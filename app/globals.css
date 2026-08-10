@@ -47,8 +47,7 @@ a { color: inherit; text-decoration: none; }
 .topbar { width: min(1380px, calc(100% - 64px)); height: 86px; margin: auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 220px; }
 .brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 13px; background: linear-gradient(145deg, #143c3b, #372b59); color: #eef8f2; font-size: 11px; font-weight: 800; letter-spacing: .08em; box-shadow: 4px 4px 0 #bad7c8, 0 8px 22px rgba(55,43,89,.16); }
-.brand strong { display: block; font-size: 17px; letter-spacing: .13em; }
-.brand small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 10px; letter-spacing: .08em; }
+.brand strong { display: block; font-size: 20px; letter-spacing: .08em; white-space: nowrap; }
 .topnav { display: flex; gap: 27px; height: 100%; align-items: center; color: var(--ink-soft); font-size: 12px; }
 .topnav a { position: relative; height: 100%; display: flex; align-items: center; }
 .topnav a.active { color: var(--ink); font-weight: 700; }
@@ -61,6 +60,7 @@ a { color: inherit; text-decoration: none; }
 .language-switch button { min-width: 31px; height: 27px; padding: 0 7px; border: 0; border-radius: 5px; background: transparent; color: var(--ink-faint); font-size: 9px; font-weight: 800; }
 .language-switch button:hover { color: var(--green-deep); }
 .language-switch button.active { background: var(--green); color: #fff; box-shadow: 0 2px 8px rgba(27,138,104,.18); }
+.mobile-about-link { display: none; }
 .page-content { width: min(1380px, calc(100% - 64px)); margin: auto; }
 
 .hero { position: relative; min-height: 390px; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 90px; padding: 70px 46px 62px; overflow: hidden; background: radial-gradient(circle at 79% 13%, rgba(119,84,184,.17), transparent 30%), radial-gradient(circle at 11% 92%, rgba(64,164,135,.15), transparent 28%), linear-gradient(115deg, #f8faf6, #eef5f0); border-bottom: 1px solid var(--line); }
@@ -90,6 +90,8 @@ a { color: inherit; text-decoration: none; }
 .search-results-popover button { width: 100%; display: flex; justify-content: space-between; padding: 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); text-align: left; font-size: 12px; }
 .search-results-popover button:hover { background: var(--green-pale); }
 .search-results-popover strong { color: var(--ink); margin-right: 8px; }
+.suggestion-name, .suggestion-market { color: var(--ink-faint); }
+.suggestion-market { font-size: 10px; }
 .search-empty { display: flex; justify-content: space-between; align-items: center; color: var(--ink-soft); font-size: 12px; }
 .search-empty button { padding: 8px 10px; border: 0; border-radius: 6px; background: var(--green-pale); color: var(--green-deep); font-size: 11px; font-weight: 700; }
 .search-empty button:disabled { opacity: .6; cursor: wait; }
@@ -172,7 +174,7 @@ a { color: inherit; text-decoration: none; }
 .panel { border: 1px solid var(--line); border-radius: 13px; background: var(--surface); box-shadow: 0 8px 24px rgba(43, 71, 61, .025); }
 .table-panel { overflow: hidden; }
 .panel-heading { display: flex; justify-content: space-between; gap: 20px; padding: 34px 34px 25px; }
-.panel-heading h2 { margin: 9px 0 7px; font-size: clamp(30px, 3vw, 39px); line-height: 1.1; letter-spacing: -.055em; }
+.panel-heading h2 { margin: 9px 0 9px; font-size: clamp(34px, 3.4vw, 46px); line-height: 1.08; letter-spacing: -.055em; }
 .section-heading-row h2, .watchlist-section h2 { margin: 8px 0 5px; font-size: 23px; letter-spacing: -.045em; }
 .panel-subtitle, .section-heading-row p:not(.section-kicker) { margin: 0; color: var(--ink-faint); font-size: 12px; }
 .sort-control { display: flex; align-items: center; gap: 8px; align-self: center; color: var(--ink-faint); font-size: 10px; }
@@ -196,12 +198,12 @@ a { color: inherit; text-decoration: none; }
 .ticker-badge { min-width: 30px; padding: 5px 7px; border-radius: 4px; display: inline-grid; place-items: center; background: #eaf3ed; color: var(--green-deep); font-size: 9px; font-weight: 800; letter-spacing: .05em; }
 .ticker-badge.market-us { background: #edf0f7; color: #526d98; }
 .ticker-badge.large { min-width: 37px; padding: 7px 8px; }
-.stock-name-cell strong { display: block; color: var(--ink); font-size: 17px; line-height: 1.15; }
-.stock-name-cell small, .range-hint, .model-label small { display: block; margin-top: 5px; color: var(--ink-faint); font-size: 10px; }
-.table-number { color: var(--ink-soft); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fair-value-number { color: var(--ink); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stock-name-cell strong { display: block; color: var(--ink); font-size: 20px; line-height: 1.15; }
+.stock-name-cell small, .range-hint, .model-label small { display: block; margin-top: 5px; color: var(--ink-faint); font-size: 12px; }
+.table-number { color: var(--ink-soft); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fair-value-number { color: var(--ink); font-size: 23px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .range-hint { font-size: 9px; }
-.upside-value { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.upside-value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .trend-mark { margin-right: 3px; font-size: 20px; font-weight: 500; }
 .text-positive { color: var(--green) !important; }
 .text-negative { color: var(--red) !important; }
@@ -353,6 +355,11 @@ a { color: inherit; text-decoration: none; }
   .topbar { width: calc(100% - 30px); height: 70px; }
   .topnav { display: none; }
   .workspace-badge { display: none; }
+  .header-controls { gap: 8px; }
+  .mobile-about-link { display: inline-flex; align-items: center; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.72); color: var(--ink-soft); font-size: 10px; font-weight: 700; }
+  .mobile-about-link.active { border-color: #b9d9ca; background: var(--green-pale); color: var(--green-deep); }
+  .language-switch { padding: 3px; }
+  .language-switch button { min-width: 34px; height: 28px; font-size: 10px; }
   .page-content { width: calc(100% - 30px); }
   .hero { display: block; min-height: auto; padding: 48px 20px 40px; }
   .hero h1 { font-size: 43px; }
@@ -377,7 +384,7 @@ a { color: inherit; text-decoration: none; }
   .metric-card { min-height: 113px; padding: 16px; }
   .metric-card strong { font-size: 23px; }
   .panel-heading { display: block; padding: 24px 18px 19px; }
-  .panel-heading h2 { font-size: 31px; }
+  .panel-heading h2 { font-size: 35px; }
   .sort-control { margin-top: 17px; justify-content: space-between; }
   .filter-tabs { padding-inline: 18px; overflow-x: auto; }
   .filter-tabs button { white-space: nowrap; }
@@ -395,10 +402,11 @@ a { color: inherit; text-decoration: none; }
   .stock-table td:nth-child(even) { padding-right: 10px; }
   .stock-table td:last-child { position: absolute; top: 13px; right: 12px; }
   .stock-name-cell { min-width: 0; }
-  .stock-name-cell strong { font-size: 18px; }
-  .table-number { font-size: 16px; }
-  .fair-value-number { font-size: 18px; }
-  .upside-value { font-size: 18px; }
+  .stock-name-cell strong { font-size: 20px; }
+  .stock-name-cell small { font-size: 11px; }
+  .table-number { font-size: 18px; }
+  .fair-value-number { font-size: 21px; }
+  .upside-value { font-size: 22px; }
   .range-hint { line-height: 1.45; }
   .table-footer { padding-inline: 18px; }
   .detail-panel { display: block; padding: 20px 18px; }
@@ -423,8 +431,7 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 430px) {
   .brand { min-width: auto; }
-  .brand small { display: none; }
-  .brand strong { font-size: 15px; }
+  .brand strong { font-size: 16px; letter-spacing: .035em; }
   .language-switch button { min-width: 29px; padding-inline: 6px; }
   .hero h1 { font-size: 39px; }
   .about-page-heading h1 { font-size: 38px; }

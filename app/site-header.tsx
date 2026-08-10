@@ -10,10 +10,7 @@ export function SiteHeader({ active }: { active: "home" | "about" }) {
     <header className="topbar">
       <Link className="brand" href="/" aria-label={t("穩盈價值雷達首頁", "WenYing Value Radar home")}>
         <span className="brand-mark">WY</span>
-        <span>
-          <strong>{t("穩盈", "WenYing")}</strong>
-          <small>{t("價值雷達", "Value Radar")}</small>
-        </span>
+        <strong>{t("穩盈 - 價值雷達", "WenYing - Value Radar")}</strong>
       </Link>
       <nav className="topnav" aria-label={t("主要導覽", "Primary navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
@@ -24,6 +21,7 @@ export function SiteHeader({ active }: { active: "home" | "about" }) {
       </nav>
       <div className="header-controls">
         <div className="workspace-badge"><span className="status-dot" />{t("穩盈基金", "WenYing Fund")} <span className="workspace-lock">{t("研究工具", "RESEARCH")}</span></div>
+        <Link className={`mobile-about-link ${active === "about" ? "active" : ""}`} href="/about">{t("關於我們", "About")}</Link>
         <div className="language-switch" role="group" aria-label={t("語言選擇", "Language selection")}>
           <button type="button" className={language === "zh" ? "active" : ""} onClick={() => setLanguage("zh")} aria-pressed={language === "zh"}>中</button>
           <button type="button" className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")} aria-pressed={language === "en"}>EN</button>

@@ -106,12 +106,25 @@ function latestAnnualFact(
 }
 
 async function fetchJson<T>(url: string, headers?: HeadersInit): Promise<T> {
-  const response = await fetch(url, {
-    headers,
-    next: { revalidate: 60 * 60 * 12 },
-  });
-  if (!response.ok) throw new Error(`資料來源回應 ${response.status}`);
-  return response.json() as Promise<T>;
+  try {
+    const response = await fetch(url, {
+      headers,
+      next: { revalidate: 60 * 60 * 12 },
+    });
+    if (!response.ok) throw new Error(`資料來源回應 ${response.status}`);
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("資料來源回應")) throw error;
+    throw new Error("公開資料暫時無法連線");
+  }
+}
+
+async function fetchOptionalJson<T>(url: string, headers?: HeadersInit): Promise<T[]> {
+  try {
+    return await fetchJson<T[]>(url, headers);
+  } catch {
+    return [];
+  }
 }
 
 async function secTickerMap() {
@@ -255,14 +268,22 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
 }
 
 async function valueTwStock(body: ValuationRequest, ticker: string) {
-  const [twseRatios, twseDaily, tpexRatios, tpexQuotes] = await Promise.all([
+  const [twseRatios, twseDaily] = await Promise.all([
     fetchJson<TwseRatioRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
     fetchJson<TwseDailyRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
-    fetchJson<TpexRatioRow[]>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis"),
-    fetchJson<TpexQuoteRow[]>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes"),
   ]);
   const twseRatio = twseRatios.find((row) => row.Code === ticker);
   const twseQuote = twseDaily.find((row) => row.Code === ticker);
+  const tpexHeaders = {
+    Accept: "application/json",
+    "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)",
+  };
+  const [tpexRatios, tpexQuotes] = twseRatio && twseQuote
+    ? [[], []] as [TpexRatioRow[], TpexQuoteRow[]]
+    : await Promise.all([
+      fetchOptionalJson<TpexRatioRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", tpexHeaders),
+      fetchOptionalJson<TpexQuoteRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", tpexHeaders),
+    ]);
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
   const ratio = twseRatio

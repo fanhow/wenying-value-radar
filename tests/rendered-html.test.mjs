@@ -29,5 +29,27 @@ test("renders development preview metadata", async () => {
     response.headers.get("content-type") ?? "",
     /^text\/html\b/i,
   );
-  assert.match(await response.text(), developmentPreviewMeta);
+  const html = await response.text();
+  assert.match(html, developmentPreviewMeta);
+  assert.match(html, /穩盈 - 價值雷達/);
+  assert.match(html, /關於我們/);
+  assert.match(html, /語言選擇/);
+  assert.doesNotMatch(html, /我們不是賭徒/);
+  assert.ok(html.indexOf("公允價值排行榜") < html.indexOf("把每天的方舟名單"));
+});
+
+test("renders the About Us page in Chinese by default", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("about", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/about", { headers: { accept: "text/html" } }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /認識穩盈/);
+  assert.match(html, /我們不是賭徒/);
 });
