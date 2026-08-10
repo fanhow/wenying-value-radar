@@ -12,6 +12,14 @@ export type MarketSymbol = {
   name: string;
 };
 
+export type YahooTaiwanSnapshot = {
+  name: string;
+  price: number;
+  eps: number;
+  bvps: number;
+  updatedAt: string;
+};
+
 const stockDirectory: StockDirectoryEntry[] = [
   {
     ticker: "2330",
@@ -55,6 +63,28 @@ export function rankMarketSymbols(entries: MarketSymbol[], query: string, limit 
       return leftScore - rightScore || leftTicker.localeCompare(rightTicker);
     })
     .slice(0, limit);
+}
+
+export function parseYahooTaiwanHtml(html: string): YahooTaiwanSnapshot | null {
+  const name = html.match(/"symbolName":"([^"]+)"/)?.[1] ?? "";
+  const price = Number(html.match(/"regularMarketPrice":([\d.]+)/)?.[1] ?? 0);
+  const incomeJson = html.match(/"incomesQ":(\[[^\]]*\])/)?.[1];
+  if (!name || !price || !incomeJson) return null;
+
+  try {
+    const incomes = JSON.parse(incomeJson) as Array<{ date?: string; eps?: string; bps?: string }>;
+    const latest = incomes[0];
+    const eps = incomes.slice(0, 4).reduce((sum, row) => sum + Number(row.eps || 0), 0);
+    return {
+      name,
+      price,
+      eps: Number.isFinite(eps) ? eps : 0,
+      bvps: Number(latest?.bps || 0),
+      updatedAt: latest?.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function safeLookupError(message: string, language: "zh" | "en") {

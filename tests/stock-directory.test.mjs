@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findStockDirectoryEntries, rankMarketSymbols, safeLookupError } from "../lib/stock-directory.ts";
+import { findStockDirectoryEntries, parseYahooTaiwanHtml, rankMarketSymbols, safeLookupError } from "../lib/stock-directory.ts";
 
 test("suggests Apple before a valuation has been loaded", () => {
   assert.deepEqual(findStockDirectoryEntries("AAPL").map(({ ticker, nameEn }) => ({ ticker, nameEn })), [
@@ -25,4 +25,15 @@ test("ranks arbitrary TWSE and TPEx ticker matches", () => {
   ];
   assert.equal(rankMarketSymbols(symbols, "3508")[0]?.name, "位速");
   assert.equal(rankMarketSymbols(symbols, "6994")[0]?.name, "富威電力");
+});
+
+test("parses a Taiwan stock fallback snapshot", () => {
+  const html = '{"symbolName":"位速","regularMarketPrice":16.85,"incomesQ":[{"date":"2026-03-01T00:00:00+08:00","eps":"-0.10","bps":"4.76"},{"eps":"-0.38"},{"eps":"-0.22"},{"eps":"-0.51"}]}';
+  assert.deepEqual(parseYahooTaiwanHtml(html), {
+    name: "位速",
+    price: 16.85,
+    eps: -1.21,
+    bvps: 4.76,
+    updatedAt: "2026-03-01",
+  });
 });

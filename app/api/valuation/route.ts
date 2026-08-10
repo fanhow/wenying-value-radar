@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clamp, valuationTargets } from "../../../lib/valuation";
+import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
 
 type Market = "TW" | "US";
 
@@ -124,6 +125,19 @@ async function fetchOptionalJson<T>(url: string, headers?: HeadersInit): Promise
     return await fetchJson<T[]>(url, headers);
   } catch {
     return [];
+  }
+}
+
+async function yahooTaiwanSnapshot(ticker: string) {
+  try {
+    const response = await fetch(`https://tw.stock.yahoo.com/quote/${encodeURIComponent(ticker)}/eps`, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)" },
+      next: { revalidate: 60 * 60 * 6 },
+    });
+    if (!response.ok) return null;
+    return parseYahooTaiwanHtml(await response.text());
+  } catch {
+    return null;
   }
 }
 
@@ -286,15 +300,26 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     ]);
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
+  const yahoo = !twseRatio || !twseQuote ? await yahooTaiwanSnapshot(ticker) : null;
   const ratio = twseRatio
     ? { date: twseRatio.Date, name: twseRatio.Name, pe: twseRatio.PEratio, pb: twseRatio.PBratio, exchange: "TWSE" }
     : tpexRatio
       ? { date: tpexRatio.Date, name: tpexRatio.CompanyName, pe: tpexRatio.PriceEarningRatio, pb: tpexRatio.PriceBookRatio, exchange: "TPEx" }
+      : yahoo
+        ? {
+          date: yahoo.updatedAt,
+          name: yahoo.name,
+          pe: yahoo.eps > 0 ? String(yahoo.price / yahoo.eps) : "0",
+          pb: yahoo.bvps > 0 ? String(yahoo.price / yahoo.bvps) : "0",
+          exchange: "TPEx",
+        }
       : null;
   const quote = twseQuote
     ? { date: twseQuote.Date, name: twseQuote.Name, close: twseQuote.ClosingPrice, exchange: "TWSE" }
     : tpexQuote
       ? { date: tpexQuote.Date, name: tpexQuote.CompanyName, close: tpexQuote.Close, exchange: "TPEx" }
+      : yahoo
+        ? { date: yahoo.updatedAt, name: yahoo.name, close: String(yahoo.price), exchange: "TPEx" }
       : null;
   const capturedNav = numeric(body.capturedNav);
   const closingPrice = numeric(quote?.close);

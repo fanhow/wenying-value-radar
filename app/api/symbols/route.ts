@@ -9,6 +9,9 @@ type TpexCompanyRow = {
   CompanyName?: string;
 };
 type SecTickerRow = { ticker?: string; title?: string };
+type YahooChartResponse = {
+  chart?: { result?: Array<{ meta?: { shortName?: string; longName?: string } }> };
+};
 
 const DIRECTORY_HEADERS = {
   Accept: "application/json",
@@ -57,5 +60,15 @@ export async function GET(request: NextRequest) {
     }));
   }
 
-  return NextResponse.json({ symbols: rankMarketSymbols(entries, query) });
+  let symbols = rankMarketSymbols(entries, query);
+  if (!symbols.length && /^\d{4,6}$/.test(query)) {
+    const yahoo = await optionalJson<YahooChartResponse>(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(query)}.TWO?interval=1d&range=5d`,
+    );
+    const meta = yahoo?.chart?.result?.[0]?.meta;
+    const name = meta?.shortName?.trim() || meta?.longName?.trim();
+    if (name) symbols = [{ ticker: query, name, market: "TW" }];
+  }
+
+  return NextResponse.json({ symbols });
 }
