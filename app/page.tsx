@@ -15,6 +15,12 @@ type RemoteSymbol = {
   name: string;
 };
 
+type MarketScanResponse = {
+  scannedCount?: number;
+  scannedByMarket?: { TW?: number; US?: number };
+  candidates?: StockInput[];
+};
+
 type ImportCandidate = {
   id: string;
   ticker: string;
@@ -77,13 +83,26 @@ function translateImportStatus(status: ImportCandidate["status"]) {
 }
 
 function translateModelLabel(label: string) {
-  return ({ "本益比法": "P/E Method", "股價淨值比法": "P/B Method", "自由現金流法": "Free Cash Flow Method", "即時淨值法": "iNAV Method" } as Record<string, string>)[label] ?? label;
+  return ({
+    "本益比法": "P/E Method",
+    "股價淨值比法": "P/B Method",
+    "自由現金流倍數法": "FCF Multiple Method",
+    "折現現金流法": "Discounted Cash Flow",
+    "盈餘能力價值法": "Earnings Power Value",
+    "Graham 防禦估值": "Graham Defensive Value",
+    "股利折現法": "Dividend Discount Model",
+    "即時淨值法": "iNAV Method",
+  } as Record<string, string>)[label] ?? label;
 }
 
 function englishModelExplanation(label: string, stock: Stock) {
   if (label === "本益比法") return `EPS ${formatNumber(stock.eps)} × target P/E ${formatNumber(stock.targetPe)}`;
   if (label === "股價淨值比法") return `Book value/share ${formatNumber(stock.bvps)} × target P/B ${formatNumber(stock.targetPb)}`;
-  if (label === "自由現金流法") return `FCF/share ${formatNumber(stock.fcfPerShare)} × FCF multiple ${formatNumber(stock.targetFcfMultiple)}`;
+  if (label === "自由現金流倍數法") return `FCF/share ${formatNumber(stock.fcfPerShare)} × FCF multiple ${formatNumber(stock.targetFcfMultiple)}`;
+  if (label === "折現現金流法") return `Five-year FCF discounted at ${formatNumber((stock.discountRate ?? 0) * 100)}%, with ${formatNumber((stock.terminalGrowth ?? 0) * 100)}% terminal growth`;
+  if (label === "盈餘能力價值法") return `Normalized EPS ${formatNumber(stock.eps)} ÷ required return ${formatNumber((stock.discountRate ?? 0) * 100)}%`;
+  if (label === "Graham 防禦估值") return `√(22.5 × EPS ${formatNumber(stock.eps)} × book value/share ${formatNumber(stock.bvps)})`;
+  if (label === "股利折現法") return `Dividend/share ${formatNumber(stock.dividendPerShare ?? 0)} discounted as a stable-growth stream`;
   return "Uses the iNAV captured from the ARKER screenshot";
 }
 
@@ -91,7 +110,7 @@ export default function Home() {
   const { language, t } = useLanguage();
   const [stockInputs, setStockInputs] = useState<StockInput[]>(seedInputs);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("undervalued");
   const [sortKey, setSortKey] = useState<SortKey>("upside");
   const [selectedTicker, setSelectedTicker] = useState("");
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -104,6 +123,10 @@ export default function Home() {
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
+  const [marketCandidates, setMarketCandidates] = useState<StockInput[]>([]);
+  const [scannedCount, setScannedCount] = useState(0);
+  const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
+  const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const [form, setForm] = useState({
     ticker: "",
@@ -193,12 +216,45 @@ export default function Home() {
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
-  const stocks = useMemo(() => stockInputs.map((stock) => calculateStock(stock, formatNumber)), [stockInputs]);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadMarketCandidates() {
+      try {
+        const response = await fetch("/api/market-scan", { signal: controller.signal });
+        const payload = await response.json() as MarketScanResponse;
+        if (!response.ok) throw new Error("market scan failed");
+        setMarketCandidates(Array.isArray(payload.candidates) ? payload.candidates : []);
+        setScannedCount(Number(payload.scannedCount) || 0);
+        setScannedByMarket({ TW: Number(payload.scannedByMarket?.TW) || 0, US: Number(payload.scannedByMarket?.US) || 0 });
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setMarketCandidates([]);
+          setScannedCount(0);
+          setScannedByMarket({ TW: 0, US: 0 });
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsMarketScanLoading(false);
+      }
+    }
+    void loadMarketCandidates();
+    return () => controller.abort();
+  }, []);
+
+  const stocks = useMemo(() => {
+    const loadedTickers = new Set(stockInputs.map((stock) => stock.ticker));
+    return [...marketCandidates.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
+      .map((stock) => calculateStock(stock, formatNumber));
+  }, [marketCandidates, stockInputs]);
+  const rankingStocks = useMemo(
+    () => marketCandidates.map((stock) => calculateStock(stock, formatNumber)),
+    [marketCandidates],
+  );
   const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
 
   const filteredStocks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const filtered = stocks.filter((stock) => {
+    const sourceStocks = filter === "undervalued" ? rankingStocks : stocks;
+    const filtered = sourceStocks.filter((stock) => {
       const matchesQuery =
         !normalizedQuery ||
         stock.ticker.toLowerCase().includes(normalizedQuery) ||
@@ -216,11 +272,12 @@ export default function Home() {
       if (sortKey === "price") return b.price - a.price;
       return b.upside - a.upside;
     });
-  }, [filter, query, sortKey, stocks]);
+  }, [filter, query, rankingStocks, sortKey, stocks]);
 
   const watchlistStocks = stocks.filter((stock) => watchlist.includes(stock.ticker));
-  const undervaluedCount = stocks.filter((stock) => stock.upside >= 0.1).length;
+  const undervaluedCount = rankingStocks.length;
   const qualityCount = stocks.filter((stock) => stock.qualityAvailable !== false && stock.qualityScore >= 75).length;
+  const displayedUniverseCount = filter === "undervalued" ? rankingStocks.length : stocks.length;
   const exactMatch = stocks.find((stock) => stock.ticker.toLowerCase() === query.trim().toLowerCase());
   const searchSuggestions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -538,7 +595,7 @@ export default function Home() {
               <div>
                 <p className="section-kicker">MARKET SCAN / 03</p>
                 <h2>{t("公允價值排行榜", "Fair Value Ranking")}</h2>
-                <p className="panel-subtitle">{t("先看折價幅度，再到下方確認模型與風險", "Compare valuation gaps first, then review models and risk below")}</p>
+                <p className="panel-subtitle">{t("直接顯示台股低估前 20 與美股低估前 20，再確認完整模型與風險", "Shows the 20 most undervalued Taiwan stocks and 20 U.S. stocks, then lets you review the full models and risk")}</p>
               </div>
               <div className="sort-control">
                 <label htmlFor="sort">{t("排序", "Sort")}</label>
@@ -550,7 +607,7 @@ export default function Home() {
               </div>
             </div>
             <div className="filter-tabs" role="tablist" aria-label={t("股票篩選", "Stock filters")}>
-              {([["all", t("全部", "All")], ["undervalued", t("低估候選", "Undervalued")], ["quality", t("高品質", "High quality")], ["risk", t("高風險警示", "High risk")]] as [Filter, string][]).map(([key, label]) => (
+              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["quality", t("高品質", "High quality")], ["risk", t("高風險警示", "High risk")]] as [Filter, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={filter === key ? "selected" : ""} onClick={() => setFilter(key)} role="tab" aria-selected={filter === key}>{label}</button>
               ))}
             </div>
@@ -577,9 +634,9 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
-              {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{stocks.length ? t("沒有符合條件的標的", "No stocks match these filters") : t("從一檔真實股票開始", "Start with a real stock")}</strong><p>{stocks.length ? t("請換一個代碼或篩選條件", "Try another ticker or filter") : t("在上方搜尋股票代碼，或上傳今天的方舟截圖", "Search for a ticker above or upload today's ARKER screenshots")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{stocks.length ? t("重新搜尋", "Search again") : t("搜尋股票代碼", "Search tickers")}</button></div>}
+              {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{isMarketScanLoading ? t("正在掃描市場…", "Scanning the market…") : stocks.length ? t("目前名單沒有符合條件的標的", "No stocks in the current list match") : t("市場資料暫時無法載入", "Market data is temporarily unavailable")}</strong><p>{isMarketScanLoading ? t("正在整理上市與上櫃估值候選", "Reviewing listed and OTC valuation candidates") : stocks.length ? t("可切換篩選條件，或搜尋其他股票代碼", "Change the filter or search another ticker") : t("仍可在上方搜尋單一股票代碼", "You can still search for an individual ticker above")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{t("搜尋股票代碼", "Search tickers")}</button></div>}
             </div>
-            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {stocks.length} {t("檔", "stocks")}</span><span><span className="legend-dot green-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot red-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
+            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {t("檔候選；台股前 20＋美股前 20", "candidates; Taiwan top 20 + U.S. top 20")}</span><span><span className="legend-dot green-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot red-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
           </div>
 
           {selected && (
@@ -630,14 +687,14 @@ export default function Home() {
 
         <section id="overview" className="overview-grid" aria-label={t("估值摘要", "Valuation summary")}>
           <article className="metric-card accent-card">
-            <div className="metric-card-top"><span>{t("追蹤標的", "Tracked Stocks")}</span><span className="metric-icon">◉</span></div>
-            <strong>{stocks.length}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("台股", "Taiwan")} {stocks.filter((stock) => stock.market === "TW").length} · {t("美股", "U.S.")} {stocks.filter((stock) => stock.market === "US").length}</p>
+            <div className="metric-card-top"><span>{t("市場掃描", "Market Scan")}</span><span className="metric-icon">◉</span></div>
+            <strong>{isMarketScanLoading ? "…" : scannedCount}<small> {t("檔", "stocks")}</small></strong>
+            <p>{t(`台股 ${scannedByMarket.TW}＋美股 ${scannedByMarket.US}`, `Taiwan ${scannedByMarket.TW} + U.S. ${scannedByMarket.US}`)}</p>
           </article>
           <article className="metric-card">
             <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon green">↗</span></div>
             <strong>{undervaluedCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("公允價值上行空間 ≥ 10%", "Fair value upside ≥ 10%")}</p>
+            <p>{t(`台股 ${marketCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${marketCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${marketCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${marketCandidates.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card">
             <div className="metric-card-top"><span>{t("高品質標的", "High Quality")}</span><span className="metric-icon blue">✦</span></div>
@@ -659,11 +716,11 @@ export default function Home() {
         </section>
 
         <section id="method" className="method-section">
-          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("穩盈價值雷達把可取得的估值方法重新加權，並以不確定性形成價格區間。它的角色是幫你把「值得研究」的標的先篩出來。", "WenYing Value Radar reweights the valuation methods supported by available data and uses uncertainty to form a price range. Its role is to surface stocks worth deeper research.")}</p></div>
-          <div className="method-cards"><article><span className="method-number">01</span><h3>{t("本益比法", "P/E Method")}</h3><p>{t("用每股盈餘乘以依成長、ROE 與槓桿調整的目標本益比；虧損時排除此模型。", "Multiplies EPS by a target P/E adjusted for growth, ROE, and leverage; excluded when earnings are negative.")}</p><span className="method-weight">{t("基礎權重 45%", "Base weight 45%")}</span></article><article><span className="method-number">02</span><h3>{t("股價淨值比法", "P/B Method")}</h3><p>{t("以每股淨值與依 ROE 調整的合理 PB 倍數估算資產價值；負淨值時排除。", "Estimates asset value from book value per share and an ROE-adjusted P/B multiple; excluded when book value is negative.")}</p><span className="method-weight">{t("基礎權重 25%", "Base weight 25%")}</span></article><article><span className="method-number">03</span><h3>{t("自由現金流法", "Free Cash Flow Method")}</h3><p>{t("以每股自由現金流與成長調整倍數估值；現金流為負或缺資料時排除。", "Values each share using free cash flow and a growth-adjusted multiple; excluded when cash flow is negative or unavailable.")}</p><span className="method-weight">{t("基礎權重 30%", "Base weight 30%")}</span></article></div>
+          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統會依產業與資料完整度選用模型，排除不適用與極端結果，再依模型分歧自動放大或縮小估值區間。這比固定三模型更接近專業估值流程，但不等同付費資料商的分析師共識預測。", "The system selects models by industry and data completeness, removes unsuitable or extreme results, and derives the valuation range from model dispersion. This is closer to a professional workflow than a fixed three-model average, but it is not the same as paid analyst-consensus forecasts.")}</p></div>
+              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("現金流與盈餘能力", "Cash Flow & Earnings Power")}</h3><p>{t("加入五年 DCF 與盈餘能力價值；金融業因現金流結構不同會自動停用 DCF。", "Adds a five-year DCF and Earnings Power Value; DCF is disabled for financial companies whose cash flows require different treatment.")}</p><span className="method-weight">{t("依產業動態選用", "Selected by industry")}</span></article><article><span className="method-number">02</span><h3>{t("倍數與資產估值", "Multiples & Asset Value")}</h3><p>{t("綜合 PE、PB、FCF 倍數與 Graham 防禦估值；高 ROE 輕資產公司不套用 PB 與 Graham，避免資產模型低估科技與品牌企業。", "Combines P/E, P/B, FCF multiples, and Graham defensive value. P/B and Graham are disabled for high-ROE asset-light companies to avoid understating technology and brand businesses.")}</p><span className="method-weight">{t("依商業型態重新加權", "Reweighted by business type")}</span></article><article><span className="method-number">03</span><h3>{t("股利、異常值與區間", "Dividends, Outliers & Range")}</h3><p>{t("有股利資料時加入 DDM；若模型值極端偏離市場且仍有其他可靠模型，會自動排除。不確定性由模型數量與分歧程度決定。", "Adds a DDM when dividends are available. Extreme market-relative values are removed when enough reliable alternatives remain, and uncertainty reflects model count and dispersion.")}</p><span className="method-weight">{t("風險自動校準", "Risk calibrated automatically")}</span></article></div>
         </section>
 
-        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("上市台股採 TWSE、上櫃台股採 TPEx；美股財務數據採 SEC EDGAR，價格採 Nasdaq 市場資訊。資料不足的模型會被排除，不會用示範數字補空白。", "Listed Taiwan stocks use TWSE data, OTC stocks use TPEx, U.S. fundamentals use SEC EDGAR, and U.S. prices use Nasdaq market data. Models with insufficient data are excluded rather than filled with sample numbers.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
+        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股市場掃描以 Nasdaq 價格配對 SEC XBRL 年度財務資料。個股明細仍優先查詢最新公開申報；資料不足的模型會被排除，不會用示範數字補空白。", "The Taiwan scan uses TWSE and TPEx data; the U.S. scan matches Nasdaq prices with annual SEC XBRL fundamentals. Stock details still prioritize the latest public filings, and missing models are excluded rather than filled with sample values.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
 
         {showAddForm && (
           <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAddForm(false); }}>

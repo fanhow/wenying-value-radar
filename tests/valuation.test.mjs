@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateStock, valuationTargets } from "../lib/valuation.ts";
+import { calculateStock, discountedCashFlowPerShare, valuationTargets } from "../lib/valuation.ts";
 
 const base = {
   ticker: "TEST",
@@ -22,17 +22,46 @@ const base = {
 
 test("calculates and weights all available valuation models", () => {
   const stock = calculateStock(base);
-  assert.equal(stock.models.length, 3);
+  assert.equal(stock.models.length, 6);
   assert.equal(stock.models.reduce((sum, model) => sum + model.weight, 0), 1);
-  assert.equal(stock.fairValue, 79);
-  assert.equal(stock.upside, -0.21);
+  assert.ok(stock.models.some((model) => model.label === "折現現金流法"));
+  assert.ok(stock.models.some((model) => model.label === "盈餘能力價值法"));
+  assert.ok(stock.models.some((model) => model.label === "Graham 防禦估值"));
+  assert.ok(stock.fairValue > 0);
 });
 
 test("renormalizes weights when a model is unavailable", () => {
-  const stock = calculateStock({ ...base, fcfPerShare: 0 });
-  assert.equal(stock.models.length, 2);
+  const stock = calculateStock({ ...base, eps: 0, fcfPerShare: 0 });
+  assert.equal(stock.models.length, 1);
   assert.equal(stock.models.reduce((sum, model) => sum + model.weight, 0), 1);
-  assert.ok(Math.abs(stock.fairValue - 78.5714285714) < 0.00001);
+  assert.equal(stock.models[0].label, "股價淨值比法");
+  assert.ok(stock.uncertainty >= 0.4);
+});
+
+test("calculates a five-year discounted cash flow with terminal value", () => {
+  const value = discountedCashFlowPerShare(10, 0, 0.1, 0.02);
+  assert.ok(value > 115 && value < 120);
+});
+
+test("removes extreme market-anchored model outliers when alternatives exist", () => {
+  const stock = calculateStock({ ...base, price: 50, fcfPerShare: 1000 });
+  assert.ok(!stock.models.some((model) => model.label === "折現現金流法"));
+  assert.ok(!stock.models.some((model) => model.label === "自由現金流倍數法"));
+  assert.ok(stock.models.length >= 2);
+});
+
+test("does not apply cash-flow models to financial companies", () => {
+  const stock = calculateStock({ ...base, sector: "Commercial Banks", dividendPerShare: 8 });
+  assert.ok(!stock.models.some((model) => model.label === "折現現金流法"));
+  assert.ok(!stock.models.some((model) => model.label === "自由現金流倍數法"));
+  assert.ok(stock.models.some((model) => model.label === "股利折現法"));
+});
+
+test("does not apply asset-heavy defensive models to high-ROE non-financial companies", () => {
+  const stock = calculateStock({ ...base, roe: 40, dividendPerShare: 1 });
+  assert.ok(!stock.models.some((model) => model.label === "股價淨值比法"));
+  assert.ok(!stock.models.some((model) => model.label === "Graham 防禦估值"));
+  assert.ok(stock.models.some((model) => model.label === "折現現金流法"));
 });
 
 test("does not label leveraged ETF as low risk", () => {

@@ -43,6 +43,8 @@ type SecCompanyFacts = {
   facts?: Record<string, Record<string, { units?: Record<string, SecFact[]> }>>;
 };
 
+type SecSubmissions = { sicDescription?: string };
+
 type SecTickerRow = { cik_str: number; ticker: string; title: string };
 
 const SEC_HEADERS = {
@@ -129,6 +131,14 @@ async function fetchOptionalJson<T>(url: string, headers?: HeadersInit): Promise
   }
 }
 
+async function fetchOptionalValue<T>(url: string, headers?: HeadersInit): Promise<T | null> {
+  try {
+    return await fetchJson<T>(url, headers);
+  } catch {
+    return null;
+  }
+}
+
 async function yahooTaiwanSnapshot(ticker: string) {
   try {
     const response = await fetch(`https://tw.stock.yahoo.com/quote/${encodeURIComponent(ticker)}/eps`, {
@@ -186,7 +196,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   if (!company) throw new Error("SEC 公司名錄中找不到這個美股代碼");
 
   const cik = String(company.cik_str).padStart(10, "0");
-  const facts = await fetchJson<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS);
+  const [facts, submissions] = await Promise.all([
+    fetchJson<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS),
+    fetchOptionalValue<SecSubmissions>(`https://data.sec.gov/submissions/CIK${cik}.json`, SEC_HEADERS),
+  ]);
   const taxonomy = facts.facts?.["us-gaap"] ? "us-gaap" : "ifrs-full";
   const isUsGaap = taxonomy === "us-gaap";
 
@@ -239,12 +252,31 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   );
   const assetsFact = latestFacts(facts, taxonomy, isUsGaap ? ["Assets"] : ["Assets"], ["USD"])[0];
   const liabilitiesFact = latestFacts(facts, taxonomy, isUsGaap ? ["Liabilities"] : ["Liabilities"], ["USD"])[0];
+  const dividendPerShareFact = latestAnnualFact(
+    facts,
+    taxonomy,
+    isUsGaap
+      ? ["CommonStockDividendsPerShareDeclared", "CommonStockDividendsPerShareCashPaid"]
+      : ["DividendsPaidPerShare"],
+    ["USD/shares", "USD / shares"],
+  );
+  const dividendsPaidFact = latestAnnualFact(
+    facts,
+    taxonomy,
+    isUsGaap ? ["PaymentsOfDividendsCommonStock", "PaymentsOfDividends"] : ["DividendsPaid"],
+    ["USD"],
+  );
 
   const shares = numeric(sharesFact?.val);
   const eps = Math.max(numeric(epsFact?.val), 0);
   const bvps = shares > 0 ? Math.max(numeric(equityFact?.val) / shares, 0) : 0;
   const annualFcf = numeric(operatingCashFact?.val) - Math.abs(numeric(capexFact?.val));
   const fcfPerShare = shares > 0 ? Math.max(annualFcf / shares, 0) : 0;
+  const dividendPerShare = Math.max(
+    numeric(dividendPerShareFact?.val)
+      || (shares > 0 ? Math.abs(numeric(dividendsPaidFact?.val)) / shares : 0),
+    0,
+  );
   const marketQuote = await nasdaqMarketPrice(ticker);
   const price = preferCapturedPrice(body.capturedPrice, marketQuote.price);
 
@@ -266,11 +298,12 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     name: body.capturedName?.trim() || facts.entityName || marketQuote.name || company.title,
     market: "US" as const,
     assetType: "EQUITY" as const,
-    sector: "美股公開發行公司",
+    sector: submissions?.sicDescription || "美股公開發行公司",
     price,
     eps,
     bvps,
     fcfPerShare,
+    dividendPerShare,
     ...targets,
     revenueGrowth: clamp(revenueGrowth, -100, 200),
     roe: clamp(roe, -100, 200),
@@ -278,7 +311,7 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     uncertainty: 0.25,
     updatedAt: marketQuote.updatedAt || epsFact?.end || new Date().toISOString().slice(0, 10),
     source: "自動資料" as const,
-    sourceNote: `財務數據取自 SEC EDGAR 公開申報；價格${numeric(body.capturedPrice) && price === numeric(body.capturedPrice) ? "採用方舟截圖" : "採用 Nasdaq 市場資訊"}。虧損、負淨值或負自由現金流模型會自動排除`,
+    sourceNote: `財務數據取自 SEC EDGAR 公開申報；價格${numeric(body.capturedPrice) && price === numeric(body.capturedPrice) ? "採用方舟截圖" : "採用 Nasdaq 市場資訊"}。系統依產業與資料完整度選用 DCF、倍數、盈餘能力、Graham 與股利模型，並排除不適用或極端結果；成長假設仍以歷史資料推估，不等同分析師共識預測`,
   };
 }
 
@@ -379,6 +412,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     eps,
     bvps,
     fcfPerShare: 0,
+    dividendPerShare: 0,
     targetPe: targets.targetPe,
     targetPb: targets.targetPb,
     targetFcfMultiple: 0,
