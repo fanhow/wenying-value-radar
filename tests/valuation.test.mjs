@@ -84,3 +84,30 @@ test("caps target multiples within documented model bounds", () => {
   assert.equal(targets.targetPb, 4);
   assert.equal(targets.targetFcfMultiple, 26);
 });
+
+test("marks limited historical inputs as low-confidence estimates", () => {
+  const stock = calculateStock({ ...base, dataCompleteness: "limited", qualityAvailable: false });
+  assert.equal(stock.valuationConfidence, "low");
+});
+
+test("requires forward data before making a firm call on high-multiple growth stocks", () => {
+  const stock = calculateStock({
+    ...base,
+    price: 300,
+    revenueGrowth: 35,
+    dataCompleteness: "historical",
+    forwardDataAvailable: false,
+  });
+  assert.equal(stock.requiresForwardData, true);
+  assert.equal(stock.valuationConfidence, "low");
+});
+
+test("keeps a mature company with complete historical inputs at medium confidence without forecasts", () => {
+  const stock = calculateStock({
+    ...base,
+    dataCompleteness: "historical",
+    forwardDataAvailable: false,
+  });
+  assert.equal(stock.requiresForwardData, false);
+  assert.equal(stock.valuationConfidence, "medium");
+});

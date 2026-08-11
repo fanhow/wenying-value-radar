@@ -8,6 +8,9 @@ export type ArkUsSnapshotRow = {
   price: number;
   eps: number;
   bvps: number;
+  revenueGrowth?: number | null;
+  fcfPerShare?: number | null;
+  debtRatio?: number | null;
   dividendPerShare: number;
   sector: string;
   date: string;

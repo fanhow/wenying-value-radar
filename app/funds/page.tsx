@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, valuationTargets, type Stock } from "../../lib/valuation";
 import fundSnapshotJson from "../../lib/fund-holdings-snapshot.json";
 import usMarketSnapshot from "../../lib/us-market-snapshot.json";
@@ -52,6 +54,9 @@ type MarketRow = {
   price: number;
   eps: number;
   bvps: number;
+  revenueGrowth?: number | null;
+  fcfPerShare?: number | null;
+  debtRatio?: number | null;
   dividendPerShare: number;
   sector: string;
   date: string;
@@ -63,11 +68,22 @@ type ValuedFund = Omit<TrackedFund, "holdings"> & { holdings: ValuedHolding[] };
 const snapshot = fundSnapshotJson as FundSnapshot;
 const marketByTicker = new Map((usMarketSnapshot as MarketRow[]).map((row) => [row.ticker, row]));
 
+function hasFiniteValue(value: unknown) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
 function valueHolding(holding: FundHolding): ValuedHolding {
   const row = marketByTicker.get(holding.ticker);
   if (!row || row.price <= 0) return { ...holding, stock: null };
+  const hasRevenueGrowth = hasFiniteValue(row.revenueGrowth);
+  const hasFcf = hasFiniteValue(row.fcfPerShare);
+  const hasDebtRatio = hasFiniteValue(row.debtRatio);
+  const revenueGrowth = hasRevenueGrowth ? Number(row.revenueGrowth) : 0;
+  const fcfPerShare = hasFcf ? Number(row.fcfPerShare) : 0;
+  const debtRatio = hasDebtRatio ? Number(row.debtRatio) : 0;
+  const historicalFieldCount = [hasRevenueGrowth, hasFcf, hasDebtRatio].filter(Boolean).length;
   const roe = row.bvps > 0 ? (row.eps / row.bvps) * 100 : 0;
-  const targets = valuationTargets(0, roe, 0);
+  const targets = valuationTargets(revenueGrowth, roe, debtRatio);
   return {
     ...holding,
     stock: calculateStock({
@@ -78,17 +94,19 @@ function valueHolding(holding: FundHolding): ValuedHolding {
       price: row.price,
       eps: Math.max(row.eps, 0),
       bvps: Math.max(row.bvps, 0),
-      fcfPerShare: 0,
+      fcfPerShare,
       dividendPerShare: Math.max(row.dividendPerShare, 0),
       ...targets,
-      revenueGrowth: 0,
+      revenueGrowth,
       roe,
-      debtRatio: 0,
-      uncertainty: 0.3,
-      qualityAvailable: false,
+      debtRatio,
+      uncertainty: historicalFieldCount >= 2 ? 0.27 : 0.4,
+      qualityAvailable: hasRevenueGrowth && hasDebtRatio,
+      dataCompleteness: historicalFieldCount >= 2 ? "historical" : "limited",
+      forwardDataAvailable: false,
       updatedAt: row.date,
       source: "自動資料",
-      sourceNote: "持倉資料來自 SEC 13F；估值使用 Nasdaq 價格與 SEC XBRL 年度財務快照。",
+      sourceNote: "持倉資料來自 SEC 13F；估值使用 Nasdaq 價格與 SEC XBRL 年度歷史快照。未納入分析師前瞻盈餘、基金買進成本、空頭或避險部位；高成長股若標示低信心，不應直接判定高估。",
     }),
   };
 }
@@ -116,6 +134,7 @@ function formatPercent(value: number) {
 
 function valuationClass(stock: Stock | null) {
   if (!stock) return "unavailable";
+  if (stock.valuationConfidence === "low") return "uncertain";
   if (stock.upside >= 0.1) return "undervalued";
   if (stock.upside <= -0.1) return "overvalued";
   return "fair";
@@ -133,6 +152,7 @@ export default function FundsPage() {
 
   const valuationLabel = (stock: Stock | null) => {
     if (!stock) return t("資料不足", "Insufficient data");
+    if (stock.valuationConfidence === "low") return t("低信心初估", "Low-confidence estimate");
     if (stock.upside >= 0.1) return t("低估", "Undervalued");
     if (stock.upside <= -0.1) return t("高估", "Overvalued");
     return t("合理區間", "Fair range");
@@ -172,8 +192,8 @@ export default function FundsPage() {
         <section className="fund-disclosure-note">
           <span>i</span>
           <p>{t(
-            "13F 最晚可在季末後 45 天申報，只揭露特定美國上市多頭證券，不包含空頭、現金、債券、未上市資產或台股 2330 等海外直接持股；台灣曝險僅能看到 TSM、SIMO 等美國掛牌證券。因此這是延遲的大戶方向訊號，不是即時交易紀錄。",
-            "13F filings may arrive up to 45 days after quarter-end and cover only specified U.S.-listed long securities. They omit shorts, cash, bonds, private assets, and direct overseas holdings such as Taiwan 2330; Taiwan exposure is visible only through U.S.-listed securities such as TSM or SIMO. Treat this as a delayed direction signal, not a live trade feed.",
+            "「前六名」是基金經理截至 2025 年底的歷史累積淨獲利排名，不代表每一檔現有持股都在本季低估。13F 最晚可在季末後 45 天申報，只揭露特定美國上市多頭證券，不包含買進成本、空頭、避險、現金、債券或未上市資產。因此這是延遲的大戶方向訊號，不能拿來判斷基金經理是否『買錯』。",
+            "The top-six ranking reflects managers' cumulative historical net gains through 2025; it does not mean every current holding was undervalued this quarter. A 13F may arrive up to 45 days after quarter-end and omits purchase cost, shorts, hedges, cash, bonds, and private assets. Treat it as a delayed direction signal, not evidence that a manager bought well or badly.",
           )}</p>
         </section>
 
@@ -192,11 +212,11 @@ export default function FundsPage() {
                       const state = valuationClass(holding.stock);
                       return (
                         <tr key={`${fund.slug}-${holding.cusip}`}>
-                          <td data-label={t("持倉", "Holding")}><div className="fund-stock-name"><span className="ticker-badge market-us">US</span><span><strong>{holding.ticker}</strong><small>{holding.stock?.name || holding.issuer}{holding.taiwanExposure ? <em>{t("台灣相關", "Taiwan-linked")}</em> : null}</small></span></div></td>
+                          <td data-label={t("持倉", "Holding")}><Link className="fund-stock-link" href={stockDetailHref(holding.ticker)} aria-label={t(`查看 ${holding.ticker} 完整估值`, `View full valuation for ${holding.ticker}`)}><div className="fund-stock-name"><span className="ticker-badge market-us">US</span><span><strong>{holding.ticker}</strong><small>{holding.stock?.name || holding.issuer}{holding.taiwanExposure ? <em>{t("台灣相關", "Taiwan-linked")}</em> : null}</small></span></div><span className="fund-stock-arrow">→</span></Link></td>
                           <td data-label={t("組合比重", "Portfolio weight")}><strong>{holding.portfolioWeight.toFixed(2)}%</strong><small>{compactUsd.format(holding.valueUsd)}</small></td>
                           <td data-label={t("持股變化", "Share change")}><span className={`fund-change ${holding.significantChange ? "significant" : ""}`}>{changeLabel(holding)}</span><small>{t("較上季持股數", "vs. prior-quarter shares")}</small></td>
                           <td data-label={t("目前價格", "Price")}><strong>{holding.stock ? formatPrice(holding.stock.price) : "—"}</strong><small>{holding.stock?.updatedAt || "—"}</small></td>
-                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
+                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? holding.stock.valuationConfidence === "low" ? t("歷史初估 · 需前瞻資料", "Historical estimate · forward data needed") : `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
                           <td data-label={t("估值狀態", "Valuation")}><span className={`fund-valuation status-${state}`}>{valuationLabel(holding.stock)}</span></td>
                         </tr>
                       );
@@ -210,7 +230,7 @@ export default function FundsPage() {
 
         <section className="fund-method-note">
           <div><p className="section-kicker">DATA METHOD / 02</p><h2>{t("基金排名看長期獲利，", "Rank managers by long-term gains;")}<br /><em>{t("持倉則看最新公開變化。", "read holdings from the latest disclosure.")}</em></h2></div>
-          <div><p>{t("基金排名資料截至 2025-12-31；持倉採 SEC 2026 Q1 Form 13F-HR，與 2025 Q4 持股數比較。公允價值使用與首頁相同的公開歷史資料模型，並非基金本身的買進成本或目標價。", "Fund rankings are as of 2025-12-31. Holdings use SEC 2026 Q1 Form 13F-HR and compare share counts with 2025 Q4. Fair value uses the same public historical-data model as the homepage; it is not the manager's purchase cost or price target.")}</p><a href={snapshot.rankingSourceUrl} target="_blank" rel="noreferrer">{t("查看排名來源", "View ranking source")} ↗</a></div>
+          <div><p>{t("基金排名資料截至 2025-12-31；持倉採 SEC 2026 Q1 Form 13F-HR，與 2025 Q4 持股數比較。估值已納入可取得的年度營收成長、自由現金流與負債，但仍不是基金買進成本或分析師目標價。缺少前瞻資料時會標示『低信心初估』。", "Fund rankings are as of 2025-12-31. Holdings use SEC 2026 Q1 Form 13F-HR and compare share counts with 2025 Q4. Valuation now includes available annual revenue growth, free cash flow, and leverage, but it is still neither the manager's purchase cost nor an analyst target. Results lacking forward data are marked low confidence.")}</p><a href={snapshot.rankingSourceUrl} target="_blank" rel="noreferrer">{t("查看排名來源", "View ranking source")} ↗</a></div>
         </section>
 
         <footer className="footer"><div><span>穩盈價值雷達 · WenYing Value Radar</span><small>{t("本網站僅供投資研究與教育用途，不構成投資或放空建議。", "For investment research and education only; this is not investment or short-selling advice.")}</small></div><span>{t("追蹤方向，仍要獨立估值", "Track direction, value independently")}</span></footer>

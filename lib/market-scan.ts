@@ -11,6 +11,9 @@ export type MarketScanRow = {
   market?: Market;
   eps?: string | number;
   bvps?: string | number;
+  revenueGrowth?: string | number | null;
+  fcfPerShare?: string | number | null;
+  debtRatio?: string | number | null;
   dividendPerShare?: string | number;
   marketCap?: string | number;
   volume?: string | number;
@@ -18,9 +21,13 @@ export type MarketScanRow = {
 
 export type ValuationDirection = "undervalued" | "overvalued";
 
-function numeric(value: string | number) {
+function numeric(value: unknown) {
   const parsed = Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function hasFiniteValue(value: unknown) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
 
 export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
@@ -35,8 +42,15 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
   if (market === "US" && (price < 3 || numeric(row.marketCap ?? 0) < 500_000_000 || numeric(row.volume ?? 0) < 100_000)) return null;
   if (eps <= 0 || bvps <= 0) return null;
 
+  const hasRevenueGrowth = hasFiniteValue(row.revenueGrowth);
+  const hasFcf = hasFiniteValue(row.fcfPerShare);
+  const hasDebtRatio = hasFiniteValue(row.debtRatio);
+  const revenueGrowth = hasRevenueGrowth ? numeric(row.revenueGrowth) : 0;
+  const fcfPerShare = hasFcf ? numeric(row.fcfPerShare) : 0;
+  const debtRatio = hasDebtRatio ? numeric(row.debtRatio) : 0;
+  const historicalFieldCount = [hasRevenueGrowth, hasFcf, hasDebtRatio].filter(Boolean).length;
   const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
-  const targets = valuationTargets(0, roe, 0);
+  const targets = valuationTargets(revenueGrowth, roe, debtRatio);
   const input: StockInput = {
     ticker: row.ticker,
     name: row.name,
@@ -45,19 +59,21 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
     price,
     eps,
     bvps,
-    fcfPerShare: 0,
+    fcfPerShare,
     dividendPerShare: Math.max(numeric(row.dividendPerShare ?? 0), 0),
     ...targets,
-    revenueGrowth: 0,
+    revenueGrowth,
     roe,
-    debtRatio: 0,
-    uncertainty: eps > 0 && bvps > 0 ? 0.3 : 0.4,
+    debtRatio,
+    uncertainty: historicalFieldCount >= 2 ? 0.27 : eps > 0 && bvps > 0 ? 0.3 : 0.4,
     updatedAt: row.date,
     source: "自動資料",
     sourceNote: market === "TW"
       ? "台股市場掃描以 TWSE／TPEx 公開的收盤價、本益比與股價淨值比進行第一輪篩選；未納入現金流與成長預測，請再查看完整財報後決策。"
-      : "美股市場掃描以 Nasdaq 上市價格及 SEC XBRL 年度 EPS、股東權益、流通股數與股利進行第一輪篩選；未納入分析師預測與現金流，請再查看完整財報後決策。",
-    qualityAvailable: false,
+      : "美股市場掃描以 Nasdaq 價格及 SEC XBRL 年度財務快照進行第一輪篩選，納入可取得的營收成長、自由現金流與負債資料；仍未納入分析師前瞻預測，高成長股可能只具低信心。",
+    qualityAvailable: hasRevenueGrowth && hasDebtRatio,
+    dataCompleteness: historicalFieldCount >= 2 ? "historical" : "limited",
+    forwardDataAvailable: false,
   };
   return input;
 }

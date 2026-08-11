@@ -1,5 +1,7 @@
 export type Market = "TW" | "US";
 export type RiskLevel = "低" | "中" | "高";
+export type DataCompleteness = "complete" | "historical" | "limited";
+export type ValuationConfidence = "high" | "medium" | "low";
 
 export type StockInput = {
   ticker: string;
@@ -26,6 +28,8 @@ export type StockInput = {
   sourceNote?: string;
   qualityAvailable?: boolean;
   riskOverride?: RiskLevel;
+  dataCompleteness?: DataCompleteness;
+  forwardDataAvailable?: boolean;
 };
 
 export type Stock = StockInput & {
@@ -36,6 +40,8 @@ export type Stock = StockInput & {
   upside: number;
   qualityScore: number;
   risk: RiskLevel;
+  valuationConfidence: ValuationConfidence;
+  requiresForwardData: boolean;
 };
 
 export function clamp(value: number, min: number, max: number) {
@@ -86,6 +92,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       upside: input.price > 0 ? (fairValue - input.price) / input.price : 0,
       qualityScore: 0,
       risk: input.riskOverride ?? "中",
+      valuationConfidence: "medium",
+      requiresForwardData: false,
     };
   }
 
@@ -179,6 +187,18 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   );
   const risk = input.riskOverride
     ?? (uncertainty >= 0.32 || input.debtRatio >= 75 ? "高" : uncertainty >= 0.2 ? "中" : "低");
+  const trailingPe = input.eps > 0 ? input.price / input.eps : Number.POSITIVE_INFINITY;
+  const requiresForwardData = input.forwardDataAvailable !== true
+    && (trailingPe > 35 || input.revenueGrowth >= 20 || input.fcfPerShare <= 0);
+  const dataCompleteness = input.dataCompleteness
+    ?? (input.qualityAvailable === false ? "limited" : "complete");
+  const valuationConfidence: ValuationConfidence = dataCompleteness === "limited"
+    || models.length < 2
+    || requiresForwardData
+    ? "low"
+    : dataCompleteness === "complete" && input.forwardDataAvailable === true && models.length >= 4 && uncertainty <= 0.24
+      ? "high"
+      : "medium";
 
   return {
     ...input,
@@ -192,5 +212,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     upside,
     qualityScore,
     risk,
+    valuationConfidence,
+    requiresForwardData,
   };
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ChangeEvent, useState } from "react";
+import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, type Market, type StockInput } from "../../lib/valuation";
 import { useLanguage } from "../language-context";
 import { SiteHeader } from "../site-header";
@@ -221,13 +222,18 @@ export default function ArkPage() {
             <div className="ark-result-grid">
               {candidates.map((candidate) => {
                 const stock = candidate.stock ? calculateStock(candidate.stock) : null;
-                return (
-                  <article className="ark-result-card" key={candidate.id}>
+                const cardContent = (
+                  <>
                     <div className="ark-result-top"><span className={`ticker-badge market-${candidate.market.toLowerCase()}`}>{candidate.market}</span><span className={`import-state state-${candidate.status === "已加入" ? "done" : candidate.status === "需要確認" ? "warn" : "working"}`}>{language === "zh" ? candidate.status : translateStatus(candidate.status)}</span></div>
                     <strong>{candidate.ticker}</strong>
                     <p>{candidate.capturedName || candidate.fileName}</p>
-                    {stock ? <div className="ark-result-values"><span>{t("目前價格", "Price")}<b>{formatPrice(stock.price, stock.market)}</b></span><span>{t("公允價值", "Fair value")}<b>{formatPrice(stock.fairValue, stock.market)}</b></span><span>{t("上行空間", "Upside")}<b className={stock.upside >= 0 ? "text-positive" : "text-negative"}>{stock.upside >= 0 ? "+" : ""}{(stock.upside * 100).toFixed(1)}%</b></span></div> : <small title={candidate.message}>{candidate.message || t("正在計算…", "Calculating…")}</small>}
-                  </article>
+                    {stock ? <><div className="ark-result-values"><span>{t("目前價格", "Price")}<b>{formatPrice(stock.price, stock.market)}</b></span><span>{stock.valuationConfidence === "low" ? t("歷史初估", "Historical estimate") : t("公允價值", "Fair value")}<b>{formatPrice(stock.fairValue, stock.market)}</b></span><span>{stock.valuationConfidence === "low" ? t("判讀狀態", "Interpretation") : t("模型差距", "Model gap")}<b className={stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}>{stock.valuationConfidence === "low" ? t("需前瞻資料", "Forward data needed") : `${stock.upside >= 0 ? "+" : ""}${(stock.upside * 100).toFixed(1)}%`}</b></span></div><small className={`ark-confidence confidence-${stock.valuationConfidence}`}>{stock.valuationConfidence === "low" ? t("低信心 · 點擊查看模型與原因 →", "Low confidence · view models and reason →") : t("點擊查看完整估值 →", "View full valuation →")}</small></> : <small title={candidate.message}>{candidate.message || t("正在計算…", "Calculating…")}</small>}
+                  </>
+                );
+                return stock ? (
+                  <Link className="ark-result-card ark-result-link" href={stockDetailHref(candidate.ticker)} key={candidate.id} aria-label={t(`查看 ${candidate.ticker} 完整估值`, `View full valuation for ${candidate.ticker}`)}>{cardContent}</Link>
+                ) : (
+                  <article className="ark-result-card" key={candidate.id}>{cardContent}</article>
                 );
               })}
             </div>

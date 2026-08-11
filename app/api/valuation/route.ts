@@ -60,6 +60,10 @@ function numeric(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function hasFiniteValue(value: unknown) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
 function formatTaiwanDate(value?: string) {
   if (!value || !/^\d{7}$/.test(value)) return value || new Date().toISOString().slice(0, 10);
   const year = Number(value.slice(0, 3)) + 1911;
@@ -197,8 +201,15 @@ function valueUsSnapshot(body: ValuationRequest, ticker: string, snapshot: ArkUs
   const price = preferCapturedPrice(body.capturedPrice, numeric(snapshot.price));
   const eps = Math.max(numeric(snapshot.eps), 0);
   const bvps = Math.max(numeric(snapshot.bvps), 0);
+  const hasRevenueGrowth = hasFiniteValue(snapshot.revenueGrowth);
+  const hasFcf = hasFiniteValue(snapshot.fcfPerShare);
+  const hasDebtRatio = hasFiniteValue(snapshot.debtRatio);
+  const revenueGrowth = hasRevenueGrowth ? clamp(numeric(snapshot.revenueGrowth), -100, 200) : 0;
+  const fcfPerShare = hasFcf ? numeric(snapshot.fcfPerShare) : 0;
+  const debtRatio = hasDebtRatio ? clamp(numeric(snapshot.debtRatio), 0, 100) : 0;
   const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
-  const targets = valuationTargets(0, roe, 0);
+  const targets = valuationTargets(revenueGrowth, roe, debtRatio);
+  const historicalFieldCount = [hasRevenueGrowth, hasFcf, hasDebtRatio].filter(Boolean).length;
   if (!price || (!eps && !bvps)) throw new Error("內建財務快照不足，暫時無法建立可靠估值");
 
   return {
@@ -210,17 +221,21 @@ function valueUsSnapshot(body: ValuationRequest, ticker: string, snapshot: ArkUs
     price,
     eps,
     bvps,
-    fcfPerShare: 0,
+    fcfPerShare,
     dividendPerShare: Math.max(numeric(snapshot.dividendPerShare), 0),
     ...targets,
-    revenueGrowth: 0,
+    revenueGrowth,
     roe,
-    debtRatio: 0,
-    uncertainty: eps > 0 && bvps > 0 ? 0.32 : 0.4,
-    qualityAvailable: false,
+    debtRatio,
+    uncertainty: historicalFieldCount >= 2 ? 0.27 : 0.4,
+    qualityAvailable: hasRevenueGrowth && hasDebtRatio,
+    dataCompleteness: historicalFieldCount >= 2 ? "historical" as const : "limited" as const,
+    forwardDataAvailable: false,
     updatedAt: snapshot.date,
     source: "自動資料" as const,
-    sourceNote: "SEC 即時資料暫時無法連線，本次改用網站內建的 Nasdaq／SEC 公開財務快照。估值僅採 EPS、每股淨值與股利，不含即時現金流與成長預測；請留意畫面資料日期。",
+    sourceNote: historicalFieldCount >= 2
+      ? "SEC 即時連線暫時不可用，本次改用網站內建的 Nasdaq／SEC 年度快照，包含可取得的 EPS、淨值、營收成長、自由現金流、負債與股利。這些仍是歷史資料，不含分析師前瞻盈餘；高成長或高本益比股票若顯示低信心，不應直接判定高估。"
+      : "SEC 即時連線暫時不可用，本次只能使用有限的 Nasdaq／SEC 年度快照。缺少現金流、成長或負債資料，結果為低信心初估，不應直接用來判定高估或低估。",
   };
 }
 
@@ -330,6 +345,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     : 0;
   const roe = equityFact?.val ? (numeric(netIncomeFact?.val) / Math.abs(equityFact.val)) * 100 : 0;
   const debtRatio = assetsFact?.val ? (numeric(liabilitiesFact?.val) / Math.abs(assetsFact.val)) * 100 : 0;
+  const hasRevenueGrowth = Boolean(uniqueRevenue[0]?.val && uniqueRevenue[1]?.val);
+  const hasFcf = Boolean(shares > 0 && operatingCashFact && capexFact);
+  const hasDebtRatio = Boolean(assetsFact?.val && liabilitiesFact?.val);
+  const historicalFieldCount = [hasRevenueGrowth, hasFcf, hasDebtRatio].filter(Boolean).length;
 
   if (!price) throw new Error("找不到可用價格，請改用含股價的方舟截圖或手動輸入");
   if (!eps && !bvps && !fcfPerShare) throw new Error("公開申報資料不足，暫時無法建立可靠估值");
@@ -350,7 +369,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     revenueGrowth: clamp(revenueGrowth, -100, 200),
     roe: clamp(roe, -100, 200),
     debtRatio: clamp(debtRatio, 0, 100),
-    uncertainty: 0.25,
+    uncertainty: historicalFieldCount >= 2 ? 0.25 : 0.4,
+    qualityAvailable: hasRevenueGrowth && hasDebtRatio,
+    dataCompleteness: historicalFieldCount >= 2 ? "historical" as const : "limited" as const,
+    forwardDataAvailable: false,
     updatedAt: marketQuote.updatedAt || epsFact?.end || new Date().toISOString().slice(0, 10),
     source: "自動資料" as const,
     sourceNote: `財務數據取自 SEC EDGAR 公開申報；價格${numeric(body.capturedPrice) && price === numeric(body.capturedPrice) ? "採用方舟截圖" : "採用 Nasdaq 市場資訊"}。系統依產業與資料完整度選用 DCF、倍數、盈餘能力、Graham 與股利模型，並排除不適用或極端結果；成長假設仍以歷史資料推估，不等同分析師共識預測`,
@@ -428,6 +450,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       debtRatio: 0,
       uncertainty: 0.02,
       qualityAvailable: false,
+      dataCompleteness: "limited" as const,
       riskOverride: isLeveragedOrInverse ? "高" as const : "中" as const,
       updatedAt: ratio?.date || quote?.date || new Date().toISOString().slice(0, 10),
       source: "方舟截圖" as const,
@@ -463,6 +486,8 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     debtRatio: 0,
     uncertainty: eps > 0 && bvps > 0 ? 0.3 : 0.36,
     qualityAvailable: false,
+    dataCompleteness: "limited" as const,
+    forwardDataAvailable: false,
     updatedAt: formatTaiwanDate(ratio.date),
     source: "自動資料" as const,
     sourceNote: `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；因未取得現金流、營收成長與負債資料，僅作初步估值且不提供品質分數`,

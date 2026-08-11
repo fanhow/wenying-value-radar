@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
 import { useLanguage, type Language } from "./language-context";
@@ -53,6 +53,15 @@ function RiskPill({ risk, language }: { risk: Stock["risk"]; language: Language 
   return <span className={`risk-pill risk-${risk === "低" ? "low" : risk === "中" ? "medium" : "high"}`}>{language === "zh" ? `${risk}風險` : `${englishRisk} Risk`}</span>;
 }
 
+function ConfidencePill({ confidence, language }: { confidence: Stock["valuationConfidence"]; language: Language }) {
+  const label = confidence === "high"
+    ? (language === "zh" ? "高信心" : "High confidence")
+    : confidence === "medium"
+      ? (language === "zh" ? "中信心" : "Medium confidence")
+      : (language === "zh" ? "低信心初估" : "Low-confidence estimate");
+  return <span className={`confidence-pill confidence-${confidence}`}>{label}</span>;
+}
+
 function TrendMark({ positive }: { positive: boolean }) {
   return <span className={`trend-mark ${positive ? "positive" : "negative"}`}>{positive ? "↗" : "↘"}</span>;
 }
@@ -100,6 +109,7 @@ export default function Home() {
   const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
+  const initialTickerHandled = useRef(false);
   const [form, setForm] = useState({
     ticker: "",
     name: "",
@@ -352,6 +362,47 @@ export default function Home() {
     }
   }
 
+  useEffect(() => {
+    if (!hasLoadedStorage || initialTickerHandled.current) return;
+    initialTickerHandled.current = true;
+    const ticker = new URLSearchParams(window.location.search).get("ticker")?.trim().toUpperCase();
+    if (!ticker || !/^[A-Z0-9-]{1,10}$/.test(ticker)) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setQuery(ticker);
+      const local = stockInputs.find((stock) => stock.ticker === ticker);
+      if (local) {
+        setSelectedTicker(ticker);
+        window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      }
+      setIsLookupLoading(true);
+      setLookupError("");
+      void fetch("/api/valuation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, market: /^\d/.test(ticker) ? "TW" : "US" }),
+        signal: controller.signal,
+      }).then(async (response) => {
+        const payload = await response.json() as { stock?: StockInput; error?: string };
+        if (!response.ok || !payload.stock) throw new Error(payload.error || "暫時無法建立估值");
+        setStockInputs((current) => [...current.filter((item) => item.ticker !== payload.stock?.ticker), payload.stock as StockInput]);
+        setWatchlist((current) => current.includes(ticker) ? current : [...current, ticker]);
+        setSelectedTicker(ticker);
+        window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      }).catch((error) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setLookupError(safeLookupError(error instanceof Error ? error.message : "", language));
+        }
+      }).finally(() => {
+        if (!controller.signal.aborted) setIsLookupLoading(false);
+      });
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [hasLoadedStorage, language, stockInputs]);
+
   function updateForm(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
   }
@@ -482,7 +533,7 @@ export default function Home() {
             <div className="stock-table-wrap">
               <table className="stock-table">
                 <thead>
-                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型公允價值", "Fair Value")}</th><th scope="col">{t("上行空間", "Upside")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("風險", "Risk")}</th><th scope="col"><span className="sr-only">{t("操作", "Actions")}</span></th></tr>
+                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("風險／信心", "Risk / Confidence")}</th><th scope="col"><span className="sr-only">{t("操作", "Actions")}</span></th></tr>
                 </thead>
                 <tbody>
                   {filteredStocks.map((stock) => {
@@ -492,10 +543,10 @@ export default function Home() {
                       <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} onClick={() => setSelectedTicker(stock.ticker)}>
                         <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stock.name} · {stock.sector}</small></span></div></td>
                         <td data-label={t("目前價格", "Current Price")}><span className="table-number">{formatPrice(stock.price, stock.market)}</span></td>
-                        <td data-label={t("公允價值", "Fair Value")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{t("區間", "Range")} {formatPrice(stock.rangeLow, stock.market)} – {formatPrice(stock.rangeHigh, stock.market)}</small></td>
-                        <td data-label={t("上行空間", "Upside")}><span className={`upside-value ${stock.upside >= 0 ? "text-positive" : "text-negative"}`}><TrendMark positive={stock.upside >= 0} /> {formatSignedPercent(stock.upside)}</span></td>
+                        <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("區間", "Range")} ${formatPrice(stock.rangeLow, stock.market)} – ${formatPrice(stock.rangeHigh, stock.market)}`}</small></td>
+                        <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}`}><TrendMark positive={stock.upside >= 0} /> {formatSignedPercent(stock.upside)}</span></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
-                        <td data-label={t("風險", "Risk")}><RiskPill risk={stock.risk} language={language} /></td>
+                        <td data-label={t("風險／信心", "Risk / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /></div></td>
                         <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); selectStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
                       </tr>
                     );
@@ -510,11 +561,12 @@ export default function Home() {
           {selected && (
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 03</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
-              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><RiskPill risk={selected.risk} language={language} /></div>
-              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong><small>{t("資料日期", "Data date")} {selected.updatedAt}</small></div><div className={selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
-              <div className="fair-value-focus"><div><span className="focus-label">{t("加權公允價值", "Weighted Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div><div className="range-track"><span className="range-line"><i style={{ left: `${clamp(((selected.price - selected.rangeLow) / (selected.rangeHigh - selected.rangeLow)) * 100, 4, 96)}%` }} /></span><div><span>{t("悲觀", "Bear")} {formatPrice(selected.rangeLow, selected.market)}</span><span>{t("樂觀", "Bull")} {formatPrice(selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(clamp(((selected.price - selected.rangeLow) / (selected.rangeHigh - selected.rangeLow)) * 100, 0, 100))}%</b></small></div></div>
+              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /></div></div>
+              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong><small>{t("資料日期", "Data date")} {selected.updatedAt}</small></div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("缺少前瞻資料，不判定高低估", "No over/undervaluation call without forward data") : selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
+              <div className="fair-value-focus"><div><span className="focus-label">{selected.valuationConfidence === "low" ? t("歷史模型參考值", "Historical Model Estimate") : t("加權公允價值", "Weighted Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div><div className="range-track"><span className="range-line"><i style={{ left: `${clamp(((selected.price - selected.rangeLow) / (selected.rangeHigh - selected.rangeLow)) * 100, 4, 96)}%` }} /></span><div><span>{t("悲觀", "Bear")} {formatPrice(selected.rangeLow, selected.market)}</span><span>{t("樂觀", "Bull")} {formatPrice(selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(clamp(((selected.price - selected.rangeLow) / (selected.rangeHigh - selected.rangeLow)) * 100, 0, 100))}%</b></small></div></div>
               <div className="detail-section"><div className="detail-section-title"><h3>{t("估值組成", "Valuation Models")}</h3><span>{t("權重合計 100%", "Total weight 100%")}</span></div><div className="model-list">{selected.models.map((model) => <div className="model-row" key={model.label}><div className="model-label"><span className="model-dot" /><span><strong>{language === "zh" ? model.label : translateModelLabel(model.label)}</strong><small>{language === "zh" ? model.explanation : englishModelExplanation(model.label, selected)}</small></span></div><div className="model-value"><strong>{formatPrice(model.value, selected.market)}</strong><small>{Math.round(model.weight * 100)}%</small></div></div>)}</div></div>
               <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與風險", "Quality & Risk")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
+              {selected.valuationConfidence === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.requiresForwardData ? t("這檔股票的價格高度依賴未來盈餘或現金流，但目前資料只有歷史財報。畫面保留計算結果供研究，不把它直接標成高估或低估。", "This price depends heavily on future earnings or cash flow, while the current inputs are historical. The estimate remains visible for research, but it is not classified as over- or undervalued.") : t("目前缺少足夠的現金流、成長或負債資料，因此只能提供初步參考。", "Cash flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
               <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
             </aside>
           )}
@@ -546,16 +598,16 @@ export default function Home() {
         <section id="watchlist" className="watchlist-section">
           <div className="section-heading-row"><div><p className="section-kicker">YOUR WATCHLIST / 05</p><h2>{t("我的觀察清單", "My Watchlist")}</h2><p>{t("把你正在研究的股票集中在這裡，搜尋代碼即可回到估值明細", "Keep the stocks you are researching together and return to their valuation details in one click")}</p></div><button type="button" className="outline-button" onClick={() => setShowAddForm(true)}><span>＋</span> {t("新增自訂標的", "Add custom stock")}</button></div>
           <div className="watchlist-cards">
-            {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => <button key={stock.ticker} type="button" className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`} onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={stock.upside >= 0 ? "text-positive" : "text-negative"}>{formatSignedPercent(stock.upside)}</strong><small>{t("上行空間", "Upside")}</small></div><span className="card-arrow">↗</span></button>) : <div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>}
+            {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => <button key={stock.ticker} type="button" className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`} onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}>{formatSignedPercent(stock.upside)}</strong><small>{stock.valuationConfidence === "low" ? t("低信心初估", "Low-confidence estimate") : t("上行空間", "Upside")}</small></div><span className="card-arrow">↗</span></button>) : <div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>}
           </div>
         </section>
 
         <section id="method" className="method-section">
           <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統會依產業與資料完整度選用模型，排除不適用與極端結果，再依模型分歧自動放大或縮小估值區間。這比固定三模型更接近專業估值流程，但不等同付費資料商的分析師共識預測。", "The system selects models by industry and data completeness, removes unsuitable or extreme results, and derives the valuation range from model dispersion. This is closer to a professional workflow than a fixed three-model average, but it is not the same as paid analyst-consensus forecasts.")}</p></div>
-              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("現金流與盈餘能力", "Cash Flow & Earnings Power")}</h3><p>{t("加入五年 DCF 與盈餘能力價值；金融業因現金流結構不同會自動停用 DCF。", "Adds a five-year DCF and Earnings Power Value; DCF is disabled for financial companies whose cash flows require different treatment.")}</p><span className="method-weight">{t("依產業動態選用", "Selected by industry")}</span></article><article><span className="method-number">02</span><h3>{t("倍數與資產估值", "Multiples & Asset Value")}</h3><p>{t("綜合 PE、PB、FCF 倍數與 Graham 防禦估值；高 ROE 輕資產公司不套用 PB 與 Graham，避免資產模型低估科技與品牌企業。", "Combines P/E, P/B, FCF multiples, and Graham defensive value. P/B and Graham are disabled for high-ROE asset-light companies to avoid understating technology and brand businesses.")}</p><span className="method-weight">{t("依商業型態重新加權", "Reweighted by business type")}</span></article><article><span className="method-number">03</span><h3>{t("股利、異常值與區間", "Dividends, Outliers & Range")}</h3><p>{t("有股利資料時加入 DDM；若模型值極端偏離市場且仍有其他可靠模型，會自動排除。不確定性由模型數量與分歧程度決定。", "Adds a DDM when dividends are available. Extreme market-relative values are removed when enough reliable alternatives remain, and uncertainty reflects model count and dispersion.")}</p><span className="method-weight">{t("風險自動校準", "Risk calibrated automatically")}</span></article></div>
+              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("現金流與盈餘能力", "Cash Flow & Earnings Power")}</h3><p>{t("加入五年 DCF 與盈餘能力價值；金融業因現金流結構不同會自動停用 DCF。", "Adds a five-year DCF and Earnings Power Value; DCF is disabled for financial companies whose cash flows require different treatment.")}</p><span className="method-weight">{t("依產業動態選用", "Selected by industry")}</span></article><article><span className="method-number">02</span><h3>{t("倍數與資產估值", "Multiples & Asset Value")}</h3><p>{t("綜合 PE、PB、FCF 倍數與 Graham 防禦估值；高 ROE 輕資產公司不套用 PB 與 Graham，避免資產模型低估科技與品牌企業。", "Combines P/E, P/B, FCF multiples, and Graham defensive value. P/B and Graham are disabled for high-ROE asset-light companies to avoid understating technology and brand businesses.")}</p><span className="method-weight">{t("依商業型態重新加權", "Reweighted by business type")}</span></article><article><span className="method-number">03</span><h3>{t("估值信心與前瞻缺口", "Confidence & Forward-data Gap")}</h3><p>{t("模型會依資料完整度、模型數量與分歧判斷信心。高本益比或高成長股若缺少前瞻盈餘／現金流，只顯示低信心歷史初估，不直接判定高估。", "Confidence reflects data completeness, model count, and dispersion. High-multiple or high-growth stocks without forward earnings/cash flow are shown as low-confidence historical estimates, not firm overvaluation calls.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
         </section>
 
-        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股市場掃描以 Nasdaq 價格配對 SEC XBRL 年度財務資料。個股明細仍優先查詢最新公開申報；資料不足的模型會被排除，不會用示範數字補空白。", "The Taiwan scan uses TWSE and TPEx data; the U.S. scan matches Nasdaq prices with annual SEC XBRL fundamentals. Stock details still prioritize the latest public filings, and missing models are excluded rather than filled with sample values.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
+        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度 EPS、淨值、營收成長、自由現金流、負債與股利。個股明細仍優先查詢最新公開申報；缺少前瞻資料時會降級信心，不用示範數字補空白。", "The Taiwan scan uses TWSE and TPEx data. The U.S. scan matches Nasdaq prices with annual SEC XBRL earnings, book value, revenue growth, free cash flow, leverage, and dividends. Stock details still prioritize the latest public filings; missing forward data lowers confidence rather than being filled with sample values.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
 
         {showAddForm && (
           <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAddForm(false); }}>
