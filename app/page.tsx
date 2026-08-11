@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
 import { useLanguage, type Language } from "./language-context";
@@ -22,16 +22,12 @@ type MarketScanResponse = {
   overvaluedCandidates?: StockInput[];
 };
 
-type ImportCandidate = {
-  id: string;
+type ValuationCandidate = {
   ticker: string;
   market: Market;
   capturedPrice?: number;
   capturedNav?: number;
   capturedName?: string;
-  fileName: string;
-  status: "辨識完成" | "計算中" | "已加入" | "需要確認";
-  message?: string;
 };
 
 const seedInputs: StockInput[] = [];
@@ -59,28 +55,6 @@ function RiskPill({ risk, language }: { risk: Stock["risk"]; language: Language 
 
 function TrendMark({ positive }: { positive: boolean }) {
   return <span className={`trend-mark ${positive ? "positive" : "negative"}`}>{positive ? "↗" : "↘"}</span>;
-}
-
-function translateImportMessage(message: string) {
-  const exact: Record<string, string> = {
-    "尚未上傳截圖": "No screenshots uploaded yet",
-    "單張截圖不可超過 15 MB": "Each screenshot must be 15 MB or smaller",
-    "正在讀取股票代碼與價格": "Reading tickers and prices",
-    "正在載入文字辨識器": "Loading text recognition",
-    "正在用交易所與 SEC 名錄核對股票代碼": "Checking tickers against exchange and SEC records",
-    "截圖辨識暫時無法使用": "Screenshot recognition is temporarily unavailable",
-  };
-  if (exact[message]) return exact[message];
-  return message
-    .replace(/^準備辨識 (\d+) 張截圖$/, "Preparing to scan $1 screenshot(s)")
-    .replace(/^辨識第 (\d+) \/ (\d+) 張截圖$/, "Scanning screenshot $1 of $2")
-    .replace(/^已辨識 (\d+) 檔，正在取得公開財務資料$/, "$1 ticker(s) found; retrieving public financial data")
-    .replace(/^完成：(\d+) 檔已加入，(\d+) 檔需要確認$/, "Complete: $1 added, $2 need review")
-    .replace(/^辨識失敗：/, "Recognition failed: ");
-}
-
-function translateImportStatus(status: ImportCandidate["status"]) {
-  return ({ "辨識完成": "Recognized", "計算中": "Calculating", "已加入": "Added", "需要確認": "Review" })[status];
 }
 
 function translateModelLabel(label: string) {
@@ -116,10 +90,6 @@ export default function Home() {
   const [selectedTicker, setSelectedTicker] = useState("");
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [importCandidates, setImportCandidates] = useState<ImportCandidate[]>([]);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importMessage, setImportMessage] = useState("尚未上傳截圖");
-  const [isImporting, setIsImporting] = useState(false);
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
@@ -347,7 +317,7 @@ export default function Home() {
     setWatchlist((current) => (current.includes(ticker) ? current.filter((item) => item !== ticker) : [...current, ticker]));
   }
 
-  async function requestValuation(candidate: Pick<ImportCandidate, "ticker" | "market" | "capturedPrice" | "capturedNav" | "capturedName">) {
+  async function requestValuation(candidate: ValuationCandidate) {
     const response = await fetch("/api/valuation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -379,127 +349,6 @@ export default function Home() {
       setLookupError(safeLookupError(error instanceof Error ? error.message : "", language));
     } finally {
       setIsLookupLoading(false);
-    }
-  }
-
-  async function handleArkUpload(event: ChangeEvent<HTMLInputElement>) {
-    const files = [...(event.target.files ?? [])].slice(0, 12);
-    if (!files.length) return;
-    if (files.some((file) => file.size > 15 * 1024 * 1024)) {
-      setImportMessage("單張截圖不可超過 15 MB");
-      event.target.value = "";
-      return;
-    }
-    setIsImporting(true);
-    setImportProgress(2);
-    setImportMessage(`準備辨識 ${files.length} 張截圖`);
-    setImportCandidates([]);
-
-    try {
-      const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("eng", 1, {
-        logger: (message) => {
-          if (typeof message.progress === "number") {
-            setImportProgress(Math.round(message.progress * 68));
-            setImportMessage(message.status === "recognizing text" ? "正在讀取股票代碼與價格" : "正在載入文字辨識器");
-          }
-        },
-      });
-      const documents: { fileName: string; text: string }[] = [];
-      try {
-        await worker.setParameters({ preserve_interword_spaces: "1" });
-        for (let index = 0; index < files.length; index += 1) {
-          setImportMessage(`辨識第 ${index + 1} / ${files.length} 張截圖`);
-          const file = files[index];
-          let width = 0;
-          let height = 0;
-          try {
-            const bitmap = await createImageBitmap(file);
-            width = bitmap.width;
-            height = bitmap.height;
-            bitmap.close();
-          } catch {
-            // Older browsers fall back to whole-image OCR below.
-          }
-
-          if (width && height) {
-            await worker.setParameters({ tessedit_pageseg_mode: "6" });
-            const bodyTop = Math.round(height * 0.18);
-            const bodyHeight = Math.round(height * 0.76);
-            const tickerColumn = await worker.recognize(file, {
-              rectangle: {
-                left: 0,
-                top: bodyTop,
-                width: Math.round(width * 0.42),
-                height: bodyHeight,
-              },
-            });
-            let text = tickerColumn.data.text;
-            if (/\b00[A-Z0-9]{2,5}\b/i.test(text)) {
-              const etfRows = await worker.recognize(file, {
-                rectangle: { left: 0, top: bodyTop, width, height: bodyHeight },
-              });
-              text += `\n${etfRows.data.text}`;
-            }
-            documents.push({ fileName: file.name, text });
-          } else {
-            await worker.setParameters({ tessedit_pageseg_mode: "3" });
-            const result = await worker.recognize(file);
-            documents.push({ fileName: file.name, text: result.data.text });
-          }
-        }
-      } finally {
-        await worker.terminate();
-      }
-
-      setImportMessage("正在用交易所與 SEC 名錄核對股票代碼");
-      const importResponse = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documents }),
-      });
-      const importPayload = await importResponse.json() as { candidates?: Omit<ImportCandidate, "status">[]; error?: string };
-      if (!importResponse.ok) throw new Error(importPayload.error || "無法核對股票代碼");
-      const deduplicated = importPayload.candidates ?? [];
-      if (!deduplicated.length) throw new Error("沒有找到可由 TWSE、TPEx 或 SEC 驗證的股票代碼");
-      setImportCandidates(deduplicated.map((candidate) => ({ ...candidate, status: "計算中" })));
-      setImportProgress(72);
-      setImportMessage(`已辨識 ${deduplicated.length} 檔，正在取得公開財務資料`);
-
-      const resolved: { candidate: ImportCandidate; stock?: StockInput }[] = [];
-      for (let index = 0; index < deduplicated.length; index += 1) {
-        const candidate = deduplicated[index];
-        try {
-          const stock = await requestValuation(candidate);
-          resolved.push({ candidate: { ...candidate, status: "已加入" }, stock });
-        } catch (error) {
-          resolved.push({
-            candidate: {
-              ...candidate,
-              status: "需要確認",
-              message: error instanceof Error ? error.message : "暫時無法建立估值",
-            },
-          });
-        }
-        setImportProgress(72 + Math.round(((index + 1) / deduplicated.length) * 27));
-      }
-
-      const addedStocks = resolved.flatMap((item) => item.stock ? [item.stock] : []);
-      setStockInputs((current) => {
-        const importedTickers = new Set(addedStocks.map((stock) => stock.ticker));
-        return [...current.filter((stock) => !importedTickers.has(stock.ticker)), ...addedStocks];
-      });
-      setWatchlist((current) => [...new Set([...current, ...addedStocks.map((stock) => stock.ticker)])]);
-      if (addedStocks[0]) setSelectedTicker(addedStocks[0].ticker);
-      setImportCandidates(resolved.map((item) => item.candidate));
-      setImportProgress(100);
-      setImportMessage(`完成：${addedStocks.length} 檔已加入，${resolved.length - addedStocks.length} 檔需要確認`);
-    } catch (error) {
-      setImportMessage(error instanceof Error ? `辨識失敗：${error.message}` : "截圖辨識暫時無法使用");
-      setImportProgress(0);
-    } finally {
-      setIsImporting(false);
-      event.target.value = "";
     }
   }
 
@@ -669,39 +518,6 @@ export default function Home() {
               <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
             </aside>
           )}
-        </section>
-
-        <section id="ark-import" className="ark-import-section" aria-labelledby="ark-import-title">
-          <div className="ark-import-copy">
-            <div className="ark-brand-row"><span className="ark-brand-logo" aria-hidden="true" /><div><span>ARKER {t("方舟運算", "Strategy")}</span><small>{t("外部策略工具", "External strategy tool")}</small></div></div>
-            <p className="section-kicker">ARK SCREENSHOT / 02</p>
-            <h2 id="ark-import-title">{t("把每天的方舟名單，", "Turn your daily ARKER list")}<br />{t("直接變成估值清單", "into a valuation watchlist")}</h2>
-            <p>{t("一次可選多張手機截圖。原始圖片只在你的瀏覽器中辨識、不會上傳；辨識出的文字代碼會送往伺服器，與 TWSE、TPEx 及 SEC 名錄核對後建立估值。ETF 則採用畫面中的即時淨值。", "Select multiple mobile screenshots at once. Images are recognized only in your browser and are never uploaded; extracted tickers are checked against TWSE, TPEx, and SEC records to build valuations. ETFs use the iNAV shown in the screenshot.")}</p>
-            <div className="ark-flow" aria-label={t("匯入步驟", "Import steps")}><span>{t("上傳截圖", "Upload")}</span><b>→</b><span>{t("辨識代碼", "Recognize")}</span><b>→</b><span>{t("計算公允價值", "Calculate fair value")}</span></div>
-          </div>
-          <div className="ark-upload-card">
-            <label className={`ark-dropzone ${isImporting ? "is-busy" : ""}`}>
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={isImporting} onChange={(event) => void handleArkUpload(event)} />
-              <span className="upload-icon">⇧</span>
-              <strong>{isImporting ? t("正在處理截圖", "Processing screenshots") : t("選擇方舟 App 截圖", "Choose ARKER App screenshots")}</strong>
-              <small>{t("支援 PNG、JPG、WebP，可一次上傳多張", "PNG, JPG, and WebP supported; select multiple files")}</small>
-            </label>
-            <div className="import-status" aria-live="polite">
-              <div><span>{language === "zh" ? importMessage : translateImportMessage(importMessage)}</span><b>{importProgress}%</b></div>
-              <span className="import-progress"><i style={{ width: `${importProgress}%` }} /></span>
-            </div>
-            {importCandidates.length > 0 && (
-              <div className="import-results">
-                {importCandidates.map((candidate) => (
-                  <div className="import-row" key={candidate.id}>
-                    <span className={`ticker-badge market-${candidate.market.toLowerCase()}`}>{candidate.market}</span>
-                    <span><strong>{candidate.ticker}</strong><small>{candidate.capturedPrice ? `${t("截圖價", "Screenshot price")} ${candidate.capturedPrice}` : candidate.fileName}</small></span>
-                    <span className={`import-state state-${candidate.status === "已加入" ? "done" : candidate.status === "需要確認" ? "warn" : "working"}`} title={candidate.message}>{language === "zh" ? candidate.status : translateImportStatus(candidate.status)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </section>
 
         <section id="overview" className="overview-grid" aria-label={t("估值摘要", "Valuation summary")}>

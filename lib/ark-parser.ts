@@ -11,7 +11,7 @@ export type ArkCandidate = {
 };
 
 export type ArkDocument = { fileName: string; text: string };
-export type SecTickerRow = { cik_str: number; ticker: string; title: string };
+export type SecTickerRow = { cik_str: number; ticker: string; title: string; price?: number };
 
 function numeric(value: unknown) {
   const parsed = Number(String(value ?? "").replaceAll(",", ""));
@@ -34,9 +34,11 @@ function companyNameScore(line: string, title: string, ticker: string) {
 }
 
 function nearbyNumbers(lines: string[], lineIndex: number, ticker: string) {
-  const neighborhood = lines.slice(Math.max(0, lineIndex), lineIndex + 3).join(" ");
-  const afterTicker = neighborhood.split(new RegExp(`\\b${escapeRegExp(ticker)}\\b`))[1] ?? neighborhood;
-  return [...afterTicker.matchAll(/(?<![A-Z0-9])\d{1,6}(?:,\d{3})*(?:\.\d+)?/g)]
+  const tickerPattern = new RegExp(`\\b${escapeRegExp(ticker)}\\b`, "g");
+  const currentLine = lines[lineIndex] ?? "";
+  const afterTicker = currentLine.split(tickerPattern)[1] ?? "";
+  const neighborhood = [afterTicker, ...lines.slice(Math.max(0, lineIndex - 2), lineIndex), ...lines.slice(lineIndex + 1, lineIndex + 3)].join(" ");
+  return [...neighborhood.replace(tickerPattern, " ").matchAll(/(?<![A-Z0-9])\d{1,6}(?:,\d{3})*(?:\.\d+)?/g)]
     .map((match) => numeric(match[0]))
     .filter((value) => value > 0 && value < 1_000_000);
 }
@@ -44,7 +46,11 @@ function nearbyNumbers(lines: string[], lineIndex: number, ticker: string) {
 function pickScreenshotValues(lines: string[], lineIndex: number, ticker: string, referencePrice: number) {
   const numbers = nearbyNumbers(lines, lineIndex, ticker);
   const plausible = referencePrice
-    ? numbers.filter((value) => Math.abs(value - referencePrice) / referencePrice <= 0.45)
+    ? numbers
+      .flatMap((value) => [value, value / 10, value / 100, value / 1000])
+      .filter((value, index, all) => value > 0 && all.findIndex((item) => Math.abs(item - value) < 0.0001) === index)
+      .filter((value) => Math.abs(value - referencePrice) / referencePrice <= 0.35)
+      .sort((left, right) => Math.abs(left - referencePrice) - Math.abs(right - referencePrice))
     : numbers;
   const capturedPrice = plausible[0];
   const capturedNav = capturedPrice
@@ -69,13 +75,17 @@ export function parseArkDocument(
     const twMatches = [...new Set(line.match(/\b(?:\d{4}|00[A-Z0-9]{2,5})\b/g) ?? [])]
       .filter((ticker) => twSymbols.has(ticker));
     twMatches.forEach((ticker) => {
+      if (!new RegExp(`^\\s*${escapeRegExp(ticker)}\\b`).test(line)) return;
       const symbol = twSymbols.get(ticker)!;
+      const values = pickScreenshotValues(lines, lineIndex, ticker, symbol.price);
+      if (!values.capturedPrice) return;
+      if (/^00/.test(ticker) && !values.capturedNav) values.capturedNav = values.capturedPrice;
       found.push({
         id: `${document.fileName}-${ticker}-${lineIndex}`,
         ticker,
         market: "TW",
         capturedName: symbol.name,
-        ...pickScreenshotValues(lines, lineIndex, ticker, symbol.price),
+        ...values,
         fileName: document.fileName,
       });
     });
@@ -86,12 +96,19 @@ export function parseArkDocument(
     if (!possibleUs.length) return;
 
     const best = possibleUs
-      .map((ticker) => ({ ticker, score: companyNameScore(line, usSymbols.get(ticker)!.title, ticker) }))
+      .map((ticker) => ({
+        ticker,
+        score: Math.max(
+          companyNameScore(line, usSymbols.get(ticker)!.title, ticker),
+          companyNameScore(lines.slice(Math.max(0, lineIndex - 2), lineIndex + 1).join(" "), usSymbols.get(ticker)!.title, ticker),
+        ),
+        startsLine: new RegExp(`^\\s*${escapeRegExp(ticker)}\\b`).test(line),
+      }))
       .sort((a, b) => b.score - a.score)[0];
-    if (best.score < 3) return;
-
     const company = usSymbols.get(best.ticker)!;
-    const values = pickScreenshotValues(lines, lineIndex, best.ticker, 0);
+    const values = pickScreenshotValues(lines, lineIndex, best.ticker, company.price ?? 0);
+    const hasQuoteSignal = /%|[▲▼△▽]/.test(line);
+    if (best.score < 4 && (!best.startsLine || !hasQuoteSignal || !values.capturedPrice)) return;
     found.push({
       id: `${document.fileName}-${best.ticker}-${lineIndex}`,
       ticker: best.ticker,

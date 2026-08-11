@@ -157,6 +157,26 @@ a { color: inherit; text-decoration: none; }
 .state-warn { max-width: 84px; overflow: hidden; background: #f8f1df; color: #956f2b; text-overflow: ellipsis; }
 .state-working { background: #edf0f7; color: var(--blue); }
 
+.ark-page { padding-top: 24px; padding-bottom: 86px; }
+.ark-page-heading { padding: 56px 52px 48px; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: radial-gradient(circle at 86% 15%, rgba(105, 111, 191, .18), transparent 34%), linear-gradient(125deg, #f8fbf8 0%, #eef7f1 52%, #f2f3f8 100%); }
+.ark-page-heading h1 { max-width: 920px; margin: 12px 0 18px; color: var(--ink); font-size: clamp(46px, 6vw, 76px); line-height: 1.02; letter-spacing: -.065em; }
+.ark-page-heading h1 em { color: var(--green); font-style: normal; }
+.ark-page-heading > p:last-child { max-width: 820px; margin: 0; color: var(--ink-soft); font-size: 15px; line-height: 1.8; }
+.ark-page-import { margin-top: 20px; }
+.ark-result-panel { margin-top: 20px; padding: 34px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.ark-result-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.ark-result-heading h2 { margin: 8px 0 0; font-size: clamp(30px, 3.2vw, 44px); letter-spacing: -.05em; }
+.ark-result-heading a { color: var(--green-deep); font-size: 12px; font-weight: 800; }
+.ark-result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 26px; }
+.ark-result-card { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
+.ark-result-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ark-result-card > strong { display: block; margin-top: 16px; color: var(--ink); font-size: 28px; letter-spacing: -.04em; }
+.ark-result-card > p { min-height: 20px; margin: 3px 0 18px; color: var(--ink-faint); font-size: 11px; }
+.ark-result-card > small { display: block; color: #956f2b; font-size: 10px; line-height: 1.6; }
+.ark-result-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ark-result-values span { color: var(--ink-faint); font-size: 9px; }
+.ark-result-values b { display: block; margin-top: 5px; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+
 .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 24px 0; }
 .metric-card { min-height: 128px; padding: 21px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .accent-card { border-color: #b9d9ca; background: #eff8f2; }
@@ -419,7 +439,7 @@ a { color: inherit; text-decoration: none; }
   .workspace-badge { display: none; }
   .brand { min-width: 0; }
   .header-controls { min-width: 0; gap: 8px; }
-  .mobile-nav { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .mobile-nav { order: 3; width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
   .mobile-nav a { display: grid; place-items: center; min-height: 31px; border-radius: 6px; color: var(--ink-faint); font-size: 10px; font-weight: 700; }
   .mobile-nav a.active { background: var(--green-pale); color: var(--green-deep); }
   .language-switch { padding: 3px; }
@@ -445,6 +465,16 @@ a { color: inherit; text-decoration: none; }
   .ark-import-section { display: block; margin-top: 15px; padding: 28px 20px 20px; }
   .ark-upload-card { margin-top: 25px; }
   .ark-flow { flex-wrap: wrap; }
+  .ark-page { padding-top: 15px; }
+  .ark-page-heading { padding: 43px 21px 38px; }
+  .ark-page-heading h1 { font-size: 43px; }
+  .ark-page-heading > p:last-child { font-size: 13px; }
+  .ark-result-panel { padding: 24px 18px; }
+  .ark-result-heading { display: block; }
+  .ark-result-heading a { display: inline-flex; margin-top: 16px; }
+  .ark-result-grid { grid-template-columns: 1fr; }
+  .ark-result-values { gap: 7px; }
+  .ark-result-values b { font-size: 13px; }
   .metric-card { min-height: 113px; padding: 16px; }
   .metric-card strong { font-size: 23px; }
   .panel-heading { display: block; padding: 24px 18px 19px; }

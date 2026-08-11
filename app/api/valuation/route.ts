@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clamp, valuationTargets } from "../../../lib/valuation";
+import { fallbackUsSymbols, findArkUsSnapshot, type ArkUsSnapshotRow } from "../../../lib/ark-directory";
 import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 
@@ -156,7 +157,9 @@ async function secTickerMap() {
   secTickerMapPromise ??= fetchJson<Record<string, SecTickerRow>>(
     "https://www.sec.gov/files/company_tickers.json",
     SEC_HEADERS,
-  );
+  ).catch(() => Object.fromEntries(
+    [...fallbackUsSymbols().values()].map((row, index) => [String(index), row]),
+  ));
   return secTickerMapPromise;
 }
 
@@ -190,16 +193,54 @@ async function nasdaqMarketPrice(ticker: string) {
   }
 }
 
+function valueUsSnapshot(body: ValuationRequest, ticker: string, snapshot: ArkUsSnapshotRow) {
+  const price = preferCapturedPrice(body.capturedPrice, numeric(snapshot.price));
+  const eps = Math.max(numeric(snapshot.eps), 0);
+  const bvps = Math.max(numeric(snapshot.bvps), 0);
+  const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
+  const targets = valuationTargets(0, roe, 0);
+  if (!price || (!eps && !bvps)) throw new Error("內建財務快照不足，暫時無法建立可靠估值");
+
+  return {
+    ticker,
+    name: body.capturedName?.trim() || snapshot.name,
+    market: "US" as const,
+    assetType: "EQUITY" as const,
+    sector: snapshot.sector || "美股公開發行公司",
+    price,
+    eps,
+    bvps,
+    fcfPerShare: 0,
+    dividendPerShare: Math.max(numeric(snapshot.dividendPerShare), 0),
+    ...targets,
+    revenueGrowth: 0,
+    roe,
+    debtRatio: 0,
+    uncertainty: eps > 0 && bvps > 0 ? 0.32 : 0.4,
+    qualityAvailable: false,
+    updatedAt: snapshot.date,
+    source: "自動資料" as const,
+    sourceNote: "SEC 即時資料暫時無法連線，本次改用網站內建的 Nasdaq／SEC 公開財務快照。估值僅採 EPS、每股淨值與股利，不含即時現金流與成長預測；請留意畫面資料日期。",
+  };
+}
+
 async function valueUsStock(body: ValuationRequest, ticker: string) {
   const map = await secTickerMap();
   const company = Object.values(map).find((row) => row.ticker.toUpperCase() === ticker);
   if (!company) throw new Error("SEC 公司名錄中找不到這個美股代碼");
 
+  const snapshot = findArkUsSnapshot(ticker);
+  if (!company.cik_str && snapshot) return valueUsSnapshot(body, ticker, snapshot);
+
   const cik = String(company.cik_str).padStart(10, "0");
   const [facts, submissions] = await Promise.all([
-    fetchJson<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS),
+    fetchOptionalValue<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS),
     fetchOptionalValue<SecSubmissions>(`https://data.sec.gov/submissions/CIK${cik}.json`, SEC_HEADERS),
   ]);
+  if (!facts) {
+    if (snapshot) return valueUsSnapshot(body, ticker, snapshot);
+    throw new Error("SEC 公開財務資料暫時無法連線，且此代碼尚無內建財務快照");
+  }
   const taxonomy = facts.facts?.["us-gaap"] ? "us-gaap" : "ifrs-full";
   const isUsGaap = taxonomy === "us-gaap";
 
@@ -218,7 +259,7 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   const sharesFact = latestFacts(
     facts,
     isUsGaap ? "dei" : taxonomy,
-    isUsGaap ? ["EntityCommonStockSharesOutstanding"] : ["NumberOfSharesOutstanding"],
+    isUsGaap ? ["EntityCommonStockSharesOutstanding"] : ["NumberOfSharesOutstanding", "NumberOfSharesIssuedAndFullyPaid"],
     ["shares"],
   )[0] ?? latestFacts(
     facts,
@@ -268,13 +309,14 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   );
 
   const shares = numeric(sharesFact?.val);
-  const eps = Math.max(numeric(epsFact?.val), 0);
-  const bvps = shares > 0 ? Math.max(numeric(equityFact?.val) / shares, 0) : 0;
+  const adrRatio = ticker === "TSM" ? 5 : 1;
+  const eps = Math.max(numeric(epsFact?.val) * adrRatio, 0);
+  const bvps = shares > 0 ? Math.max((numeric(equityFact?.val) / shares) * adrRatio, 0) : 0;
   const annualFcf = numeric(operatingCashFact?.val) - Math.abs(numeric(capexFact?.val));
-  const fcfPerShare = shares > 0 ? Math.max(annualFcf / shares, 0) : 0;
+  const fcfPerShare = shares > 0 ? Math.max((annualFcf / shares) * adrRatio, 0) : 0;
   const dividendPerShare = Math.max(
-    numeric(dividendPerShareFact?.val)
-      || (shares > 0 ? Math.abs(numeric(dividendsPaidFact?.val)) / shares : 0),
+    numeric(dividendPerShareFact?.val) * adrRatio
+      || (shares > 0 ? (Math.abs(numeric(dividendsPaidFact?.val)) / shares) * adrRatio : 0),
     0,
   );
   const marketQuote = await nasdaqMarketPrice(ticker);

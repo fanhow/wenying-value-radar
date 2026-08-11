@@ -37,7 +37,25 @@ test("renders development preview metadata", async () => {
   assert.match(html, /語言選擇/);
   assert.match(html, /MARKET SCAN \/ 04/);
   assert.doesNotMatch(html, /我們不是賭徒/);
-  assert.ok(html.indexOf("公允價值排行榜") < html.indexOf("把每天的方舟名單"));
+  assert.match(html, /方舟運算/);
+  assert.doesNotMatch(html, /選擇方舟 App 截圖/);
+});
+
+test("renders the standalone ARKER import page in Chinese by default", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("ark", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/ark", { headers: { accept: "text/html" } }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /把方舟名單/);
+  assert.match(html, /選擇方舟 App 截圖/);
+  assert.match(html, /內建名錄與財務快照/);
 });
 
 test("renders the About Us page in Chinese by default", async () => {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "./language-context";
 
-export function SiteHeader({ active }: { active: "home" | "funds" | "about" }) {
+export function SiteHeader({ active }: { active: "home" | "funds" | "ark" | "about" }) {
   const { language, setLanguage, t } = useLanguage();
 
   return (
@@ -15,7 +15,7 @@ export function SiteHeader({ active }: { active: "home" | "funds" | "about" }) {
       <nav className="topnav" aria-label={t("主要導覽", "Primary navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Fund Tracker")}</Link>
-        <Link href="/#ark-import">{t("方舟匯入", "ARK Import")}</Link>
+        <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK Tool")}</Link>
         <Link href="/#watchlist">{t("我的觀察", "Watchlist")}</Link>
         <Link href="/#method">{t("模型說明", "Method")}</Link>
         <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About Us")}</Link>
@@ -30,6 +30,7 @@ export function SiteHeader({ active }: { active: "home" | "funds" | "about" }) {
       <nav className="mobile-nav" aria-label={t("手機版導覽", "Mobile navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Funds")}</Link>
+        <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK")}</Link>
         <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About")}</Link>
       </nav>
     </header>
