@@ -93,7 +93,7 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
     financialLeverage: hasFinancialLeverage ? numeric(row.financialLeverage) : undefined,
     uncertainty: historicalFieldCount >= 2 ? 0.27 : eps > 0 && bvps > 0 ? 0.3 : 0.4,
     updatedAt: row.date,
-    dataBasis: market === "US" ? "annual" : "market-ratio",
+    dataBasis: row.dataBasis ?? (market === "US" ? "annual" : "market-ratio"),
     financialDataDate: row.financialDataDate ?? row.date,
     source: "自動資料",
     sourceNote: market === "TW"

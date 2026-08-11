@@ -1,10 +1,12 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { runSnapshotJob, snapshotKindForCron, type SnapshotValuation } from "../lib/snapshot-scheduler";
+import { setRuntimeDatabase } from "../lib/runtime-env";
 
 interface Env {
   ASSETS: Fetcher;
-  DB: D1Database;
+  DB?: D1Database;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -19,6 +21,11 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+interface ScheduledController {
+  cron: string;
+  scheduledTime: number;
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -27,6 +34,7 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    setRuntimeDatabase(env.DB);
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {
@@ -41,6 +49,29 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+  },
+
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    setRuntimeDatabase(env.DB);
+    const kind = snapshotKindForCron(controller.cron);
+    ctx.waitUntil(runSnapshotJob(kind, {
+      database: env.DB,
+      invokeValuation: kind === "quarterly-financial"
+        ? async (ticker, market) => {
+          const request = new Request("https://snapshot.internal/api/valuation", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ticker, market }),
+          });
+          const response = await handler.fetch(request, env, ctx);
+          if (!response.ok) return null;
+          const payload = await response.json() as { stock?: Record<string, unknown> };
+          return payload.stock
+            ? { ...payload.stock, ticker, market } as SnapshotValuation
+            : null;
+        }
+        : undefined,
+    }));
   },
 };
 

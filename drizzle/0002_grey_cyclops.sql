@@ -1,0 +1,1 @@
+CREATE INDEX `idx_snapshot_runs_started_at` ON `snapshot_runs` (`started_at`);

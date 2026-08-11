@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
+import { shouldRefreshSavedStock } from "../lib/data-freshness";
 import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 
@@ -159,6 +160,7 @@ export default function Home() {
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const initialTickerHandled = useRef(false);
+  const initialSavedRefreshHandled = useRef(false);
   const [form, setForm] = useState({
     ticker: "",
     name: "",
@@ -377,6 +379,15 @@ export default function Home() {
     window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
+  function openWatchlistStock(ticker: string) {
+    const local = stocks.find((stock) => stock.ticker === ticker);
+    if (local && local.source !== "手動輸入" && local.source !== "方舟截圖") {
+      void lookupTicker(ticker, true);
+      return;
+    }
+    selectStock(ticker);
+  }
+
   function openRankedStock(ticker: string) {
     selectStock(ticker);
     void lookupTicker(ticker, true);
@@ -397,7 +408,7 @@ export default function Home() {
     return payload.stock;
   }
 
-  async function lookupTicker(value = query, forceRefresh = false) {
+  const lookupTicker = useCallback(async (value = query, forceRefresh = false) => {
     const ticker = value.trim().toUpperCase();
     if (!ticker) return;
     const local = stocks.find((stock) => stock.ticker === ticker);
@@ -419,7 +430,14 @@ export default function Home() {
     } finally {
       setIsLookupLoading(false);
     }
-  }
+  }, [language, query, stocks]);
+
+  useEffect(() => {
+    if (!hasLoadedStorage || initialSavedRefreshHandled.current) return;
+    initialSavedRefreshHandled.current = true;
+    const saved = stockInputs.find((stock) => stock.ticker === selectedTicker);
+    if (saved && shouldRefreshSavedStock(saved)) void lookupTicker(saved.ticker, true);
+  }, [hasLoadedStorage, lookupTicker, selectedTicker, stockInputs]);
 
   useEffect(() => {
     if (!hasLoadedStorage || initialTickerHandled.current) return;
@@ -526,6 +544,11 @@ export default function Home() {
                 onChange={(event) => handleQueryChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
+                    const exact = stocks.find((stock) => stock.ticker.toLowerCase() === query.trim().toLowerCase());
+                    if (exact && exact.source !== "手動輸入" && exact.source !== "方舟截圖") {
+                      void lookupTicker(exact.ticker, true);
+                      return;
+                    }
                     const suggestion = searchSuggestions[0];
                     if (suggestion?.isLoaded && !suggestion.isRefreshable) selectStock(suggestion.ticker);
                     else void lookupTicker(suggestion?.ticker ?? query, Boolean(suggestion?.isLoaded));
@@ -539,7 +562,7 @@ export default function Home() {
             </div>
             <div className="search-hints">
               <span>{t("快速查看", "Quick access")}</span>
-              {watchlist.slice(0, 4).map((ticker) => <button key={ticker} type="button" onClick={() => selectStock(ticker)}>{ticker}</button>)}
+              {watchlist.slice(0, 4).map((ticker) => <button key={ticker} type="button" onClick={() => openWatchlistStock(ticker)}>{ticker}</button>)}
             </div>
             {query && !exactMatch && searchSuggestions.length > 0 && (
               <div className="search-results-popover">
@@ -689,7 +712,7 @@ export default function Home() {
               <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("穩健模型組合", "Robust Model Set")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試，再以中位數形成中央公允價值。現金流轉換率異常時先正規化，避免同一異常值同時放大 P/FCF 與兩個 DCF。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests, then form the central fair value by median. Abnormal cash-flow conversion is normalized before it can amplify P/FCF and both DCF models.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
         </section>
 
-        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
+        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。每日價格與季度財報由背景快照排程更新，若來源暫時不可用則保留上一份可追溯資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. Background snapshots refresh prices daily and core financials quarterly; if a source is temporarily unavailable, the last traceable snapshot remains in use. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
 
         {showAddForm && (
           <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAddForm(false); }}>
