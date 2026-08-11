@@ -49,8 +49,12 @@ function formatSignedPercent(value: number) {
 }
 
 function RiskPill({ risk, language }: { risk: Stock["risk"]; language: Language }) {
-  const englishRisk = risk === "低" ? "Low" : risk === "中" ? "Medium" : "High";
-  return <span className={`risk-pill risk-${risk === "低" ? "low" : risk === "中" ? "medium" : "high"}`}>{language === "zh" ? `${risk}風險` : `${englishRisk} Risk`}</span>;
+  const label = risk === "低"
+    ? (language === "zh" ? "較穩定" : "Stable")
+    : risk === "中"
+      ? (language === "zh" ? "一般" : "Moderate")
+      : (language === "zh" ? "需審慎" : "Needs review");
+  return <span className={`risk-pill risk-${risk === "低" ? "low" : risk === "中" ? "medium" : "high"}`}>{label}</span>;
 }
 
 function ConfidencePill({ confidence, language }: { confidence: Stock["valuationConfidence"]; language: Language }) {
@@ -339,6 +343,7 @@ export default function Home() {
         name: stock.name,
         upside: stock.upside,
         isLoaded: true,
+        isRefreshable: stock.source !== "手動輸入",
       }));
     const directory = findStockDirectoryEntries(query)
       .filter((entry) => !loaded.some((stock) => stock.ticker === entry.ticker))
@@ -348,11 +353,12 @@ export default function Home() {
         name: language === "zh" ? entry.nameZh : entry.nameEn,
         upside: null,
         isLoaded: false,
+        isRefreshable: false,
       }));
     const remote = remoteSymbols
       .filter((entry) => !loaded.some((stock) => stock.ticker === entry.ticker)
         && !directory.some((stock) => stock.ticker === entry.ticker))
-      .map((entry) => ({ ...entry, upside: null, isLoaded: false }));
+      .map((entry) => ({ ...entry, upside: null, isLoaded: false, isRefreshable: false }));
 
     return [...loaded, ...directory, ...remote].slice(0, 4);
   }, [language, query, remoteSymbols, stocks]);
@@ -369,6 +375,11 @@ export default function Home() {
     setSelectedTicker(ticker);
     setQuery("");
     window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  function openRankedStock(ticker: string) {
+    selectStock(ticker);
+    void lookupTicker(ticker, true);
   }
 
   function toggleWatchlist(ticker: string) {
@@ -499,8 +510,8 @@ export default function Home() {
         <section className="hero" aria-labelledby="page-title">
           <div className="hero-copy">
             <p className="eyebrow"><span className="eyebrow-line" />{t("公允價值研究首頁", "FAIR VALUE RESEARCH")} <span className="beta-tag">BETA</span></p>
-            <h1 id="page-title">{t("看見價格，", "See the price,")}<br /><em>{t("也看見它與價值的距離。", "and the distance to value.")}</em></h1>
-            <p className="hero-description">{t("搜尋台股與美股、匯入方舟名單，以透明模型比較目前價格、公允價值與上行空間。", "Search Taiwan and U.S. stocks or import an ARKER list, then compare market price, fair value, and potential upside through transparent models.")}</p>
+            <h1 id="page-title">{t("看見價格", "See the price")}<br /><em>{t("也看見它與價值的距離", "and the distance to value")}</em></h1>
+            <p className="hero-description">{t("搜尋台股與美股、匯入方舟名單，以透明模型比較目前價格、公允價值與上行空間", "Search Taiwan and U.S. stocks or import an ARKER list, then compare market price, fair value, and potential upside through transparent models")}</p>
             <div className="hero-principles" aria-label={t("公允價值研究重點", "Fair value research priorities")}>
               <span>{t("目前價格", "Market Price")}</span><span>{t("公允價值", "Fair Value")}</span><span>{t("安全邊際", "Margin of Safety")}</span>
             </div>
@@ -516,8 +527,8 @@ export default function Home() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     const suggestion = searchSuggestions[0];
-                    if (suggestion?.isLoaded) selectStock(suggestion.ticker);
-                    else void lookupTicker(suggestion?.ticker ?? query);
+                    if (suggestion?.isLoaded && !suggestion.isRefreshable) selectStock(suggestion.ticker);
+                    else void lookupTicker(suggestion?.ticker ?? query, Boolean(suggestion?.isLoaded));
                   }
                 }}
                 placeholder={t("輸入 2330、3508 或 AAPL", "Enter 2330, 3508, or AAPL")}
@@ -533,7 +544,7 @@ export default function Home() {
             {query && !exactMatch && searchSuggestions.length > 0 && (
               <div className="search-results-popover">
                 {searchSuggestions.map((suggestion) => (
-                  <button type="button" key={suggestion.ticker} onClick={() => suggestion.isLoaded ? selectStock(suggestion.ticker) : void lookupTicker(suggestion.ticker)}>
+                  <button type="button" key={suggestion.ticker} onClick={() => suggestion.isLoaded && !suggestion.isRefreshable ? selectStock(suggestion.ticker) : void lookupTicker(suggestion.ticker, Boolean(suggestion.isLoaded))}>
                     <span><strong>{suggestion.ticker}</strong> <span className="suggestion-name">{suggestion.name}</span></span>
                     {suggestion.upside === null
                       ? <span className="suggestion-market">{suggestion.market === "TW" ? t("台股", "Taiwan") : t("美股", "U.S.")}</span>
@@ -574,28 +585,28 @@ export default function Home() {
               </div>
             </div>
             <div className="filter-tabs" role="tablist" aria-label={t("股票篩選", "Stock filters")}>
-              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["overvalued", t("高估候選 40", "Top 40 Overvalued")], ["quality", t("高品質", "High quality")], ["risk", t("高風險警示", "High risk")]] as [Filter, string][]).map(([key, label]) => (
+              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["overvalued", t("高估候選 40", "Top 40 Overvalued")], ["quality", t("高品質", "High quality")], ["risk", t("審慎檢視", "Needs review")]] as [Filter, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={filter === key ? "selected" : ""} onClick={() => setFilter(key)} role="tab" aria-selected={filter === key}>{label}</button>
               ))}
             </div>
             <div className="stock-table-wrap">
               <table className="stock-table">
                 <thead>
-                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("風險／信心", "Risk / Confidence")}</th><th scope="col"><span className="sr-only">{t("操作", "Actions")}</span></th></tr>
+                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("模型狀態／信心", "Model Status / Confidence")}</th><th scope="col"><span className="sr-only">{t("操作", "Actions")}</span></th></tr>
                 </thead>
                 <tbody>
                   {filteredStocks.map((stock) => {
                     const isSelected = selected?.ticker === stock.ticker;
                     const isWatched = watchlist.includes(stock.ticker);
                     return (
-                      <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} onClick={() => setSelectedTicker(stock.ticker)}>
+                      <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} role="button" tabIndex={0} onClick={() => openRankedStock(stock.ticker)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRankedStock(stock.ticker); } }}>
                         <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stock.name} · {stock.sector}</small></span></div></td>
                         <td data-label={t("目前價格", "Current Price")}><span className="table-number">{formatPrice(stock.price, stock.market)}</span></td>
                         <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("區間", "Range")} ${formatPrice(stock.rangeLow, stock.market)} – ${formatPrice(stock.rangeHigh, stock.market)}`}</small></td>
                         <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}`}><TrendMark positive={stock.upside >= 0} /> {formatSignedPercent(stock.upside)}</span></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
-                        <td data-label={t("風險／信心", "Risk / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /></div></td>
-                        <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); selectStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
+                        <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /></div></td>
+                        <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); openRankedStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
                       </tr>
                     );
                   })}
@@ -612,11 +623,12 @@ export default function Home() {
               <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /></div></div>
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong>{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
               <div className="fair-value-focus">
-                <div><span className="focus-label">{t("模型平均公允價值", "Model Average Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div>
+                <div><span className="focus-label">{t("模型中位公允價值", "Median Model Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div>
                 <div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("悲觀", "Bear")} {formatPrice(selected.rangeLow, selected.market)}</span><span>{t("樂觀", "Bull")} {formatPrice(selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>
                 <div className="valuation-meta-grid">
                   <div><span>CAPM / WACC</span><strong>CAPM {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
                   <div><span>{t("資料基礎", "Data Basis")}</span><strong>{formatDataBasis(selected.assumptions.dataBasis, language)}</strong>{selected.assumptions.financialDataDate && <small>{t("財務日期", "Financial date")} {selected.assumptions.financialDataDate}</small>}</div>
+                  {selected.assumptions.fcfNormalizationApplied && <div><span>{t("FCF 正規化", "FCF Normalization")}</span><strong>{formatPrice(selected.assumptions.reportedFcfPerShare, selected.market)} → {formatPrice(selected.assumptions.normalizedFcfPerShare, selected.market)}</strong><small>{t("避免單期現金流重複放大多個模型", "Prevents one-period cash flow from amplifying several models")}</small></div>}
                 </div>
                 {selected.assumptions.structuralThemes.length > 0 && <div className="structural-theme-panel">
                   <div className="structural-theme-heading"><div><span>{t("結構性趨勢", "Structural Themes")}</span><strong>{selected.assumptions.structuralThemes.map((theme) => language === "zh" ? theme.nameZh : theme.nameEn).join(" · ")}</strong></div><small>{t("資料截至", "As of")} {selected.assumptions.themeAsOf} · {t("下次檢視", "Review")} {selected.assumptions.themeReviewAfter}</small></div>
@@ -626,16 +638,16 @@ export default function Home() {
                 </div>}
               </div>
               <div className="detail-section">
-                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{t("等權適用模型 · 合計 100%", "Equal-weight applicable models · total 100%")}</span></div>
+                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{t("適用模型等權列示 · 中央值採中位數", "Applicable models listed equally · median center")}</span></div>
                 <div className="model-list">{selected.models.map((model) => (
                   <div className="model-row" key={model.id || model.label}>
                     <div className="model-label"><span className="model-dot" /><span><strong>{localizedModelLabel(model, language)}</strong><small>{localizedModelExplanation(model, language)}</small></span></div>
-                    <div className="model-value"><span>{t("基準", "Base")}</span><strong>{formatPrice(model.value, selected.market)}</strong><small>{t("區間", "Range")} {formatPrice(model.rangeLow, selected.market)} – {formatPrice(model.rangeHigh, selected.market)}</small><em>{t("等權", "Equal weight")} {formatModelWeight(model.weight)}</em></div>
+                    <div className="model-value"><span>{t("基準", "Base")}</span><strong>{formatPrice(model.value, selected.market)}</strong><small>{t("區間", "Range")} {formatPrice(model.rangeLow, selected.market)} – {formatPrice(model.rangeHigh, selected.market)}</small><em>{t("等權參考", "Equal reference")} {formatModelWeight(model.weight)}</em></div>
                   </div>
                 ))}</div>
               </div>
-              <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與風險", "Quality & Risk")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
-              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入平均", "Not included in the average")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
+              <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與模型狀態", "Quality & Model Status")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
+              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
               {selected.valuationConfidence === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.historicalCaution ? t("目前主要依據公開歷史財報；資料日期、模型數量或模型分歧使結果的不確定性較高。畫面保留計算結果供研究，但不做強烈高低估判定。", "The estimate mainly uses public historical filings. Data age, model count, or model dispersion increases uncertainty, so the result remains visible for research without a strong valuation call.") : t("目前公開資料缺少足夠的現金流、成長或負債資訊，因此只能提供初步參考。", "Public cash-flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
               <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
             </aside>
@@ -673,8 +685,8 @@ export default function Home() {
         </section>
 
         <section id="method" className="method-section">
-          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統只平均真正適用的模型，每個納入模型採等權；不適用模型會列出排除原因。極端值由不參考目前股價的 robust filter 檢查，避免市場價格反過來影響公允價值。估值只使用公開 LTM、年度財報與市場比率；公開資料不足時會降低信心，不假裝精準。", "Only applicable models enter the average, and every included model receives equal weight. Exclusions are explained. A robust filter that does not use the current price checks extreme results, so market price cannot feed back into fair value. Estimates use only public LTM, annual filings, and market ratios; incomplete public data lowers confidence.")}</p></div>
-              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("等權模型組合", "Equal-Weight Model Set")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試，再以等權平均形成公允價值；缺少可驗證倍數時不勉強納入。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests, then contribute equally. Unverified multiples are excluded.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
+          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統只納入真正適用的模型，中央公允價值採中位數，降低同一項現金流或單一極端模型重複放大的影響。不適用模型會列出排除原因，robust filter 也不參考目前股價。估值只使用公開 LTM、年度財報與市場比率；公開資料不足時會降低信心，不假裝精準。", "Only applicable models are included, and the central fair value uses the median to reduce repeated amplification from one cash-flow input or an extreme model. Exclusions are explained, and the robust filter does not use the current price. Estimates use only public LTM, annual filings, and market ratios; incomplete public data lowers confidence.")}</p></div>
+              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("穩健模型組合", "Robust Model Set")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試，再以中位數形成中央公允價值。現金流轉換率異常時先正規化，避免同一異常值同時放大 P/FCF 與兩個 DCF。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests, then form the central fair value by median. Abnormal cash-flow conversion is normalized before it can amplify P/FCF and both DCF models.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
         </section>
 
         <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>

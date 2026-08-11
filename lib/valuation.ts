@@ -97,6 +97,10 @@ export type ValuationAssumptions = {
   themeReviewAfter?: string;
   startingGrowth: number;
   terminalGrowth: number;
+  aggregationMethod: "median";
+  reportedFcfPerShare: number;
+  normalizedFcfPerShare: number;
+  fcfNormalizationApplied: boolean;
   dataBasis: string;
   financialDataDate?: string;
   defaulted: string[];
@@ -367,11 +371,11 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const price = Math.max(numeric(input.price), 0);
   const eps = numeric(input.eps);
   const bvps = numeric(input.bvps);
-  const fcfPerShare = numeric(input.fcfPerShare);
+  const reportedFcfPerShare = numeric(input.fcfPerShare);
   const dividendPerShare = Math.max(numeric(input.dividendPerShare), 0);
-  const targetPe = Math.max(numeric(input.targetPe), 0);
+  const suppliedTargetPe = Math.max(numeric(input.targetPe), 0);
   const targetPb = Math.max(numeric(input.targetPb), 0);
-  const targetFcfMultiple = Math.max(numeric(input.targetFcfMultiple), 0);
+  const suppliedTargetFcfMultiple = Math.max(numeric(input.targetFcfMultiple), 0);
   const revenueGrowth = numeric(input.revenueGrowth);
   const roe = numeric(input.roe);
   const debtRatio = numeric(input.debtRatio);
@@ -411,6 +415,10 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       structuralBlendWeight: 0,
       startingGrowth: 0,
       terminalGrowth: 0,
+      aggregationMethod: "median",
+      reportedFcfPerShare,
+      normalizedFcfPerShare: reportedFcfPerShare,
+      fcfNormalizationApplied: false,
       dataBasis,
       financialDataDate,
       defaulted: [],
@@ -420,11 +428,11 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       price,
       eps,
       bvps,
-      fcfPerShare,
+      fcfPerShare: reportedFcfPerShare,
       dividendPerShare,
-      targetPe,
+      targetPe: suppliedTargetPe,
       targetPb,
-      targetFcfMultiple,
+      targetFcfMultiple: suppliedTargetFcfMultiple,
       revenueGrowth,
       roe,
       debtRatio,
@@ -448,6 +456,65 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   }
 
   const financial = isFinancialCompany(input);
+  const cashPerShare = Math.max(numeric(input.cashPerShare), 0);
+  const debtPerShare = Math.max(numeric(input.debtPerShare), 0);
+  const netDebtPerShare = debtPerShare - cashPerShare;
+  const revenuePerShare = Math.max(numeric(input.revenuePerShare), 0);
+  const ebitdaPerShare = Math.max(numeric(input.ebitdaPerShare), 0);
+  const ebitPerShare = Math.max(numeric(input.ebitPerShare), 0);
+  const netMarginPercent = rate(input.netMargin, 0) * 100;
+  const netDebtToEbitda = ebitdaPerShare > 0
+    ? Math.max(netDebtPerShare, 0) / ebitdaPerShare
+    : 0;
+  const hasFundamentalMultipleInputs = !financial
+    && input.source !== "手動輸入"
+    && eps > 0
+    && revenuePerShare > 0
+    && ebitdaPerShare > 0
+    && input.netMargin !== undefined
+    && input.debtPerShare !== undefined
+    && input.cashPerShare !== undefined;
+  const hasFundamentalEvInputs = hasFundamentalMultipleInputs
+    && (dataBasis === "ltm" || dataBasis === "annual");
+  const targetPe = hasFundamentalMultipleInputs
+    ? clamp(
+      12 + Math.max(revenueGrowth, 0) * 0.6 + Math.max(netMarginPercent, 0) * 0.4
+        - netDebtToEbitda * 2,
+      10,
+      36,
+    )
+    : suppliedTargetPe;
+  const targetFcfMultiple = hasFundamentalMultipleInputs
+    ? clamp(
+      12 + Math.max(revenueGrowth, 0) * 0.5 + Math.max(netMarginPercent, 0) * 0.35
+        - netDebtToEbitda * 4,
+      8,
+      32,
+    )
+    : suppliedTargetFcfMultiple;
+  const fcfConversionCap = dataCompleteness === "limited"
+    || dataBasis === "estimated"
+    || netDebtToEbitda >= 1.5
+    ? 1.25
+    : 1.6;
+  const suppliedNormalizedFcf = Math.max(numeric(input.normalizedFcfPerShare), 0);
+  const normalizedFcfPerShare = reportedFcfPerShare > 0 && eps > 0
+    ? Math.min(
+      reportedFcfPerShare,
+      suppliedNormalizedFcf > 0 ? suppliedNormalizedFcf : eps * fcfConversionCap,
+    )
+    : Math.max(reportedFcfPerShare, 0);
+  const fcfNormalizationApplied = normalizedFcfPerShare > 0
+    && reportedFcfPerShare > normalizedFcfPerShare * 1.001;
+  const fcfPerShare = normalizedFcfPerShare;
+  const fundamentalEvRevenueMultiple = hasFundamentalEvInputs
+    ? clamp(
+      1 + Math.max(revenueGrowth, 0) ** 1.3 * 0.15 + Math.max(netMarginPercent, 0) * 0.1
+        - netDebtToEbitda * 0.5,
+      1,
+      12,
+    )
+    : 0;
   const assetLight = !financial && roe >= 25;
   const mature = eps > 0
     && roe > 0
@@ -512,6 +579,10 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     themeReviewAfter: structuralThemes[0]?.reviewAfter,
     startingGrowth,
     terminalGrowth,
+    aggregationMethod: "median",
+    reportedFcfPerShare,
+    normalizedFcfPerShare,
+    fcfNormalizationApplied,
     dataBasis,
     financialDataDate,
   };
@@ -658,15 +729,13 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   addDcf(5, "折現現金流法");
   addDcf(10, "10 年折現現金流法");
 
-  const cashPerShare = Math.max(numeric(input.cashPerShare), 0);
-  const debtPerShare = Math.max(numeric(input.debtPerShare), 0);
-  const netDebtPerShare = debtPerShare - cashPerShare;
   const enterpriseValueModel = (
     id: string,
     label: string,
     metric: number,
     multiple: number,
     metricLabel: string,
+    multipleSource = "獨立產業倍數",
   ) => {
     if (financial || metric <= 0 || multiple <= 0) {
       const reason = financial
@@ -695,7 +764,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         low,
         high,
-        metricLabel + " " + formatNumber(metric) + " × EV 倍數 " + formatNumber(multiple)
+        metricLabel + " " + formatNumber(metric) + " × " + multipleSource + " " + formatNumber(multiple)
           + "，再扣除每股淨負債 " + formatNumber(netDebtPerShare) + "。",
       ),
       id,
@@ -704,13 +773,18 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     );
   };
 
-  const revenuePerShare = Math.max(numeric(input.revenuePerShare), 0);
-  const ebitdaPerShare = Math.max(numeric(input.ebitdaPerShare), 0);
-  const ebitPerShare = Math.max(numeric(input.ebitPerShare), 0);
-  const evRevenueMultiple = Math.max(numeric(input.targetEvRevenueMultiple), 0);
+  const explicitEvRevenueMultiple = Math.max(numeric(input.targetEvRevenueMultiple), 0);
+  const evRevenueMultiple = explicitEvRevenueMultiple || fundamentalEvRevenueMultiple;
   const evEbitdaMultiple = Math.max(numeric(input.targetEvEbitdaMultiple), 0);
   const evEbitMultiple = Math.max(numeric(input.targetEvEbitMultiple), 0);
-  enterpriseValueModel("ev-revenue", "EV／營收倍數法", revenuePerShare, evRevenueMultiple, "每股營收");
+  enterpriseValueModel(
+    "ev-revenue",
+    "EV／營收倍數法",
+    revenuePerShare,
+    evRevenueMultiple,
+    "每股營收",
+    explicitEvRevenueMultiple > 0 ? "獨立產業 EV 倍數" : "歷史基本面推導 EV 倍數",
+  );
   enterpriseValueModel("ev-ebitda", "EV／EBITDA 倍數法", ebitdaPerShare, evEbitdaMultiple, "每股 EBITDA");
   enterpriseValueModel("ev-ebit", "EV／EBIT 倍數法", ebitPerShare, evEbitMultiple, "每股 EBIT");
 
@@ -854,7 +928,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     weight: equalWeight,
   }));
   const fairValue = models.length > 0
-    ? models.reduce((sum, model) => sum + model.value, 0) / models.length
+    ? median(models.map((model) => model.value))
     : 0;
   const dispersion = fairValue > 0 && models.length > 0
     ? models.reduce((sum, model) => sum + Math.abs(model.value - fairValue), 0) / models.length / fairValue
@@ -874,10 +948,10 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     0.65,
   );
   const modelRangeLow = models.length > 0
-    ? models.reduce((sum, model) => sum + model.rangeLow, 0) / models.length
+    ? median(models.map((model) => model.rangeLow))
     : 0;
   const modelRangeHigh = models.length > 0
-    ? models.reduce((sum, model) => sum + model.rangeHigh, 0) / models.length
+    ? median(models.map((model) => model.rangeHigh))
     : 0;
   const rangeLow = fairValue > 0
     ? Math.max(0, Math.min(modelRangeLow, fairValue * (1 - uncertainty)))
@@ -920,6 +994,9 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   if (!financial && fcfPerShare <= 0) {
     historicalCautionReasons.push("缺少正數自由現金流，現金流模型無法交叉驗證。");
   }
+  if (fcfNormalizationApplied) {
+    historicalCautionReasons.push("自由現金流明顯高於盈餘能力，估值已採保守正規化數值。");
+  }
   if (models.length < 2) {
     historicalCautionReasons.push("適用模型少於兩種，缺少交叉驗證。");
   }
@@ -944,7 +1021,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     price,
     eps,
     bvps,
-    fcfPerShare,
+    fcfPerShare: reportedFcfPerShare,
     dividendPerShare,
     targetPe,
     targetPb,

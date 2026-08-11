@@ -40,18 +40,18 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
-  assert.match(html, /每個納入模型採等權/);
-  assert.match(html, /不參考目前股價的 robust filter/);
+  assert.match(html, /中央公允價值採中位數/);
+  assert.match(html, /robust filter 也不參考目前股價/);
   assert.match(html, /估值只使用公開 LTM、年度財報與市場比率/);
 });
 
 test("valuation details expose the bilingual model audit trail", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /模型平均公允價值/);
-  assert.match(source, /Model Average Fair Value/);
-  assert.match(source, /等權適用模型/);
-  assert.match(source, /Equal-weight applicable models/);
+  assert.match(source, /模型中位公允價值/);
+  assert.match(source, /Median Model Fair Value/);
+  assert.match(source, /適用模型等權列示 · 中央值採中位數/);
+  assert.match(source, /Applicable models listed equally · median center/);
   assert.match(source, /資料基礎/);
   assert.match(source, /Data Basis/);
   assert.match(source, /排除模型/);
@@ -65,6 +65,8 @@ test("valuation details expose the bilingual model audit trail", async () => {
   assert.match(source, /width <= 0\) return 50/);
   assert.match(source, /model\.rangeLow/);
   assert.match(source, /model\.rangeHigh/);
+  assert.match(source, /onClick=\{\(\) => openRankedStock\(stock\.ticker\)\}/);
+  assert.match(source, /onKeyDown=/);
 });
 
 test("renders the standalone ARKER import page in Chinese by default", async () => {

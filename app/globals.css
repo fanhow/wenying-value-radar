@@ -71,6 +71,7 @@ a { color: inherit; text-decoration: none; }
 .beta-tag { margin-left: 9px; padding: 4px 7px; border: 1px solid #b7d7c8; border-radius: 4px; color: var(--green-deep); font-size: 9px; letter-spacing: .1em; }
 .hero h1 { margin: 17px 0 18px; color: var(--ink); font-size: clamp(40px, 4vw, 63px); line-height: 1.1; letter-spacing: -.065em; font-weight: 650; }
 .hero h1 em, .method-intro em { color: var(--green); font-style: normal; }
+.hero h1 em { display: inline-block; font-size: .86em; white-space: nowrap; }
 .hero-description { max-width: 500px; margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.85; }
 .hero-principles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .hero-principles span { padding: 7px 10px; border: 1px solid rgba(27,138,104,.2); border-radius: 999px; background: rgba(255,255,255,.55); color: var(--green-deep); font-size: 10px; font-weight: 700; letter-spacing: .05em; }
@@ -492,6 +493,7 @@ a { color: inherit; text-decoration: none; }
   .page-content { width: calc(100% - 30px); }
   .hero { display: block; min-height: auto; padding: 48px 20px 40px; }
   .hero h1 { font-size: 43px; }
+  .hero h1 em { font-size: 1em; white-space: normal; }
   .hero-description { font-size: 13px; }
   .hero-principles { margin-top: 19px; }
   .search-wrap { margin-top: 35px; }

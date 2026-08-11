@@ -307,7 +307,86 @@ test("keeps legacy StockInput fields compatible while exposing assumptions", () 
   assert.ok(stock.models.every((model) => model.id && model.category && model.status === "applied"));
   assert.ok(Array.isArray(stock.excludedModels));
   assert.ok(stock.assumptions.defaulted.includes("beta（市場／產業預設）"));
+  assert.equal(stock.assumptions.aggregationMethod, "median");
   assert.equal(stock.discountRate, stock.wacc);
+});
+
+test("uses the model median as the central fair value", () => {
+  const stock = calculateStock(base);
+  const values = stock.models.map((model) => model.value).sort((left, right) => left - right);
+  const middle = Math.floor(values.length / 2);
+  const expected = values.length % 2 === 0
+    ? (values[middle - 1] + values[middle]) / 2
+    : values[middle];
+  closeTo(stock.fairValue, expected);
+});
+
+test("keeps an AAPL-like LTM valuation near a broad historical model cluster", () => {
+  const stock = calculateStock({
+    ticker: "AAPL",
+    name: "Apple Inc.",
+    market: "US",
+    sector: "Technology Hardware",
+    price: 308.26,
+    eps: 8.72,
+    bvps: 7.3673,
+    fcfPerShare: 9.3656,
+    targetPe: 27.7848,
+    targetPb: 4,
+    targetFcfMultiple: 24.1848,
+    revenueGrowth: 14.2424,
+    roe: 119.91,
+    debtRatio: 71.946,
+    uncertainty: 0.24,
+    beta: 1,
+    debtPerShare: 5.6392,
+    cashPerShare: 4.2756,
+    revenuePerShare: 31.9869,
+    ebitPerShare: 10.611,
+    ebitdaPerShare: 11.5086,
+    netMargin: 0.276186,
+    source: "自動資料",
+    dataBasis: "ltm",
+    dataCompleteness: "historical",
+  });
+  assert.ok(stock.models.some((model) => model.id === "ev-revenue"));
+  assert.ok(stock.fairValue >= 250 && stock.fairValue <= 280, "AAPL-like fair value was " + stock.fairValue);
+  assert.ok(stock.upside >= -0.2 && stock.upside <= -0.08, "AAPL-like gap was " + stock.upside);
+});
+
+test("normalizes extreme FCF conversion before it can amplify several models", () => {
+  const stock = calculateStock({
+    ticker: "GDDY",
+    name: "GoDaddy Inc.",
+    market: "US",
+    sector: "Technology",
+    price: 91.49,
+    eps: 6.73,
+    bvps: 0.1,
+    fcfPerShare: 13.446,
+    targetPe: 25,
+    targetPb: 4,
+    targetFcfMultiple: 21.79,
+    revenueGrowth: 7.4073,
+    roe: 200,
+    debtRatio: 99,
+    uncertainty: 0.3,
+    beta: 1,
+    debtPerShare: 29.8024,
+    cashPerShare: 7.633,
+    revenuePerShare: 40.3016,
+    ebitPerShare: 10.0018,
+    ebitdaPerShare: 10.7337,
+    netMargin: 0.178347,
+    source: "自動資料",
+    dataBasis: "estimated",
+    dataCompleteness: "limited",
+  });
+  assert.equal(stock.fcfPerShare, 13.446);
+  assert.equal(stock.assumptions.fcfNormalizationApplied, true);
+  closeTo(stock.assumptions.normalizedFcfPerShare, 6.73 * 1.25);
+  assert.ok(stock.upside >= 0.35 && stock.upside <= 0.6, "GDDY-like gap was " + stock.upside);
+  assert.ok(stock.historicalCautionReasons.some((reason) => reason.includes("正規化")));
 });
 
 test("does not compress an AAPL-like public LTM fixture toward 100", () => {
