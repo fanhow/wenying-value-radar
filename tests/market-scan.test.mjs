@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { marketCandidateFromRatio, selectTopMarketCandidates } from "../lib/market-scan.ts";
+import { marketCandidateFromRatio, selectMarketCandidates, selectTopMarketCandidates } from "../lib/market-scan.ts";
 
 test("selects a materially undervalued exchange ratio candidate", () => {
   const candidate = marketCandidateFromRatio({
@@ -30,4 +30,18 @@ test("limits each market ranking to its requested top count", () => {
     sector: "台灣上市公司",
   }));
   assert.equal(selectTopMarketCandidates(universe, 20).length, 20);
+});
+
+test("selects and sorts the most overvalued candidates", () => {
+  const universe = Array.from({ length: 25 }, (_, index) => ({
+    ticker: String(2000 + index),
+    name: `Expensive ${index}`,
+    price: 100 + index * 5,
+    pe: 60 + index,
+    pb: 8,
+    sector: "台灣上市公司",
+  }));
+  const selected = selectMarketCandidates(universe, "overvalued", 20);
+  assert.equal(selected.length, 20);
+  assert.equal(selected[0].ticker, "2024");
 });

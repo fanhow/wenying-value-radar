@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { selectTopMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
+import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
 
@@ -60,11 +60,19 @@ export async function GET() {
     market: "US",
   }));
 
-  const candidates = [...selectTopMarketCandidates(taiwanUniverse), ...selectTopMarketCandidates(usUniverse)];
+  const candidates = [
+    ...selectMarketCandidates(taiwanUniverse, "undervalued"),
+    ...selectMarketCandidates(usUniverse, "undervalued"),
+  ];
+  const overvaluedCandidates = [
+    ...selectMarketCandidates(taiwanUniverse, "overvalued"),
+    ...selectMarketCandidates(usUniverse, "overvalued"),
+  ];
 
   return NextResponse.json({
     scannedCount: taiwanUniverse.length + usUniverse.length,
     scannedByMarket: { TW: taiwanUniverse.length, US: usUniverse.length },
     candidates,
+    overvaluedCandidates,
   });
 }

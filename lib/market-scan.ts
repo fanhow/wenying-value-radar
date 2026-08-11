@@ -16,12 +16,14 @@ export type MarketScanRow = {
   volume?: string | number;
 };
 
+export type ValuationDirection = "undervalued" | "overvalued";
+
 function numeric(value: string | number) {
   const parsed = Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null {
+export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
   const market = row.market ?? "TW";
   if (market === "TW" ? !/^\d{4}$/.test(row.ticker) : !/^[A-Z][A-Z0-9.-]{0,9}$/.test(row.ticker)) return null;
   const price = numeric(row.price);
@@ -57,16 +59,35 @@ export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null 
       : "美股市場掃描以 Nasdaq 上市價格及 SEC XBRL 年度 EPS、股東權益、流通股數與股利進行第一輪篩選；未納入分析師預測與現金流，請再查看完整財報後決策。",
     qualityAvailable: false,
   };
+  return input;
+}
+
+export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null {
+  const input = marketStockFromRatio(row);
+  if (!input) return null;
   const upside = calculateStock(input).upside;
   return upside >= 0.1 && upside <= 1 ? input : null;
 }
 
 export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20) {
+  return selectMarketCandidates(universe, "undervalued", limit);
+}
+
+export function selectMarketCandidates(
+  universe: MarketScanRow[],
+  direction: ValuationDirection,
+  limit = 20,
+) {
   return universe
-    .map(marketCandidateFromRatio)
+    .map(marketStockFromRatio)
     .filter((stock): stock is StockInput => stock !== null)
     .map((stock) => ({ stock, upside: calculateStock(stock).upside }))
-    .sort((left, right) => right.upside - left.upside)
+    .filter(({ upside }) => direction === "undervalued"
+      ? upside >= 0.1 && upside <= 1
+      : upside <= -0.1)
+    .sort((left, right) => direction === "undervalued"
+      ? right.upside - left.upside
+      : left.upside - right.upside)
     .slice(0, limit)
     .map(({ stock }) => stock);
 }

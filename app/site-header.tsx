@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "./language-context";
 
-export function SiteHeader({ active }: { active: "home" | "about" }) {
+export function SiteHeader({ active }: { active: "home" | "funds" | "about" }) {
   const { language, setLanguage, t } = useLanguage();
 
   return (
@@ -14,6 +14,7 @@ export function SiteHeader({ active }: { active: "home" | "about" }) {
       </Link>
       <nav className="topnav" aria-label={t("主要導覽", "Primary navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
+        <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Fund Tracker")}</Link>
         <Link href="/#ark-import">{t("方舟匯入", "ARK Import")}</Link>
         <Link href="/#watchlist">{t("我的觀察", "Watchlist")}</Link>
         <Link href="/#method">{t("模型說明", "Method")}</Link>
@@ -21,12 +22,16 @@ export function SiteHeader({ active }: { active: "home" | "about" }) {
       </nav>
       <div className="header-controls">
         <div className="workspace-badge"><span className="status-dot" />{t("穩盈基金", "WenYing Fund")} <span className="workspace-lock">{t("研究工具", "RESEARCH")}</span></div>
-        <Link className={`mobile-about-link ${active === "about" ? "active" : ""}`} href="/about">{t("關於我們", "About")}</Link>
         <div className="language-switch" role="group" aria-label={t("語言選擇", "Language selection")}>
           <button type="button" className={language === "zh" ? "active" : ""} onClick={() => setLanguage("zh")} aria-pressed={language === "zh"}>中</button>
           <button type="button" className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")} aria-pressed={language === "en"}>EN</button>
         </div>
       </div>
+      <nav className="mobile-nav" aria-label={t("手機版導覽", "Mobile navigation")}>
+        <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
+        <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Funds")}</Link>
+        <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About")}</Link>
+      </nav>
     </header>
   );
 }

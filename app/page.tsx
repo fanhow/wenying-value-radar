@@ -6,7 +6,7 @@ import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directo
 import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 
-type Filter = "all" | "undervalued" | "quality" | "risk";
+type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
 type SortKey = "upside" | "quality" | "price";
 
 type RemoteSymbol = {
@@ -19,6 +19,7 @@ type MarketScanResponse = {
   scannedCount?: number;
   scannedByMarket?: { TW?: number; US?: number };
   candidates?: StockInput[];
+  overvaluedCandidates?: StockInput[];
 };
 
 type ImportCandidate = {
@@ -124,6 +125,7 @@ export default function Home() {
   const [lookupError, setLookupError] = useState("");
   const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
   const [marketCandidates, setMarketCandidates] = useState<StockInput[]>([]);
+  const [overvaluedCandidates, setOvervaluedCandidates] = useState<StockInput[]>([]);
   const [scannedCount, setScannedCount] = useState(0);
   const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
@@ -224,11 +226,13 @@ export default function Home() {
         const payload = await response.json() as MarketScanResponse;
         if (!response.ok) throw new Error("market scan failed");
         setMarketCandidates(Array.isArray(payload.candidates) ? payload.candidates : []);
+        setOvervaluedCandidates(Array.isArray(payload.overvaluedCandidates) ? payload.overvaluedCandidates : []);
         setScannedCount(Number(payload.scannedCount) || 0);
         setScannedByMarket({ TW: Number(payload.scannedByMarket?.TW) || 0, US: Number(payload.scannedByMarket?.US) || 0 });
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           setMarketCandidates([]);
+          setOvervaluedCandidates([]);
           setScannedCount(0);
           setScannedByMarket({ TW: 0, US: 0 });
         }
@@ -242,18 +246,27 @@ export default function Home() {
 
   const stocks = useMemo(() => {
     const loadedTickers = new Set(stockInputs.map((stock) => stock.ticker));
-    return [...marketCandidates.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
+    const scanInputs = [...marketCandidates, ...overvaluedCandidates];
+    return [...scanInputs.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [marketCandidates, stockInputs]);
+  }, [marketCandidates, overvaluedCandidates, stockInputs]);
   const rankingStocks = useMemo(
     () => marketCandidates.map((stock) => calculateStock(stock, formatNumber)),
     [marketCandidates],
+  );
+  const overvaluedRankingStocks = useMemo(
+    () => overvaluedCandidates.map((stock) => calculateStock(stock, formatNumber)),
+    [overvaluedCandidates],
   );
   const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
 
   const filteredStocks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const sourceStocks = filter === "undervalued" ? rankingStocks : stocks;
+    const sourceStocks = filter === "undervalued"
+      ? rankingStocks
+      : filter === "overvalued"
+        ? overvaluedRankingStocks
+        : stocks;
     const filtered = sourceStocks.filter((stock) => {
       const matchesQuery =
         !normalizedQuery ||
@@ -263,6 +276,7 @@ export default function Home() {
       const matchesFilter =
         filter === "all" ||
         (filter === "undervalued" && stock.upside >= 0.1) ||
+        (filter === "overvalued" && stock.upside <= -0.1) ||
         (filter === "quality" && stock.qualityAvailable !== false && stock.qualityScore >= 75) ||
         (filter === "risk" && stock.risk === "高");
       return matchesQuery && matchesFilter;
@@ -270,14 +284,19 @@ export default function Home() {
     return [...filtered].sort((a, b) => {
       if (sortKey === "quality") return b.qualityScore - a.qualityScore;
       if (sortKey === "price") return b.price - a.price;
+      if (filter === "overvalued") return a.upside - b.upside;
       return b.upside - a.upside;
     });
-  }, [filter, query, rankingStocks, sortKey, stocks]);
+  }, [filter, overvaluedRankingStocks, query, rankingStocks, sortKey, stocks]);
 
   const watchlistStocks = stocks.filter((stock) => watchlist.includes(stock.ticker));
   const undervaluedCount = rankingStocks.length;
-  const qualityCount = stocks.filter((stock) => stock.qualityAvailable !== false && stock.qualityScore >= 75).length;
-  const displayedUniverseCount = filter === "undervalued" ? rankingStocks.length : stocks.length;
+  const overvaluedCount = overvaluedRankingStocks.length;
+  const displayedUniverseCount = filter === "undervalued"
+    ? rankingStocks.length
+    : filter === "overvalued"
+      ? overvaluedRankingStocks.length
+      : stocks.length;
   const exactMatch = stocks.find((stock) => stock.ticker.toLowerCase() === query.trim().toLowerCase());
   const searchSuggestions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -595,7 +614,7 @@ export default function Home() {
               <div>
                 <p className="section-kicker">MARKET SCAN / 03</p>
                 <h2>{t("公允價值排行榜", "Fair Value Ranking")}</h2>
-                <p className="panel-subtitle">{t("直接顯示台股低估前 20 與美股低估前 20，再確認完整模型與風險", "Shows the 20 most undervalued Taiwan stocks and 20 U.S. stocks, then lets you review the full models and risk")}</p>
+                <p className="panel-subtitle">{t("低估與高估候選皆提供台股前 20＋美股前 20，作為多空研究起點", "Both screens show the top 20 Taiwan and top 20 U.S. stocks as a starting point for long and short research")}</p>
               </div>
               <div className="sort-control">
                 <label htmlFor="sort">{t("排序", "Sort")}</label>
@@ -607,7 +626,7 @@ export default function Home() {
               </div>
             </div>
             <div className="filter-tabs" role="tablist" aria-label={t("股票篩選", "Stock filters")}>
-              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["quality", t("高品質", "High quality")], ["risk", t("高風險警示", "High risk")]] as [Filter, string][]).map(([key, label]) => (
+              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["overvalued", t("高估候選 40", "Top 40 Overvalued")], ["quality", t("高品質", "High quality")], ["risk", t("高風險警示", "High risk")]] as [Filter, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={filter === key ? "selected" : ""} onClick={() => setFilter(key)} role="tab" aria-selected={filter === key}>{label}</button>
               ))}
             </div>
@@ -636,7 +655,7 @@ export default function Home() {
               </table>
               {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{isMarketScanLoading ? t("正在掃描市場…", "Scanning the market…") : stocks.length ? t("目前名單沒有符合條件的標的", "No stocks in the current list match") : t("市場資料暫時無法載入", "Market data is temporarily unavailable")}</strong><p>{isMarketScanLoading ? t("正在整理上市與上櫃估值候選", "Reviewing listed and OTC valuation candidates") : stocks.length ? t("可切換篩選條件，或搜尋其他股票代碼", "Change the filter or search another ticker") : t("仍可在上方搜尋單一股票代碼", "You can still search for an individual ticker above")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{t("搜尋股票代碼", "Search tickers")}</button></div>}
             </div>
-            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {t("檔候選；台股前 20＋美股前 20", "candidates; Taiwan top 20 + U.S. top 20")}</span><span><span className="legend-dot green-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot red-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
+            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t("檔高估候選；台股前 20＋美股前 20", "overvalued candidates; Taiwan top 20 + U.S. top 20") : filter === "undervalued" ? t("檔低估候選；台股前 20＋美股前 20", "undervalued candidates; Taiwan top 20 + U.S. top 20") : t("檔", "stocks")}</span><span><span className="legend-dot green-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot red-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
           </div>
 
           {selected && (
@@ -697,9 +716,9 @@ export default function Home() {
             <p>{t(`台股 ${marketCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${marketCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${marketCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${marketCandidates.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card">
-            <div className="metric-card-top"><span>{t("高品質標的", "High Quality")}</span><span className="metric-icon blue">✦</span></div>
-            <strong>{qualityCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t("品質分數 ≥ 75 / 100", "Quality score ≥ 75 / 100")}</p>
+            <div className="metric-card-top"><span>{t("高估候選", "Overvalued")}</span><span className="metric-icon red">↘</span></div>
+            <strong>{overvaluedCount}<small> {t("檔", "stocks")}</small></strong>
+            <p>{t(`台股 ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card muted-card">
             <div className="metric-card-top"><span>{t("資料狀態", "Data Status")}</span><span className="live-label"><span className="status-dot" />{t("公開資料", "Public data")}</span></div>
