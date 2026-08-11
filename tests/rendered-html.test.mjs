@@ -35,6 +35,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /關於我們/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
+  assert.match(html, /MARKET SCAN \/ 04/);
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.ok(html.indexOf("公允價值排行榜") < html.indexOf("把每天的方舟名單"));
 });

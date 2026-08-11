@@ -29,6 +29,13 @@ const stockDirectory: StockDirectoryEntry[] = [
     aliases: ["台灣積體電路", "taiwan semiconductor", "tsmc"],
   },
   {
+    ticker: "2454",
+    market: "TW",
+    nameZh: "聯發科",
+    nameEn: "MediaTek",
+    aliases: ["聯發科技", "mediatek", "media tek"],
+  },
+  {
     ticker: "AAPL",
     market: "US",
     nameZh: "Apple",
@@ -36,6 +43,11 @@ const stockDirectory: StockDirectoryEntry[] = [
     aliases: ["apple inc", "蘋果"],
   },
 ];
+
+export function isTaiwanSymbolQuery(query: string) {
+  const normalized = query.trim();
+  return /^\d/.test(normalized) || /[\u3400-\u9fff]/.test(normalized);
+}
 
 export function findStockDirectoryEntries(query: string, limit = 4) {
   const normalized = query.trim().toLowerCase();

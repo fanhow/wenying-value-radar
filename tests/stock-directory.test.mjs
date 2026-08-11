@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findStockDirectoryEntries, parseYahooTaiwanHtml, rankMarketSymbols, safeLookupError } from "../lib/stock-directory.ts";
+import { findStockDirectoryEntries, isTaiwanSymbolQuery, parseYahooTaiwanHtml, rankMarketSymbols, safeLookupError } from "../lib/stock-directory.ts";
 
 test("suggests Apple before a valuation has been loaded", () => {
   assert.deepEqual(findStockDirectoryEntries("AAPL").map(({ ticker, nameEn }) => ({ ticker, nameEn })), [
@@ -10,6 +10,17 @@ test("suggests Apple before a valuation has been loaded", () => {
 
 test("resolves 2330 to the Taiwan Semiconductor display name", () => {
   assert.equal(findStockDirectoryEntries("2330")[0]?.nameZh, "台積電");
+});
+
+test("resolves MediaTek by its Chinese company name", () => {
+  assert.equal(findStockDirectoryEntries("聯發科")[0]?.ticker, "2454");
+  assert.equal(findStockDirectoryEntries("聯發科技")[0]?.ticker, "2454");
+});
+
+test("routes Chinese company names to the Taiwan symbol directory", () => {
+  assert.equal(isTaiwanSymbolQuery("聯發科"), true);
+  assert.equal(isTaiwanSymbolQuery("2454"), true);
+  assert.equal(isTaiwanSymbolQuery("AAPL"), false);
 });
 
 test("does not expose upstream redirect URLs to users", () => {

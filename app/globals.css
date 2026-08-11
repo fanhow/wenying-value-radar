@@ -230,7 +230,7 @@ a { color: inherit; text-decoration: none; }
 .table-empty p { margin: 7px 0 15px; color: var(--ink-faint); font-size: 11px; }
 .table-empty button { padding: 9px 13px; border: 0; border-radius: 6px; background: var(--green); color: #fff; font-size: 11px; }
 
-.detail-panel { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); column-gap: 38px; padding: 32px 34px 28px; }
+.detail-panel { order: -1; display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); column-gap: 38px; padding: 32px 34px 28px; }
 .detail-topline, .fair-value-focus, .detail-note { grid-column: 1 / -1; }
 .detail-topline, .detail-section-title, .quality-meter > div:first-child { display: flex; align-items: center; justify-content: space-between; }
 .detail-actions { display: flex; align-items: center; gap: 7px; }

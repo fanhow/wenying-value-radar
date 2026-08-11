@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
+import { isTaiwanSymbolQuery, rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 
 type TwseSymbolRow = { Code?: string; Name?: string };
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   if (!query || query.length > 40) return NextResponse.json({ symbols: [] });
 
   let entries: MarketSymbol[] = [];
-  if (/^\d/.test(query)) {
+  if (isTaiwanSymbolQuery(query)) {
     const [twseRows, tpexRows, tpexCompanies] = await Promise.all([
       optionalJson<TwseSymbolRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
       optionalJson<TpexSymbolRow[]>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes"),
