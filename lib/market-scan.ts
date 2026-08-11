@@ -14,6 +14,16 @@ export type MarketScanRow = {
   revenueGrowth?: string | number | null;
   fcfPerShare?: string | number | null;
   debtRatio?: string | number | null;
+  revenuePerShare?: string | number | null;
+  ebitPerShare?: string | number | null;
+  ebitdaPerShare?: string | number | null;
+  cashPerShare?: string | number | null;
+  debtPerShare?: string | number | null;
+  netMargin?: string | number | null;
+  assetTurnover?: string | number | null;
+  financialLeverage?: string | number | null;
+  dataBasis?: string;
+  financialDataDate?: string | null;
   dividendPerShare?: string | number;
   marketCap?: string | number;
   volume?: string | number;
@@ -45,6 +55,14 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
   const hasRevenueGrowth = hasFiniteValue(row.revenueGrowth);
   const hasFcf = hasFiniteValue(row.fcfPerShare);
   const hasDebtRatio = hasFiniteValue(row.debtRatio);
+  const hasRevenuePerShare = hasFiniteValue(row.revenuePerShare);
+  const hasEbitPerShare = hasFiniteValue(row.ebitPerShare);
+  const hasEbitdaPerShare = hasFiniteValue(row.ebitdaPerShare);
+  const hasCashPerShare = hasFiniteValue(row.cashPerShare);
+  const hasDebtPerShare = hasFiniteValue(row.debtPerShare);
+  const hasNetMargin = hasFiniteValue(row.netMargin);
+  const hasAssetTurnover = hasFiniteValue(row.assetTurnover);
+  const hasFinancialLeverage = hasFiniteValue(row.financialLeverage);
   const revenueGrowth = hasRevenueGrowth ? numeric(row.revenueGrowth) : 0;
   const fcfPerShare = hasFcf ? numeric(row.fcfPerShare) : 0;
   const debtRatio = hasDebtRatio ? numeric(row.debtRatio) : 0;
@@ -65,15 +83,24 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
     revenueGrowth,
     roe,
     debtRatio,
+    revenuePerShare: hasRevenuePerShare ? numeric(row.revenuePerShare) : undefined,
+    ebitPerShare: hasEbitPerShare ? numeric(row.ebitPerShare) : undefined,
+    ebitdaPerShare: hasEbitdaPerShare ? numeric(row.ebitdaPerShare) : undefined,
+    cashPerShare: hasCashPerShare ? numeric(row.cashPerShare) : undefined,
+    debtPerShare: hasDebtPerShare ? numeric(row.debtPerShare) : undefined,
+    netMargin: hasNetMargin ? numeric(row.netMargin) : undefined,
+    assetTurnover: hasAssetTurnover ? numeric(row.assetTurnover) : undefined,
+    financialLeverage: hasFinancialLeverage ? numeric(row.financialLeverage) : undefined,
     uncertainty: historicalFieldCount >= 2 ? 0.27 : eps > 0 && bvps > 0 ? 0.3 : 0.4,
     updatedAt: row.date,
+    dataBasis: market === "US" ? "annual" : "market-ratio",
+    financialDataDate: row.financialDataDate ?? row.date,
     source: "自動資料",
     sourceNote: market === "TW"
       ? "台股市場掃描以 TWSE／TPEx 公開的收盤價、本益比與股價淨值比進行第一輪篩選；未納入現金流與成長預測，請再查看完整財報後決策。"
-      : "美股市場掃描以 Nasdaq 價格及 SEC XBRL 年度財務快照進行第一輪篩選，納入可取得的營收成長、自由現金流與負債資料；仍未納入分析師前瞻預測，高成長股可能只具低信心。",
+      : "美股市場掃描以 Nasdaq 價格及 SEC XBRL 年度財務快照進行第一輪篩選，納入可取得的營收成長、自由現金流與負債資料；資料期間較舊、欄位不足或模型分歧較大時只具低信心。",
     qualityAvailable: hasRevenueGrowth && hasDebtRatio,
     dataCompleteness: historicalFieldCount >= 2 ? "historical" : "limited",
-    forwardDataAvailable: false,
   };
   return input;
 }
@@ -81,8 +108,16 @@ export function marketStockFromRatio(row: MarketScanRow): StockInput | null {
 export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null {
   const input = marketStockFromRatio(row);
   if (!input) return null;
-  const upside = calculateStock(input).upside;
-  return upside >= 0.1 && upside <= 1 ? input : null;
+  const valuation = validValuation(input);
+  return valuation && valuation.upside >= 0.1 && valuation.upside <= 1 ? input : null;
+}
+
+function validValuation(stock: StockInput) {
+  const valuation = calculateStock(stock);
+  const hasValidModel = valuation.models.some((model) => Number.isFinite(model.value) && model.value > 0);
+  return Number.isFinite(valuation.fairValue) && valuation.fairValue > 0 && hasValidModel
+    ? valuation
+    : null;
 }
 
 export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20) {
@@ -97,7 +132,9 @@ export function selectMarketCandidates(
   return universe
     .map(marketStockFromRatio)
     .filter((stock): stock is StockInput => stock !== null)
-    .map((stock) => ({ stock, upside: calculateStock(stock).upside }))
+    .map((stock) => ({ stock, valuation: validValuation(stock) }))
+    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock> } => row.valuation !== null)
+    .map(({ stock, valuation }) => ({ stock, upside: valuation.upside }))
     .filter(({ upside }) => direction === "undervalued"
       ? upside >= 0.1 && upside <= 1
       : upside <= -0.1)

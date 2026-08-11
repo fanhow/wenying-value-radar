@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { marketCandidateFromRatio, selectMarketCandidates, selectTopMarketCandidates } from "../lib/market-scan.ts";
+import {
+  marketCandidateFromRatio,
+  marketStockFromRatio,
+  selectMarketCandidates,
+  selectTopMarketCandidates,
+} from "../lib/market-scan.ts";
 
 test("selects a materially undervalued exchange ratio candidate", () => {
   const candidate = marketCandidateFromRatio({
@@ -32,6 +37,56 @@ test("limits each market ranking to its requested top count", () => {
   assert.equal(selectTopMarketCandidates(universe, 20).length, 20);
 });
 
+test("passes optional annual SEC fields into the valuation engine", () => {
+  const stock = marketStockFromRatio({
+    ticker: "TEST",
+    name: "Test Corporation",
+    market: "US",
+    price: 100,
+    pe: 20,
+    pb: 5,
+    eps: 5,
+    bvps: 20,
+    revenuePerShare: 30,
+    ebitPerShare: 7,
+    ebitdaPerShare: 8,
+    cashPerShare: 4,
+    debtPerShare: 6,
+    netMargin: 16.7,
+    assetTurnover: 1.1,
+    financialLeverage: 2.2,
+    financialDataDate: "2025-12-31",
+    marketCap: 10_000_000_000,
+    volume: 1_000_000,
+    sector: "Technology",
+  });
+
+  assert.equal(stock?.revenuePerShare, 30);
+  assert.equal(stock?.ebitPerShare, 7);
+  assert.equal(stock?.ebitdaPerShare, 8);
+  assert.equal(stock?.cashPerShare, 4);
+  assert.equal(stock?.debtPerShare, 6);
+  assert.equal(stock?.netMargin, 16.7);
+  assert.equal(stock?.assetTurnover, 1.1);
+  assert.equal(stock?.financialLeverage, 2.2);
+  assert.equal(stock?.dataBasis, "annual");
+  assert.equal(stock?.financialDataDate, "2025-12-31");
+});
+
+test("marks Taiwan ratio rows as market-ratio data", () => {
+  const stock = marketStockFromRatio({
+    ticker: "2330",
+    name: "TSMC",
+    price: 100,
+    pe: 10,
+    pb: 2,
+    sector: "Taiwan listed company",
+  });
+
+  assert.equal(stock?.dataBasis, "market-ratio");
+  assert.equal(stock?.revenuePerShare, undefined);
+});
+
 test("selects and sorts the most overvalued candidates", () => {
   const universe = Array.from({ length: 25 }, (_, index) => ({
     ticker: String(2000 + index),
@@ -44,4 +99,22 @@ test("selects and sorts the most overvalued candidates", () => {
   const selected = selectMarketCandidates(universe, "overvalued", 20);
   assert.equal(selected.length, 20);
   assert.equal(selected[0].ticker, "2024");
+});
+
+test("does not rank an overvalued row without a finite fair value model", () => {
+  const selected = selectMarketCandidates([{
+    ticker: "HUGE",
+    name: "Overflow Corporation",
+    market: "US",
+    price: Number.MAX_VALUE,
+    pe: 1,
+    pb: 1,
+    eps: Number.MAX_VALUE,
+    bvps: Number.MAX_VALUE,
+    marketCap: Number.MAX_VALUE,
+    volume: 1_000_000,
+    sector: "Technology",
+  }], "overvalued", 20);
+
+  assert.deepEqual(selected, []);
 });

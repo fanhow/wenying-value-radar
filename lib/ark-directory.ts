@@ -11,6 +11,16 @@ export type ArkUsSnapshotRow = {
   revenueGrowth?: number | null;
   fcfPerShare?: number | null;
   debtRatio?: number | null;
+  revenuePerShare?: number | null;
+  ebitPerShare?: number | null;
+  ebitdaPerShare?: number | null;
+  cashPerShare?: number | null;
+  debtPerShare?: number | null;
+  netMargin?: number | null;
+  assetTurnover?: number | null;
+  financialLeverage?: number | null;
+  dataBasis?: "annual";
+  financialDataDate?: string | null;
   dividendPerShare: number;
   sector: string;
   date: string;

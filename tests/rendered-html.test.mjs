@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const developmentPreviewMeta =
@@ -39,6 +40,31 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
+  assert.match(html, /每個納入模型採等權/);
+  assert.match(html, /不參考目前股價的 robust filter/);
+  assert.match(html, /估值只使用公開 LTM、年度財報與市場比率/);
+});
+
+test("valuation details expose the bilingual model audit trail", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /模型平均公允價值/);
+  assert.match(source, /Model Average Fair Value/);
+  assert.match(source, /等權適用模型/);
+  assert.match(source, /Equal-weight applicable models/);
+  assert.match(source, /資料基礎/);
+  assert.match(source, /Data Basis/);
+  assert.match(source, /排除模型/);
+  assert.match(source, /Excluded Models/);
+  assert.match(source, /結構性趨勢/);
+  assert.match(source, /Structural Themes/);
+  assert.match(source, /只影響 DCF 起始成長率/);
+  assert.match(source, /按月檢視/);
+  assert.match(source, /price-independent robust outlier filter/);
+  assert.match(source, /key=\{model\.id \|\| model\.label\}/);
+  assert.match(source, /width <= 0\) return 50/);
+  assert.match(source, /model\.rangeLow/);
+  assert.match(source, /model\.rangeHigh/);
 });
 
 test("renders the standalone ARKER import page in Chinese by default", async () => {

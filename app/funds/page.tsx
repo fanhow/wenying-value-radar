@@ -103,10 +103,9 @@ function valueHolding(holding: FundHolding): ValuedHolding {
       uncertainty: historicalFieldCount >= 2 ? 0.27 : 0.4,
       qualityAvailable: hasRevenueGrowth && hasDebtRatio,
       dataCompleteness: historicalFieldCount >= 2 ? "historical" : "limited",
-      forwardDataAvailable: false,
       updatedAt: row.date,
       source: "自動資料",
-      sourceNote: "持倉資料來自 SEC 13F；估值使用 Nasdaq 價格與 SEC XBRL 年度歷史快照。未納入分析師前瞻盈餘、基金買進成本、空頭或避險部位；高成長股若標示低信心，不應直接判定高估。",
+      sourceNote: "持倉資料來自 SEC 13F；估值使用 Nasdaq 價格與 SEC XBRL 年度歷史快照。資料不代表基金買進成本，也不包含空頭或避險部位；高成長股若標示低信心，不應直接判定高估。",
     }),
   };
 }
@@ -216,7 +215,7 @@ export default function FundsPage() {
                           <td data-label={t("組合比重", "Portfolio weight")}><strong>{holding.portfolioWeight.toFixed(2)}%</strong><small>{compactUsd.format(holding.valueUsd)}</small></td>
                           <td data-label={t("持股變化", "Share change")}><span className={`fund-change ${holding.significantChange ? "significant" : ""}`}>{changeLabel(holding)}</span><small>{t("較上季持股數", "vs. prior-quarter shares")}</small></td>
                           <td data-label={t("目前價格", "Price")}><strong>{holding.stock ? formatPrice(holding.stock.price) : "—"}</strong><small>{holding.stock?.updatedAt || "—"}</small></td>
-                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? holding.stock.valuationConfidence === "low" ? t("歷史初估 · 需前瞻資料", "Historical estimate · forward data needed") : `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
+                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? holding.stock.valuationConfidence === "low" ? t("歷史資料 · 低信心", "Historical data · low confidence") : `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
                           <td data-label={t("估值狀態", "Valuation")}><span className={`fund-valuation status-${state}`}>{valuationLabel(holding.stock)}</span></td>
                         </tr>
                       );
@@ -230,7 +229,7 @@ export default function FundsPage() {
 
         <section className="fund-method-note">
           <div><p className="section-kicker">DATA METHOD / 02</p><h2>{t("基金排名看長期獲利，", "Rank managers by long-term gains;")}<br /><em>{t("持倉則看最新公開變化。", "read holdings from the latest disclosure.")}</em></h2></div>
-          <div><p>{t("基金排名資料截至 2025-12-31；持倉採 SEC 2026 Q1 Form 13F-HR，與 2025 Q4 持股數比較。估值已納入可取得的年度營收成長、自由現金流與負債，但仍不是基金買進成本或分析師目標價。缺少前瞻資料時會標示『低信心初估』。", "Fund rankings are as of 2025-12-31. Holdings use SEC 2026 Q1 Form 13F-HR and compare share counts with 2025 Q4. Valuation now includes available annual revenue growth, free cash flow, and leverage, but it is still neither the manager's purchase cost nor an analyst target. Results lacking forward data are marked low confidence.")}</p><a href={snapshot.rankingSourceUrl} target="_blank" rel="noreferrer">{t("查看排名來源", "View ranking source")} ↗</a></div>
+          <div><p>{t("基金排名資料截至 2025-12-31；持倉採 SEC 2026 Q1 Form 13F-HR，與 2025 Q4 持股數比較。估值納入可取得的年度營收成長、自由現金流與負債，但不代表基金買進成本。資料期間較舊、欄位不足或模型分歧較大時會標示『低信心初估』。", "Fund rankings are as of 2025-12-31. Holdings use SEC 2026 Q1 Form 13F-HR and compare share counts with 2025 Q4. Valuation includes available annual revenue growth, free cash flow, and leverage, but does not represent the manager's purchase cost. Older periods, incomplete fields, or wide model dispersion are marked low confidence.")}</p><a href={snapshot.rankingSourceUrl} target="_blank" rel="noreferrer">{t("查看排名來源", "View ranking source")} ↗</a></div>
         </section>
 
         <footer className="footer"><div><span>穩盈價值雷達 · WenYing Value Radar</span><small>{t("本網站僅供投資研究與教育用途，不構成投資或放空建議。", "For investment research and education only; this is not investment or short-selling advice.")}</small></div><span>{t("追蹤方向，仍要獨立估值", "Track direction, value independently")}</span></footer>
