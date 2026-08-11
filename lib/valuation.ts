@@ -1,4 +1,5 @@
 import { matchStructuralThemes, type StructuralTheme } from "./market-themes.ts";
+import type { InstitutionalSignal } from "./fund-signal.ts";
 
 export type Market = "TW" | "US";
 export type RiskLevel = "低" | "中" | "高";
@@ -55,6 +56,7 @@ export type StockInput = {
   targetEvEbitMultiple?: number;
   dataBasis?: "annual" | "ltm" | "historical" | "estimated" | "market-ratio";
   financialDataDate?: string;
+  institutionalSignal?: InstitutionalSignal;
 };
 
 export type ValuationModel = {

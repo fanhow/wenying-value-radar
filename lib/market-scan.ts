@@ -22,7 +22,7 @@ export type MarketScanRow = {
   netMargin?: string | number | null;
   assetTurnover?: string | number | null;
   financialLeverage?: string | number | null;
-  dataBasis?: string;
+  dataBasis?: StockInput["dataBasis"];
   financialDataDate?: string | null;
   dividendPerShare?: string | number;
   marketCap?: string | number;

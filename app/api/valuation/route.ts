@@ -4,15 +4,16 @@ import { fallbackUsSymbols, findArkUsSnapshot, type ArkUsSnapshotRow } from "../
 import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
 import {
   aggregateDebtValues,
+  metricFactsFromConcepts,
   metricFromConcepts,
   metricsAlign,
-  selectSecFacts,
   summarizeFinancialBasis,
   trailingTwelveMonthsGrowth,
-  trailingTwelveMonthsMetric,
   type SecCompanyFacts,
 } from "../../../lib/sec-financials";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
+import fundHoldingsSnapshot from "../../../lib/fund-holdings-snapshot.json";
+import { institutionalSignalForTicker } from "../../../lib/fund-signal";
 
 type Market = "TW" | "US";
 
@@ -292,10 +293,9 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   const revenueConcepts = isUsGaap
     ? ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"]
     : ["Revenue"];
-  const revenueFacts = revenueConcepts
-    .map((concept) => selectSecFacts(facts, taxonomy, [concept], ["USD"]))
-    .find((conceptFacts) => trailingTwelveMonthsMetric(conceptFacts) !== null) ?? [];
-  const revenueMetric = trailingTwelveMonthsMetric(revenueFacts);
+  const revenueCandidate = metricFactsFromConcepts(facts, taxonomy, revenueConcepts, ["USD"], "duration");
+  const revenueFacts = revenueCandidate?.facts ?? [];
+  const revenueMetric = revenueCandidate?.metric ?? null;
   const revenueGrowthMetric = trailingTwelveMonthsGrowth(revenueFacts);
   const netIncomeMetric = metricFromConcepts(
     facts,
@@ -659,7 +659,10 @@ export async function POST(request: NextRequest) {
     }
     const market: Market = body.market ?? (/^\d/.test(ticker) ? "TW" : "US");
     const stock = market === "TW" ? await valueTwStock(body, ticker) : await valueUsStock(body, ticker);
-    return NextResponse.json({ stock });
+    const institutionalSignal = institutionalSignalForTicker(fundHoldingsSnapshot, ticker);
+    return NextResponse.json({
+      stock: institutionalSignal ? { ...stock, institutionalSignal } : stock,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "暫時無法取得估值資料";
     return NextResponse.json({ error: message }, { status: 422 });

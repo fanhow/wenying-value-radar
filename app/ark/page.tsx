@@ -118,7 +118,7 @@ export default function ArkPage() {
       const documents: { fileName: string; text: string }[] = [];
 
       try {
-        await worker.setParameters({ preserve_interword_spaces: "1", tessedit_pageseg_mode: "6" });
+        await worker.setParameters({ preserve_interword_spaces: "1", tessedit_pageseg_mode: "6" as Tesseract.PSM });
         for (let index = 0; index < files.length; index += 1) {
           setMessage(`辨識第 ${index + 1} / ${files.length} 張截圖`);
           const file = files[index];

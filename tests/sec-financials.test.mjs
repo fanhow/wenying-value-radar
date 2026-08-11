@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   aggregateDebtValues,
   latestInstantMetric,
+  metricFactsFromConcepts,
   metricFromConcepts,
   metricsAlign,
   selectSecFacts,
@@ -170,4 +171,48 @@ test("falls through when the first same-unit concept cannot produce an annual me
   const metric = metricFromConcepts(companyFacts, "us-gaap", ["QuarterlyOnly", "AnnualRevenue"], ["USD"], "duration");
   assert.equal(metric?.value, 100);
   assert.equal(metric?.basis, "annual");
+});
+
+test("chooses the newest metric when an earlier concept is stale", () => {
+  const staleAnnual = { val: 10, start: "2017-01-01", end: "2018-12-31", filed: "2019-02-01", form: "10-K" };
+  const currentAnnual = { val: 20, start: "2025-01-01", end: "2025-12-31", filed: "2026-02-01", form: "10-K" };
+  const companyFacts = {
+    facts: {
+      "us-gaap": {
+        FirstConcept: { units: { USD: [staleAnnual] } },
+        LaterConcept: { units: { USD: [currentAnnual] } },
+      },
+    },
+  };
+  const metric = metricFromConcepts(
+    companyFacts,
+    "us-gaap",
+    ["FirstConcept", "LaterConcept"],
+    ["USD"],
+    "duration",
+  );
+  assert.equal(metric?.value, 20);
+  assert.equal(metric?.end, "2025-12-31");
+});
+
+test("returns the facts belonging to the newest concept metric", () => {
+  const staleAnnual = { val: 10, start: "2017-01-01", end: "2018-12-31", form: "10-K" };
+  const currentAnnual = { val: 20, start: "2025-01-01", end: "2025-12-31", form: "10-K" };
+  const companyFacts = {
+    facts: {
+      "us-gaap": {
+        OldRevenueConcept: { units: { USD: [staleAnnual] } },
+        CurrentRevenueConcept: { units: { USD: [currentAnnual] } },
+      },
+    },
+  };
+  const candidate = metricFactsFromConcepts(
+    companyFacts,
+    "us-gaap",
+    ["OldRevenueConcept", "CurrentRevenueConcept"],
+    ["USD"],
+    "duration",
+  );
+  assert.equal(candidate?.metric.value, 20);
+  assert.equal(candidate?.facts[0]?.end, "2025-12-31");
 });

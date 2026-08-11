@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
+import type { InstitutionalSignal } from "../lib/fund-signal";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
 import { shouldRefreshSavedStock } from "../lib/data-freshness";
 import { useLanguage, type Language } from "./language-context";
@@ -65,6 +66,42 @@ function ConfidencePill({ confidence, language }: { confidence: Stock["valuation
       ? (language === "zh" ? "中信心" : "Medium confidence")
       : (language === "zh" ? "低信心初估" : "Low-confidence estimate");
   return <span className={`confidence-pill confidence-${confidence}`}>{label}</span>;
+}
+
+function InstitutionalSignalPill({ signal, language }: { signal?: InstitutionalSignal; language: Language }) {
+  if (!signal) return null;
+  const changeLabel = signal.increasedByCount > 0
+    ? (language === "zh" ? `${signal.heldByCount}/${signal.trackedFundCount} 出現 · ${signal.increasedByCount}/${signal.heldByCount} 加倉` : `${signal.heldByCount}/${signal.trackedFundCount} reported · ${signal.increasedByCount}/${signal.heldByCount} increased`)
+    : (language === "zh" ? `${signal.heldByCount}/${signal.trackedFundCount} 出現` : `${signal.heldByCount}/${signal.trackedFundCount} reported`);
+  return <span className="institutional-signal-pill">{language === "zh" ? "大戶訊號" : "Institutional signal"} · {changeLabel}</span>;
+}
+
+function InstitutionalSignalPanel({ signal, language }: { signal?: InstitutionalSignal; language: Language }) {
+  if (!signal) return null;
+  const heldLabel = language === "zh"
+    ? `前六大基金公開前十大持股中，${signal.heldByCount}/${signal.trackedFundCount} 出現`
+    : `${signal.heldByCount}/${signal.trackedFundCount} of the top-six funds appear in the published top holdings`;
+  const increasedLabel = language === "zh"
+    ? `${signal.increasedByCount}/${signal.heldByCount} 加倉`
+    : `${signal.increasedByCount}/${signal.heldByCount} increased`;
+  const changedLabel = signal.reducedByCount > 0
+    ? (language === "zh" ? ` · ${signal.reducedByCount}/${signal.heldByCount} 減倉` : ` · ${signal.reducedByCount}/${signal.heldByCount} reduced`)
+    : "";
+  return <div className="institutional-signal-panel">
+    <div className="institutional-signal-heading">
+      <div><span>{language === "zh" ? "大戶訊號" : "Institutional signal"}</span><strong>{heldLabel} · {increasedLabel}{changedLabel}</strong></div>
+      <small>{language === "zh" ? "獨立參考，不直接加到公允價值" : "Separate context; not added to fair value"}</small>
+    </div>
+    <div className="institutional-signal-holdings">
+      {signal.holdings.map((holding) => <span key={holding.fundName} className={`institutional-holding-change ${holding.changeType}`}>
+        {holding.fundName} · {holding.changeType === "new" ? (language === "zh" ? "新建" : "new") : holding.changeType === "increased" ? (language === "zh" ? "加倉" : "increased") : holding.changeType === "reduced" ? (language === "zh" ? "減倉" : "reduced") : (language === "zh" ? "持平" : "unchanged")}
+        {holding.changePercent !== null ? ` ${holding.changePercent >= 0 ? "+" : ""}${holding.changePercent.toFixed(1)}%` : ""}
+      </span>)}
+    </div>
+    <p>{language === "zh"
+      ? `資料來自 SEC 13F，申報有延遲，且只反映公開多頭前十大持股；未出現不代表沒有持倉，也不代表基金認同本模型估值。申報日 ${signal.reportDate ?? "—"}。`
+      : `Data comes from SEC 13F filings with a reporting lag and covers published long positions only; absence is not proof of no position, and ownership is not an endorsement of this valuation. Report date: ${signal.reportDate ?? "—"}.`}</p>
+  </div>;
 }
 
 function TrendMark({ positive }: { positive: boolean }) {
@@ -643,8 +680,9 @@ export default function Home() {
           {selected && (
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 03</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
-              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /></div></div>
+              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} /></div></div>
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong>{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
+              <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               <div className="fair-value-focus">
                 <div><span className="focus-label">{t("模型中位公允價值", "Median Model Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div>
                 <div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("悲觀", "Bear")} {formatPrice(selected.rangeLow, selected.market)}</span><span>{t("樂觀", "Bull")} {formatPrice(selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>

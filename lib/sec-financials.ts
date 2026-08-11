@@ -31,6 +31,11 @@ export type FinancialGrowth = {
   basis: "ltm" | "annual";
 };
 
+export type ConceptMetric = {
+  facts: SecFact[];
+  metric: FinancialMetric;
+};
+
 type MetricPeriod = Pick<FinancialMetric, "basis" | "end">;
 
 type DebtValues = {
@@ -282,6 +287,32 @@ export function trailingTwelveMonthsGrowth(facts: SecFact[]): FinancialGrowth | 
   return null;
 }
 
+export function metricFactsFromConcepts(
+  companyFacts: SecCompanyFacts,
+  taxonomy: string,
+  conceptNames: string[],
+  acceptedUnits: string[],
+  mode: "duration" | "instant",
+) {
+  const candidates: ConceptMetric[] = conceptNames.flatMap((conceptName) => {
+    const facts = selectSecFacts(companyFacts, taxonomy, [conceptName], acceptedUnits);
+    const metric = mode === "instant" ? latestInstantMetric(facts) : trailingTwelveMonthsMetric(facts);
+    return metric ? [{ facts, metric }] : [];
+  });
+  if (!candidates.length) return null;
+
+  // A concept list often contains legacy and newer SEC concepts for the same
+  // metric.  Do not let the first (possibly stale) concept hide a newer value.
+  // Prefer the most recent period, then the stronger period basis when dates tie.
+  const basisRank = (basis: FinancialMetric["basis"]) =>
+    basis === "ltm" ? 3 : basis === "annual" ? 2 : 1;
+  return candidates.sort(
+    (left, right) =>
+      timestamp(right.metric.end) - timestamp(left.metric.end) ||
+      basisRank(right.metric.basis) - basisRank(left.metric.basis),
+  )[0];
+}
+
 export function metricFromConcepts(
   companyFacts: SecCompanyFacts,
   taxonomy: string,
@@ -289,10 +320,5 @@ export function metricFromConcepts(
   acceptedUnits: string[],
   mode: "duration" | "instant",
 ) {
-  for (const conceptName of conceptNames) {
-    const facts = selectSecFacts(companyFacts, taxonomy, [conceptName], acceptedUnits);
-    const metric = mode === "instant" ? latestInstantMetric(facts) : trailingTwelveMonthsMetric(facts);
-    if (metric) return metric;
-  }
-  return null;
+  return metricFactsFromConcepts(companyFacts, taxonomy, conceptNames, acceptedUnits, mode)?.metric ?? null;
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
+import type { StockInput } from "../../../lib/valuation";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
 import {
@@ -54,22 +55,11 @@ export async function GET() {
   }));
   const taiwanUniverse = [...listed, ...otc].filter((row) => /^\d{4}$/.test(row.ticker) && Number(row.price) > 0);
   const usUniverse: MarketScanRow[] = usMarketSnapshot.map((row) => ({
-    ticker: row.ticker,
-    name: row.name,
-    price: row.price,
+    ...row,
+    dataBasis: row.dataBasis as StockInput["dataBasis"],
     pe: 0,
     pb: 0,
-    eps: row.eps,
-    bvps: row.bvps,
-    revenueGrowth: row.revenueGrowth,
-    fcfPerShare: row.fcfPerShare,
-    debtRatio: row.debtRatio,
-    dividendPerShare: row.dividendPerShare,
-    marketCap: row.marketCap,
-    volume: row.volume,
-    date: row.date,
-    sector: row.sector,
-    market: "US",
+    market: "US" as const,
   }));
 
   // A scheduled Worker writes fresh prices and selected quarterly financial
