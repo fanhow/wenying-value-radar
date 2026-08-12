@@ -234,7 +234,7 @@ a { color: inherit; text-decoration: none; }
 .fair-value-number { color: var(--ink); font-size: 23px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .range-hint { font-size: 9px; }
 .upside-value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.trend-mark { display: inline-block; margin-right: 8px; font-size: 48px; font-weight: 900; line-height: .65; vertical-align: -7px; text-shadow: 0 2px 3px rgba(19,43,45,.18); }
+.trend-mark { font-weight: 900; text-shadow: 0 2px 3px rgba(19,43,45,.18); }
 .trend-mark.direction-up, .card-arrow.direction-up { color: var(--red) !important; }
 .trend-mark.direction-down, .card-arrow.direction-down { color: var(--green) !important; }
 .trend-mark.direction-flat, .card-arrow.direction-flat { color: var(--ink-faint) !important; }
@@ -287,6 +287,8 @@ a { color: inherit; text-decoration: none; }
 .price-hero > div { padding: 15px; border-radius: 9px; background: #f6f9f7; }
 .price-hero span, .fair-value-focus .focus-label { display: block; color: var(--ink-faint); font-size: 9px; }
 .price-hero strong { display: block; margin-top: 7px; color: var(--ink); font-size: 28px; letter-spacing: -.045em; }
+.price-hero .hero-upside > strong { display: flex; align-items: baseline; gap: 8px; }
+.price-hero .hero-upside > strong .trend-mark { display: inline; margin: 0; color: inherit; font-size: 1em; line-height: 1; letter-spacing: 0; vertical-align: baseline; }
 .price-hero small { display: block; margin-top: 7px; color: var(--ink-faint); font-size: 9px; }
 .positive-box { background: var(--green-pale) !important; }
 .positive-box strong { color: var(--green) !important; }
