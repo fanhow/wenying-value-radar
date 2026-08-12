@@ -482,7 +482,7 @@ export default function FundsPage() {
         </div>
 
         <section className="fund-method-note">
-          <div><p className="section-kicker">DATA METHOD / 02</p><h2>{t("基金排名看長期獲利", "Rank managers by long-term gains")}<br /><em>{t("持倉看最新公開變化", "Read holdings from the latest disclosure")}</em></h2></div>
+          <div><h2>{t("基金排名看長期獲利", "Rank managers by long-term gains")}<br /><em>{t("持倉看最新公開變化", "Read holdings from the latest disclosure")}</em></h2></div>
           <div><p>{t("基金排名資料截至 2025-12-31；持倉採 SEC 2026 Q1 Form 13F-HR，與 2025 Q4 持股數比較。估值納入可取得的年度營收成長、自由現金流與負債，但不代表基金買進成本。資料期間較舊、欄位不足或模型分歧較大時會標示『低信心初估』。", "Fund rankings are as of 2025-12-31. Holdings use SEC 2026 Q1 Form 13F-HR and compare share counts with 2025 Q4. Valuation includes available annual revenue growth, free cash flow, and leverage, but does not represent the manager's purchase cost. Older periods, incomplete fields, or wide model dispersion are marked low confidence.")}</p><a href={snapshot.rankingSourceUrl} target="_blank" rel="noreferrer">{t("查看排名來源", "View ranking source")} ↗</a></div>
         </section>
 
