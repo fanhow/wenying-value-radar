@@ -64,6 +64,9 @@ export type MarketScanRow = {
 
 export type ValuationDirection = "undervalued" | "overvalued";
 
+export const TAIWAN_MIN_DAILY_VOLUME = 100_000;
+export const TAIWAN_MIN_DAILY_TURNOVER = 5_000_000;
+
 function numeric(value: unknown) {
   const parsed = Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -71,6 +74,19 @@ function numeric(value: unknown) {
 
 function hasFiniteValue(value: unknown) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
+export function hasCandidateLiquidity(row: MarketScanRow) {
+  const market = row.market ?? "TW";
+  const volume = numeric(row.volume);
+  const price = numeric(row.price);
+  if (market === "US") {
+    return price >= 3 && numeric(row.marketCap) >= 500_000_000 && volume >= 100_000;
+  }
+  return /^\d{4}$/.test(row.ticker)
+    && !/^00/.test(row.ticker)
+    && volume >= TAIWAN_MIN_DAILY_VOLUME
+    && price * volume >= TAIWAN_MIN_DAILY_TURNOVER;
 }
 
 export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: ComparableMultiples): StockInput | null {
@@ -160,6 +176,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
 }
 
 export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null {
+  if (!hasCandidateLiquidity(row)) return null;
   const input = marketStockFromRatio(row, row.comparableMultiples);
   if (!input) return null;
   const valuation = validValuation(input);
@@ -186,6 +203,7 @@ export function selectMarketCandidates(
 ) {
   const profiles = comparableMap ?? comparableMapForUniverse(universe);
   return universe
+    .filter(hasCandidateLiquidity)
     .map((row) => marketStockFromRatio(row, profiles.get(String(row.ticker).trim().toUpperCase())))
     .filter((stock): stock is StockInput => stock !== null)
     .map((stock) => ({ stock, valuation: validValuation(stock) }))

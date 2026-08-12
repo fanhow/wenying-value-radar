@@ -73,6 +73,38 @@ function mergeIntoStorage(addedStocks: StockInput[]) {
   );
 }
 
+async function saveImportLog(rows: ImportCandidate[]) {
+  const importedAt = new Date().toISOString();
+  const batchId = crypto.randomUUID();
+  const observations = rows.flatMap((candidate) => {
+    if (!candidate.stock) return [];
+    const stock = calculateStock(candidate.stock);
+    return [{
+      batchId,
+      importedAt,
+      fileName: candidate.fileName,
+      market: stock.market,
+      ticker: stock.ticker,
+      name: stock.name,
+      capturedPrice: candidate.capturedPrice,
+      marketPrice: stock.price,
+      fairValue: stock.fairValue,
+      valuationGap: stock.upside,
+      confidence: stock.valuationConfidence,
+    }];
+  });
+  if (!observations.length) return;
+  try {
+    await fetch("/api/ark-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ observations }),
+    });
+  } catch {
+    // The import itself remains successful when the optional research log is unavailable.
+  }
+}
+
 export default function ArkPage() {
   const { language, t } = useLanguage();
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
@@ -167,6 +199,7 @@ export default function ArkPage() {
 
       const addedStocks = resolved.flatMap((candidate) => candidate.stock ? [candidate.stock] : []);
       mergeIntoStorage(addedStocks);
+      await saveImportLog(resolved);
       setCandidates(resolved);
       setProgress(100);
       const fallbackNote = importPayload.usedFallbackDirectory ? "（已啟用內建名錄備援）" : "";

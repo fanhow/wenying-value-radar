@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isTaiwanSymbolQuery, rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
+import { findStockDirectoryEntries, isTaiwanSymbolQuery, rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 
 type TwseSymbolRow = { Code?: string; Name?: string };
@@ -24,6 +24,7 @@ async function optionalJson<T>(url: string): Promise<T | null> {
     const response = await fetch(url, {
       headers: DIRECTORY_HEADERS,
       next: { revalidate: 60 * 60 * 12 },
+      signal: AbortSignal.timeout(2_500),
     });
     if (!response.ok) return null;
     return response.json() as Promise<T>;
@@ -35,6 +36,13 @@ async function optionalJson<T>(url: string): Promise<T | null> {
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!query || query.length > 40) return NextResponse.json({ symbols: [] });
+
+  const local = findStockDirectoryEntries(query, 6).map((entry) => ({
+    ticker: entry.ticker,
+    name: entry.nameZh || entry.nameEn,
+    market: entry.market,
+  }));
+  if (local.length) return NextResponse.json({ symbols: local, source: "local-directory" });
 
   let entries: MarketSymbol[] = [];
   if (isTaiwanSymbolQuery(query)) {

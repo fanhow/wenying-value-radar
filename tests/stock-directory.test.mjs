@@ -17,6 +17,11 @@ test("resolves MediaTek by its Chinese company name", () => {
   assert.equal(findStockDirectoryEntries("聯發科技")[0]?.ticker, "2454");
 });
 
+test("resolves frequently searched Taiwan company names locally", () => {
+  assert.equal(findStockDirectoryEntries("仁寶")[0]?.ticker, "2324");
+  assert.equal(findStockDirectoryEntries("潤泰全")[0]?.ticker, "2915");
+});
+
 test("routes Chinese company names to the Taiwan symbol directory", () => {
   assert.equal(isTaiwanSymbolQuery("聯發科"), true);
   assert.equal(isTaiwanSymbolQuery("2454"), true);

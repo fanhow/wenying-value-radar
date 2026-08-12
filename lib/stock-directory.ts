@@ -22,6 +22,20 @@ export type YahooTaiwanSnapshot = {
 
 const stockDirectory: StockDirectoryEntry[] = [
   {
+    ticker: "2324",
+    market: "TW",
+    nameZh: "仁寶",
+    nameEn: "Compal Electronics",
+    aliases: ["仁寶電腦", "compal", "compal electronics"],
+  },
+  {
+    ticker: "2915",
+    market: "TW",
+    nameZh: "潤泰全",
+    nameEn: "Ruentex Industries",
+    aliases: ["潤泰全球", "ruentex", "ruentex industries"],
+  },
+  {
     ticker: "2330",
     market: "TW",
     nameZh: "台積電",

@@ -22,6 +22,7 @@ const snapshot = quotes.map((quote) => {
     date: quote.Date,
     pe: ratio?.PriceEarningRatio ?? "",
     pb: ratio?.PriceBookRatio ?? "",
+    volume: quote.TradingShares ?? "",
   };
 });
 

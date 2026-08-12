@@ -13,11 +13,11 @@ import {
 } from "../../../lib/snapshot-store";
 
 type TwseRatioRow = { Date?: string; Code?: string; Name?: string; PEratio?: string; PBratio?: string };
-type TwseDailyRow = { Date?: string; Code?: string; Name?: string; ClosingPrice?: string };
+type TwseDailyRow = { Date?: string; Code?: string; Name?: string; ClosingPrice?: string; TradeVolume?: string };
 
 async function optionalRows<T>(url: string): Promise<T[]> {
   try {
-    const response = await fetch(url, { next: { revalidate: 60 * 60 * 6 } });
+    const response = await fetch(url, { next: { revalidate: 60 * 60 * 6 }, signal: AbortSignal.timeout(5_000) });
     if (!response.ok) return [];
     return response.json() as Promise<T[]>;
   } catch {
@@ -42,6 +42,7 @@ export async function GET() {
       date: row.Date || quote?.Date,
       sector: "台灣上市公司",
       market: "TW",
+      volume: quote?.TradeVolume ?? 0,
     };
   });
   const otc: MarketScanRow[] = tpexSnapshot.map((row) => ({
@@ -53,6 +54,7 @@ export async function GET() {
     date: row.date,
     sector: "台灣上櫃公司",
     market: "TW",
+    volume: row.volume,
   }));
   const taiwanUniverse = [...listed, ...otc].filter((row) => /^\d{4}$/.test(row.ticker) && Number(row.price) > 0);
   const usUniverse: MarketScanRow[] = usMarketSnapshot.map((row) => ({

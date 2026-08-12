@@ -117,6 +117,7 @@ async function fetchJson<T>(url: string, headers?: HeadersInit): Promise<T> {
     const response = await fetch(url, {
       headers,
       next: { revalidate: 60 * 60 * 12 },
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) throw new Error(`資料來源回應 ${response.status}`);
     return response.json() as Promise<T>;
@@ -147,6 +148,7 @@ async function yahooTaiwanSnapshot(ticker: string) {
     const response = await fetch(`https://tw.stock.yahoo.com/quote/${encodeURIComponent(ticker)}/eps`, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)" },
       next: { revalidate: 60 * 60 * 6 },
+      signal: AbortSignal.timeout(4_000),
     });
     if (!response.ok) return null;
     return parseYahooTaiwanHtml(await response.text());
@@ -573,8 +575,8 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
 
 async function valueTwStock(body: ValuationRequest, ticker: string) {
   const [twseRatios, twseDaily] = await Promise.all([
-    fetchJson<TwseRatioRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
-    fetchJson<TwseDailyRow[]>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
+    fetchOptionalJson<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
+    fetchOptionalJson<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
   ]);
   const twseRatio = twseRatios.find((row) => row.Code === ticker);
   const twseQuote = twseDaily.find((row) => row.Code === ticker);

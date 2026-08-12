@@ -27,8 +27,8 @@ type NasdaqRow = {
   volume?: string | number;
 };
 
-type TwseRow = { Code?: string; Name?: string; ClosingPrice?: string; Date?: string };
-type TpexRow = { SecuritiesCompanyCode?: string; CompanyName?: string; Close?: string; Date?: string };
+type TwseRow = { Code?: string; Name?: string; ClosingPrice?: string; TradeVolume?: string; Date?: string };
+type TpexRow = { SecuritiesCompanyCode?: string; CompanyName?: string; Close?: string; TradingShares?: string; Date?: string };
 
 export type SnapshotJobOptions = {
   database?: D1Database;
@@ -77,6 +77,7 @@ function parseNasdaqRows(payload: { data?: { rows?: NasdaqRow[] } } | undefined,
       ticker,
       name: String(row.name ?? ticker),
       price,
+      volume: numberValue(row.TradeVolume),
       marketCap: numberValue(row.marketCap),
       volume: numberValue(row.volume),
       priceDate: updatedAt.slice(0, 10),
@@ -95,6 +96,7 @@ function parseTwseRows(rows: TwseRow[], updatedAt: string) {
       ticker,
       name: String(row.Name ?? ticker),
       price,
+      volume: numberValue(row.TradingShares),
       priceDate: row.Date ?? updatedAt.slice(0, 10),
       updatedAt,
     }];
