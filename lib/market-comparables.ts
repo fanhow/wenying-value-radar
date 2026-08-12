@@ -238,16 +238,21 @@ export function comparableMultiplesForRow(
   minPeers = MIN_PEERS,
 ): ComparableMultiples | undefined {
   const targetGroup = rowPeerGroup(target);
-  const groupPeers = targetGroup
-    ? universe.filter((row) => rowPeerGroup(row) === targetGroup && isEligiblePeer(row, target))
+  const groupRows = targetGroup
+    ? universe.filter((row) => rowPeerGroup(row) === targetGroup)
     : [];
+  const groupPeers = groupRows.filter((row) => isEligiblePeer(row, target));
   if (groupPeers.length >= Math.max(MIN_BUSINESS_GROUP_PEERS, minPeers - 1)) {
     const groupProfile = comparableMultiplesFromPeers(target, groupPeers, Math.max(MIN_BUSINESS_GROUP_PEERS, minPeers - 1), targetGroup);
-    const sectorPeers = universe.filter((row) => isEligiblePeer(row, target));
+    const sectorPeers = universe
+      .filter((row) => rowSector(row) === rowSector(target))
+      .filter((row) => isEligiblePeer(row, target));
     const sectorProfile = comparableMultiplesFromPeers(target, sectorPeers, minPeers);
     return groupProfile ? mergeBusinessGroupWithSector(groupProfile, sectorProfile) : sectorProfile;
   }
-  const peers = universe.filter((row) => isEligiblePeer(row, target));
+  const peers = universe
+    .filter((row) => rowSector(row) === rowSector(target))
+    .filter((row) => isEligiblePeer(row, target));
   return comparableMultiplesFromPeers(target, peers, minPeers);
 }
 
@@ -257,12 +262,17 @@ export function buildComparableMap(
 ) {
   const result = new Map<string, ComparableMultiples>();
   const groups = new Map<string, ComparableRow[]>();
+  const sectors = new Map<string, ComparableRow[]>();
   for (const row of universe) {
     const peerGroup = rowPeerGroup(row);
     const key = `${marketKey(row.market)}|${peerGroup ? `group:${peerGroup}` : `sector:${rowSector(row)}`}`;
     const group = groups.get(key) ?? [];
     group.push(row);
     groups.set(key, group);
+    const sectorKeyValue = `${marketKey(row.market)}|sector:${rowSector(row)}`;
+    const sectorRows = sectors.get(sectorKeyValue) ?? [];
+    sectorRows.push(row);
+    sectors.set(sectorKeyValue, sectorRows);
   }
   for (const target of universe) {
     const targetGroup = rowPeerGroup(target);
@@ -271,12 +281,14 @@ export function buildComparableMap(
       ? (groups.get(groupKey) ?? []).filter((row) => isEligiblePeer(row, target))
       : [];
     const useGroup = groupPeers.length >= Math.max(MIN_BUSINESS_GROUP_PEERS, minPeers - 1);
+    const sectorKeyValue = `${marketKey(target.market)}|sector:${rowSector(target)}`;
+    const sectorRows = sectors.get(sectorKeyValue) ?? [];
     const peers = useGroup
       ? groupPeers
-      : universe.filter((row) => isEligiblePeer(row, target));
+      : sectorRows.filter((row) => isEligiblePeer(row, target));
     const profile = comparableMultiplesFromPeers(target, peers, useGroup ? Math.max(MIN_BUSINESS_GROUP_PEERS, minPeers - 1) : minPeers, useGroup ? targetGroup : null);
     if (profile && useGroup) {
-      const sectorPeers = universe.filter((row) => isEligiblePeer(row, target));
+      const sectorPeers = sectorRows.filter((row) => isEligiblePeer(row, target));
       const sectorProfile = comparableMultiplesFromPeers(target, sectorPeers, minPeers);
       result.set(normalize(target.ticker), mergeBusinessGroupWithSector(profile, sectorProfile));
     } else if (profile) {
