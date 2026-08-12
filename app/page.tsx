@@ -9,6 +9,7 @@ import { valuationDirection, valuationDirectionSymbol, type ValuationDirection }
 import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
+import { SiteFooter } from "./site-footer";
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
 type SortKey = "upside" | "quality" | "price";
@@ -846,11 +847,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="method" className="method-section">
-          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統只納入真正適用的模型，中央公允價值採模型家族平衡：同一模型家族內等權，家族之間也等權，避免 5 年與 10 年 DCF 或相關倍數重複放大。不適用模型會列出排除原因，robust filter 也不參考目前股價。估值只使用公開 LTM、年度財報與市場比率；公開資料不足時會降低信心，不假裝精準。", "Only applicable models are included. The central fair value is family-balanced: equal within each model family and equal across families, preventing 5-year/10-year DCFs or related multiples from repeating the same assumption. Exclusions are explained, and the robust filter does not use the current price. Estimates use only public LTM, annual filings, and market ratios; incomplete public data lowers confidence.")}</p></div>
-                  <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("模型家族平衡", "Family-Balanced Models")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試；同一家族內等權，家族之間等權，避免相同現金流或不同期限被重複計算。沒有獨立產業倍數時，EV 模型會排除。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests. Models are equal within a family and families are equal across the center, preventing repeated cash-flow or horizon assumptions. EV models are excluded without an independent industry multiple.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
-        </section>
-
         <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。每日價格與季度財報由背景快照排程更新，若來源暫時不可用則保留上一份可追溯資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. Background snapshots refresh prices daily and core financials quarterly; if a source is temporarily unavailable, the last traceable snapshot remains in use. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
 
         {showAddForm && (
@@ -887,7 +883,7 @@ export default function Home() {
           </div>
         )}
 
-        <footer className="footer"><div><span>穩盈價值雷達 · WenYing Value Radar</span><small>{t("方舟／ARKER 名稱與圖標屬其原權利人；本工具為穩盈基金的獨立研究網站，並非方舟官方服務。", "The ARKER name and logo belong to their respective owner. This is an independent WenYing Fund research tool and is not an official ARKER service.")}</small></div><span>{t("估值是研究起點，不是單獨的買賣指令", "Valuation is a research starting point, not a standalone trading signal")}</span></footer>
+        <SiteFooter disclaimer={["方舟／ARKER 名稱與圖標屬其原權利人；本工具為穩盈基金的獨立研究網站，並非方舟官方服務。", "The ARKER name and logo belong to their respective owner. This is an independent WenYing Fund research tool and is not an official ARKER service."]} motto={["估值是研究起點，不是單獨的買賣指令", "Valuation is a research starting point, not a standalone trading signal"]} />
       </div>
     </main>
   );

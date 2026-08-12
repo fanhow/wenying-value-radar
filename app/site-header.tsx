@@ -17,7 +17,6 @@ export function SiteHeader({ active }: { active: "home" | "funds" | "ark" | "abo
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Fund Tracker")}</Link>
         <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK Tool")}</Link>
         <Link href="/#watchlist">{t("我的觀察", "Watchlist")}</Link>
-        <Link href="/#method">{t("模型說明", "Method")}</Link>
         <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About Us")}</Link>
       </nav>
       <div className="header-controls">

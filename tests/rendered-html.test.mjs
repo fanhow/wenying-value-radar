@@ -40,9 +40,9 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
-  assert.match(html, /中央公允價值採模型家族平衡/);
-  assert.match(html, /robust filter 也不參考目前股價/);
-  assert.match(html, /估值只使用公開 LTM、年度財報與市場比率/);
+  assert.doesNotMatch(html, /href="\/#method"/);
+  assert.doesNotMatch(html, /HOW IT WORKS/);
+  assert.match(html, /Rev\. 2026\.08\.13\.1/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
@@ -97,6 +97,7 @@ assert.match(fundsSource, /不是基金預測的合理本益比/);
 });
 
 test("renders the standalone ARKER import page in Chinese by default", async () => {
+  const source = await readFile(new URL("../app/ark/page.tsx", import.meta.url), "utf8");
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("ark", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -113,6 +114,8 @@ test("renders the standalone ARKER import page in Chinese by default", async () 
   assert.match(html, /內建名錄與財務快照/);
   assert.match(html, /方舟運算長期紀錄/);
   assert.match(html, /每次匯入會保存/);
+  assert.match(source, /groupArkLogRowsByDay/);
+  assert.match(source, /<details className="ark-log-batch"/);
 });
 
 test("renders the About Us page in Chinese by default", async () => {

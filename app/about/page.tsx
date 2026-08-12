@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SiteHeader } from "../site-header";
 import { useLanguage } from "../language-context";
+import { SiteFooter } from "../site-footer";
 
 export default function AboutPage() {
   const { t } = useLanguage();
@@ -43,7 +44,7 @@ export default function AboutPage() {
           <div className="about-bridge-copy"><p>{t("穩盈價值雷達把這套理念轉成可以重複使用的研究流程：先驗證資料，再衡量公允價值與風險，最後才決定是否值得進一步研究。", "WenYing Value Radar turns these principles into a repeatable research process: validate the data, measure fair value and risk, and only then decide whether an idea deserves deeper research.")}</p><Link href="/#overview">{t("前往公允價值首頁", "Open the Fair Value dashboard")} <span>→</span></Link></div>
         </section>
 
-        <footer className="footer"><div><span>穩盈價值雷達 · WenYing Value Radar</span><small>{t("本網站僅供投資研究與教育用途，不構成投資建議。", "This website is for investment research and education only and does not constitute investment advice.")}</small></div><span>{t("先守住風險，再追求成長", "Protect the downside, then pursue growth")}</span></footer>
+        <SiteFooter disclaimer={["本網站僅供投資研究與教育用途，不構成投資建議。", "This website is for investment research and education only and does not constitute investment advice."]} motto={["先守住風險，再追求成長", "Protect the downside, then pursue growth"]} />
       </div>
     </main>
   );

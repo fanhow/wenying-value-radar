@@ -70,7 +70,7 @@ a { color: inherit; text-decoration: none; }
 .eyebrow-line { width: 28px; height: 1px; display: inline-block; vertical-align: middle; margin: 0 10px 3px 0; background: var(--green); }
 .beta-tag { margin-left: 9px; padding: 4px 7px; border: 1px solid #b7d7c8; border-radius: 4px; color: var(--green-deep); font-size: 9px; letter-spacing: .1em; }
 .hero h1 { margin: 17px 0 18px; color: var(--ink); font-size: clamp(40px, 4vw, 63px); line-height: 1.1; letter-spacing: -.065em; font-weight: 650; }
-.hero h1 em, .method-intro em { color: var(--green); font-style: normal; }
+.hero h1 em { color: var(--green); font-style: normal; }
 .hero h1 em { display: inline-block; font-size: .86em; white-space: nowrap; }
 .hero-description { max-width: 560px; margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.85; }
 .hero-principles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
@@ -192,9 +192,13 @@ a { color: inherit; text-decoration: none; }
 .ark-log-empty { margin: 24px 0 0; padding: 20px; border: 1px dashed #cfe1d7; border-radius: 10px; color: var(--ink-faint); background: rgba(255,255,255,.55); font-size: 11px; }
 .ark-log-batches { display: grid; gap: 14px; margin-top: 24px; }
 .ark-log-batch { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
-.ark-log-batch-heading { display: flex; justify-content: space-between; gap: 15px; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #f4f8f5; }
+.ark-log-batch-heading { display: flex; justify-content: space-between; gap: 15px; padding: 13px 16px; border: 0; background: #f4f8f5; cursor: pointer; list-style: none; }
+.ark-log-batch-heading::-webkit-details-marker { display: none; }
 .ark-log-batch-heading strong { color: var(--ink); font-size: 11px; }
 .ark-log-batch-heading span { color: var(--ink-faint); font-size: 10px; }
+.ark-log-batch-heading i { display: inline-block; margin-left: 5px; color: var(--green); font-style: normal; transition: transform .18s; }
+.ark-log-batch[open] .ark-log-batch-heading { border-bottom: 1px solid var(--line); }
+.ark-log-batch[open] .ark-log-batch-heading i { transform: rotate(180deg); }
 .ark-log-rows { display: grid; }
 .ark-log-row { display: grid; grid-template-columns: minmax(180px, 1.65fr) repeat(4, minmax(88px, 1fr)); gap: 13px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #edf1ee; }
 .ark-log-row:last-child { border-bottom: 0; }
@@ -453,17 +457,6 @@ a { color: inherit; text-decoration: none; }
 .card-arrow { position: absolute; right: 9px; bottom: 7px; color: var(--ink-faint); font-size: 12px; }
 .watchlist-empty { grid-column: 1 / -1; padding: 25px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--ink-faint); font-size: 12px; text-align: center; }
 
-.method-section { display: grid; grid-template-columns: .8fr 1.2fr; gap: 85px; align-items: center; padding: 100px 46px 78px; }
-.method-intro h2 { margin: 13px 0 17px; font-size: 32px; line-height: 1.18; letter-spacing: -.06em; }
-.method-intro > p:last-child { max-width: 350px; margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.8; }
-.method-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
-.method-cards article { min-height: 218px; padding: 22px 19px; border-top: 2px solid var(--green); background: #eff5f0; }
-.method-cards article:nth-child(2) { border-color: var(--blue); background: #f0f4f8; }
-.method-cards article:nth-child(3) { border-color: var(--gold); background: #f8f4ea; }
-.method-number { color: var(--ink-faint); font: 11px Georgia, serif; }
-.method-cards h3 { margin: 28px 0 11px; font-size: 14px; }
-.method-cards p { min-height: 72px; margin: 0; color: var(--ink-soft); font-size: 10px; line-height: 1.7; }
-.method-weight { display: block; margin-top: 20px; color: var(--ink-faint); font-size: 9px; }
 .data-layer-banner { display: flex; align-items: center; gap: 17px; margin-bottom: 56px; padding: 20px 23px; border: 1px solid #cbded3; border-radius: 10px; background: #eaf5ee; }
 .data-layer-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--green); color: white; font-size: 21px; }
 .data-layer-banner strong { font-size: 12px; }
@@ -472,6 +465,14 @@ a { color: inherit; text-decoration: none; }
 .footer { min-height: 112px; display: flex; justify-content: space-between; align-items: center; gap: 28px; padding: 20px 0 26px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 9px; }
 .footer > div span { display: block; color: var(--ink-soft); font-weight: 700; }
 .footer > div small { display: block; max-width: 690px; margin-top: 6px; color: var(--ink-faint); font-size: 9px; line-height: 1.6; }
+.revision-log { margin-top: 7px; color: var(--ink-faint); }
+.revision-log summary { width: fit-content; cursor: pointer; font-size: 8px; letter-spacing: .03em; list-style: none; }
+.revision-log summary::-webkit-details-marker { display: none; }
+.revision-log summary::before { content: "+"; margin-right: 5px; color: var(--green); }
+.revision-log[open] summary::before { content: "−"; }
+.revision-log ul { display: grid; gap: 4px; max-width: 760px; margin: 8px 0 0; padding: 9px 12px; border-left: 1px solid var(--line-strong); list-style: none; }
+.revision-log li { display: grid; grid-template-columns: 76px 1fr; gap: 8px; color: var(--ink-faint); font-size: 8px; line-height: 1.5; }
+.revision-log b { color: var(--ink-soft); font-weight: 700; }
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(17, 43, 35, .38); backdrop-filter: blur(5px); }
 .add-modal { width: min(700px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 29px; border-radius: 15px; background: var(--surface); box-shadow: 0 30px 100px rgba(17, 43, 35, .25); }
@@ -711,11 +712,6 @@ a { color: inherit; text-decoration: none; }
   .section-heading-row { display: block; }
   .outline-button { margin-top: 17px; }
   .watchlist-cards { grid-template-columns: 1fr; }
-  .method-section { display: block; padding: 72px 20px 54px; }
-  .method-intro > p:last-child { max-width: none; }
-  .method-cards { grid-template-columns: 1fr; margin-top: 28px; }
-  .method-cards article { min-height: auto; }
-  .method-cards p { min-height: auto; }
   .data-layer-banner { align-items: flex-start; margin-bottom: 36px; padding: 16px; }
   .coming-label { display: none; }
   .footer { display: block; padding-top: 24px; line-height: 1.9; }

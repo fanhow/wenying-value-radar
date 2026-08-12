@@ -6,6 +6,7 @@ import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, type Market, type StockInput } from "../../lib/valuation";
 import { useLanguage } from "../language-context";
 import { SiteHeader } from "../site-header";
+import { SiteFooter } from "../site-footer";
 
 type ImportStatus = "計算中" | "已加入" | "需要確認";
 
@@ -66,21 +67,26 @@ function formatPrice(value: number, market: Market) {
   return `${market === "TW" ? "NT$" : "US$"} ${numberFormatter.format(value)}`;
 }
 
-function formatLogDate(value: string, language: "zh" | "en") {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(language === "zh" ? "zh-TW" : "en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function formatGap(value: number) {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
 }
 
 function confidenceLabel(confidence: ArkLogRow["confidence"], t: (zh: string, en: string) => string) {
   return confidence === "high" ? t("高信心", "High") : confidence === "medium" ? t("中信心", "Medium") : t("低信心", "Low");
+}
+
+function groupArkLogRowsByDay(rows: ArkLogRow[], language: "zh" | "en") {
+  const grouped = new Map<string, { label: string; rows: ArkLogRow[]; batches: Set<string> }>();
+  rows.forEach((row) => {
+    const date = new Date(row.importedAt);
+    const key = Number.isNaN(date.getTime()) ? row.importedAt : `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+    const label = Number.isNaN(date.getTime()) ? row.importedAt : new Intl.DateTimeFormat(language === "zh" ? "zh-TW" : "en-US", { dateStyle: "full" }).format(date);
+    const group = grouped.get(key) ?? { label, rows: [], batches: new Set<string>() };
+    group.rows.push(row);
+    group.batches.add(row.batchId);
+    grouped.set(key, group);
+  });
+  return [...grouped.entries()].map(([key, group]) => ({ ...group, key, batchCount: group.batches.size }));
 }
 
 async function fetchArkLogRows() {
@@ -368,11 +374,11 @@ export default function ArkPage() {
             <p className="ark-log-empty">{t("尚無已保存的方舟運算紀錄；完成一次匯入後會出現在這裡。", "No ARKER records yet. Complete an import and it will appear here.")}</p>
           ) : (
             <div className="ark-log-batches">
-              {[...new Map(logRows.map((row) => [row.batchId, logRows.filter((item) => item.batchId === row.batchId)])).values()].map((rows) => (
-                <article className="ark-log-batch" key={rows[0].batchId}>
-                  <div className="ark-log-batch-heading"><strong>{formatLogDate(rows[0].importedAt, language)}</strong><span>{rows.length} {t("檔標的", "symbols")}</span></div>
+              {groupArkLogRowsByDay(logRows, language).map((day) => (
+                <details className="ark-log-batch" key={day.key}>
+                  <summary className="ark-log-batch-heading"><strong>{day.label}</strong><span>{day.batchCount} {t("批次", "batch(es)")} · {day.rows.length} {t("檔標的", "symbols")} <i aria-hidden="true">⌄</i></span></summary>
                   <div className="ark-log-rows">
-                    {rows.map((row) => (
+                    {day.rows.map((row) => (
                       <div className="ark-log-row" key={row.id}>
                         <div className="ark-log-symbol"><span className={`ticker-badge market-${row.market.toLowerCase()}`}>{row.market}</span><strong>{row.ticker}</strong><small>{row.name || row.fileName}</small></div>
                         <div><span>{t("上傳價格", "Captured")}</span><b>{row.capturedPrice ? formatPrice(row.capturedPrice, row.market) : "—"}</b></div>
@@ -382,11 +388,12 @@ export default function ArkPage() {
                       </div>
                     ))}
                   </div>
-                </article>
+                </details>
               ))}
             </div>
           )}
         </section>
+        <SiteFooter disclaimer={["本工具只保存辨識後的研究快照，不保存原始截圖；內容僅供研究，不構成投資建議。", "Only recognized research snapshots are stored; source screenshots are not. This content is for research and is not investment advice."]} motto={["記錄假設，也記錄結果", "Track assumptions and outcomes"]} />
       </div>
     </main>
   );
