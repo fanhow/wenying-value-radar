@@ -740,7 +740,7 @@ export default function Home() {
             <div className="stock-table-wrap">
               <table className="stock-table">
                 <thead>
-                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("模型狀態／信心", "Model Status / Confidence")}</th><th scope="col"><span className="sr-only">{t("操作", "Actions")}</span></th></tr>
+                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("模型狀態／信心", "Model Status / Confidence")}</th></tr>
                 </thead>
                 <tbody>
                   {filteredStocks.map((stock) => {
@@ -756,7 +756,6 @@ export default function Home() {
                         <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : directionTextClass(direction)}`}><TrendMark direction={direction} /> {formatSignedPercent(stock.upside)}</span></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
                         <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /><GrowthPremiumPill assessment={growthPremium} language={language} /></div></td>
-                        <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); openRankedStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
                       </tr>
                     );
                   })}
