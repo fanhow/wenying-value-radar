@@ -466,7 +466,17 @@ a { color: inherit; text-decoration: none; }
 .primary-button span { margin-left: 8px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-.funds-page { padding-top: 24px; }
+.funds-page { display: flex; flex-direction: column; padding-top: 24px; }
+.funds-hero { order: 1; }
+.fund-rank-grid { order: 2; }
+.fund-disclosure-note { order: 3; }
+.fund-overlap-panel { order: 4; }
+.fund-sections { order: 5; }
+.fund-business-panel { order: 6; }
+.fund-manager-panel { order: 7; }
+.fund-market-panel { order: 8; }
+.fund-method-note { order: 9; }
+.funds-page > .footer { order: 10; }
 .funds-hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 58px; align-items: center; padding: 68px 48px; overflow: hidden; border-radius: 18px; color: #f5fbf8; background: radial-gradient(circle at 88% 6%, rgba(119,84,184,.32), transparent 33%), radial-gradient(circle at 5% 95%, rgba(46,158,126,.25), transparent 35%), #102c2e; box-shadow: var(--shadow); }
 .funds-hero h1 { margin: 18px 0 21px; font-size: clamp(42px, 4.7vw, 66px); line-height: 1.08; letter-spacing: -.065em; }
 .funds-hero h1 em, .fund-method-note h2 em { color: #9fe0c4; font-style: normal; }

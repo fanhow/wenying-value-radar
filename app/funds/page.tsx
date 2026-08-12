@@ -342,9 +342,9 @@ export default function FundsPage() {
           )}</p>
         </section>
 
-        <section className="fund-pattern-panel" aria-label={t("基金持股產業本益比分布", "Fund holding sector P/E profile")}>
+        <section className="fund-pattern-panel fund-market-panel" aria-label={t("基金持股產業本益比分布", "Fund holding sector P/E profile")}>
           <div className="fund-pattern-heading">
-            <div><p className="section-kicker">MARKET MULTIPLE / 02</p><h2>{t("六大基金把不同產業定價在哪裡", "How the six funds price different sectors")}</h2></div>
+            <div><p className="section-kicker">MARKET MULTIPLE / 05</p><h2>{t("六大基金把不同產業定價在哪裡", "How the six funds price different sectors")}</h2></div>
             <span>{t("僅統計公開獲利持股", "Profitable disclosed holdings only")}</span>
           </div>
           <div className="fund-pattern-grid">
@@ -365,7 +365,7 @@ export default function FundsPage() {
           )}</p>
         </section>
 
-        <section className="fund-pattern-panel" aria-label={t("基金持股商業模式本益比分布", "Fund holding business-model P/E profile")}>
+        <section className="fund-pattern-panel fund-business-panel" aria-label={t("基金持股商業模式本益比分布", "Fund holding business-model P/E profile")}>
           <div className="fund-pattern-heading">
             <div><p className="section-kicker">BUSINESS MODEL / 03</p><h2>{t("熱門股的本益比，先看它屬於哪種生意", "Read a hot stock's P/E by business model first")}</h2></div>
             <span>{t("只統計可稽核的代表性代碼", "Curated representative tickers only")}</span>
@@ -392,7 +392,7 @@ export default function FundsPage() {
           )}</p>
         </section>
 
-        <section className="fund-pattern-panel" aria-label={t("各基金持股本益比分布", "P/E profile by fund manager")}>
+        <section className="fund-pattern-panel fund-manager-panel" aria-label={t("各基金持股本益比分布", "P/E profile by fund manager")}>
           <div className="fund-pattern-heading">
             <div><p className="section-kicker">MANAGER SNAPSHOT / 04</p><h2>{t("六大基金各自承受多少本益比", "How much P/E each manager is carrying")}</h2></div>
             <span>{t("目前公開持股的統計快照", "Current disclosed-holdings snapshot")}</span>
@@ -417,7 +417,7 @@ export default function FundsPage() {
 
         <section className="fund-overlap-panel" aria-label={t("六大基金共同持倉", "Six-fund overlapping holdings")}>
           <div className="fund-pattern-heading">
-            <div><p className="section-kicker">CROWDING SIGNAL / 03</p><h2>{t("多家基金同時持有的股票", "Stocks held by multiple funds")}</h2></div>
+            <div><p className="section-kicker">CROWDING SIGNAL / 02</p><h2>{t("多家基金同時持有的股票", "Stocks held by multiple funds")}</h2></div>
             <span>{t("只作方向提示，不改寫公允價值", "Context only; does not change fair value")}</span>
           </div>
           <div className="fund-overlap-list">

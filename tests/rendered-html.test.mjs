@@ -86,7 +86,7 @@ test("valuation details expose the bilingual model audit trail", async () => {
   assert.match(source, /Usable peers by model/);
   assert.match(fundsSource, /profile\.uniqueSampleSize/);
 assert.match(fundsSource, /fundPortfolioOverlapProfiles/);
-assert.match(fundsSource, /CROWDING SIGNAL \/ 03/);
+assert.match(fundsSource, /CROWDING SIGNAL \/ 02/);
 assert.match(fundsSource, /stockDetailHref\(profile\.ticker\)/);
 assert.match(fundsSource, /fundManagerPeProfiles/);
 assert.match(fundsSource, /MANAGER SNAPSHOT \/ 04/);
