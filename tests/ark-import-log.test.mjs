@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeArkObservation, saveArkImportObservations } from "../lib/ark-import-log.ts";
+import { normalizeArkObservation, readArkImportObservations, saveArkImportObservations } from "../lib/ark-import-log.ts";
 
 test("normalizes a durable ARKER import observation", () => {
   const row = normalizeArkObservation({
@@ -40,4 +40,21 @@ test("persists point-in-time ARKER observations in the durable log", async () =>
   assert.equal(batches.length, 2);
   assert.equal(batches[1][0].values[4], "1808");
   assert.equal(batches[1][0].values[8], 59.15);
+});
+
+test("reads recent ARKER observations for the history view", async () => {
+  const rows = [{ id: 7, batchId: "batch-3", importedAt: "2026-08-13T03:00:00.000Z", fileName: "ark-3.png", market: "US", ticker: "TSLA", name: "Tesla", capturedPrice: 330, marketPrice: 334, fairValue: 240, valuationGap: -0.2814, confidence: "medium" }];
+  const database = {
+    prepare(sql) {
+      return {
+        sql,
+        bind(...values) {
+          return { sql, values, async all() { return { results: rows }; } };
+        },
+      };
+    },
+    async batch() { return []; },
+  };
+  const result = await readArkImportObservations(20, database);
+  assert.deepEqual(result, rows);
 });

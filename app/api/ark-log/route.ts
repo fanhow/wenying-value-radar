@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveArkImportObservations, type ArkImportObservation } from "../../../lib/ark-import-log";
+import { readArkImportObservations, saveArkImportObservations, type ArkImportObservation } from "../../../lib/ark-import-log";
+
+export async function GET(request: NextRequest) {
+  const limit = Number(new URL(request.url).searchParams.get("limit") || 120);
+  const rows = await readArkImportObservations(limit);
+  return NextResponse.json({ rows });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,4 +17,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ saved: 0, error: "Unable to save import observations" }, { status: 422 });
   }
 }
-

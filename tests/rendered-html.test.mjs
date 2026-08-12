@@ -111,6 +111,8 @@ test("renders the standalone ARKER import page in Chinese by default", async () 
   assert.match(html, /把方舟名單/);
   assert.match(html, /選擇方舟 App 截圖/);
   assert.match(html, /內建名錄與財務快照/);
+  assert.match(html, /方舟運算長期紀錄/);
+  assert.match(html, /每次匯入會保存/);
 });
 
 test("renders the About Us page in Chinese by default", async () => {

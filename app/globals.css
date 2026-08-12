@@ -184,6 +184,29 @@ a { color: inherit; text-decoration: none; }
 .ark-result-values b { display: block; margin-top: 5px; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ark-confidence { min-height: 16px !important; margin-top: 13px; color: var(--green-deep) !important; font-weight: 700; }
 .ark-confidence.confidence-low { color: #956f2b !important; }
+.ark-log-panel { margin-top: 20px; padding: 34px; border: 1px solid var(--line); border-radius: 16px; background: #f8fbf9; }
+.ark-log-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.ark-log-heading h2 { margin: 8px 0 10px; font-size: clamp(28px, 3vw, 40px); letter-spacing: -.05em; }
+.ark-log-heading p:not(.section-kicker) { max-width: 820px; margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.75; }
+.ark-log-count { flex: 0 0 auto; padding: 7px 10px; border: 1px solid #cfe1d7; border-radius: 999px; color: var(--green-deep); background: var(--green-pale); font-size: 10px; font-weight: 800; }
+.ark-log-empty { margin: 24px 0 0; padding: 20px; border: 1px dashed #cfe1d7; border-radius: 10px; color: var(--ink-faint); background: rgba(255,255,255,.55); font-size: 11px; }
+.ark-log-batches { display: grid; gap: 14px; margin-top: 24px; }
+.ark-log-batch { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.ark-log-batch-heading { display: flex; justify-content: space-between; gap: 15px; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #f4f8f5; }
+.ark-log-batch-heading strong { color: var(--ink); font-size: 11px; }
+.ark-log-batch-heading span { color: var(--ink-faint); font-size: 10px; }
+.ark-log-rows { display: grid; }
+.ark-log-row { display: grid; grid-template-columns: minmax(180px, 1.65fr) repeat(4, minmax(88px, 1fr)); gap: 13px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #edf1ee; }
+.ark-log-row:last-child { border-bottom: 0; }
+.ark-log-row > div:not(.ark-log-symbol) > span { display: block; color: var(--ink-faint); font-size: 9px; }
+.ark-log-row > div:not(.ark-log-symbol) > b { display: block; margin-top: 5px; color: var(--ink); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ark-log-symbol { min-width: 0; display: grid; grid-template-columns: auto auto; align-items: center; gap: 0 8px; }
+.ark-log-symbol strong { color: var(--ink); font-size: 13px; }
+.ark-log-symbol small { grid-column: 2; overflow: hidden; color: var(--ink-faint); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.ark-log-confidence { display: block; margin-top: 5px; font-size: 9px; }
+.ark-log-confidence.confidence-low { color: #956f2b; }
+.ark-log-confidence.confidence-medium { color: var(--blue); }
+.ark-log-confidence.confidence-high { color: var(--green-deep); }
 
 .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 24px 0; }
 .metric-card { min-height: 128px; padding: 21px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
@@ -626,6 +649,11 @@ a { color: inherit; text-decoration: none; }
   .ark-result-grid { grid-template-columns: 1fr; }
   .ark-result-values { gap: 7px; }
   .ark-result-values b { font-size: 13px; }
+  .ark-log-panel { padding: 24px 18px; }
+  .ark-log-heading { display: block; }
+  .ark-log-count { display: inline-flex; margin-top: 16px; }
+  .ark-log-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  .ark-log-symbol { grid-column: 1 / -1; }
   .metric-card { min-height: 113px; padding: 16px; }
   .metric-card strong { font-size: 23px; }
   .panel-heading { display: block; padding: 24px 18px 19px; }

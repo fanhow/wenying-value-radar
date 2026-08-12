@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, type Market, type StockInput } from "../../lib/valuation";
 import { useLanguage } from "../language-context";
@@ -20,6 +20,21 @@ type ImportCandidate = {
   status: ImportStatus;
   message?: string;
   stock?: StockInput;
+};
+
+type ArkLogRow = {
+  id: number;
+  batchId: string;
+  importedAt: string;
+  fileName: string;
+  market: Market;
+  ticker: string;
+  name: string;
+  capturedPrice?: number | null;
+  marketPrice: number;
+  fairValue: number;
+  valuationGap: number;
+  confidence: "low" | "medium" | "high";
 };
 
 const numberFormatter = new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 2 });
@@ -49,6 +64,30 @@ function translateStatus(status: ImportStatus) {
 
 function formatPrice(value: number, market: Market) {
   return `${market === "TW" ? "NT$" : "US$"} ${numberFormatter.format(value)}`;
+}
+
+function formatLogDate(value: string, language: "zh" | "en") {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(language === "zh" ? "zh-TW" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function formatGap(value: number) {
+  return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
+}
+
+function confidenceLabel(confidence: ArkLogRow["confidence"], t: (zh: string, en: string) => string) {
+  return confidence === "high" ? t("高信心", "High") : confidence === "medium" ? t("中信心", "Medium") : t("低信心", "Low");
+}
+
+async function fetchArkLogRows() {
+  const response = await fetch("/api/ark-log?limit=120", { headers: { Accept: "application/json" }, cache: "no-store" });
+  const payload = await response.json() as { rows?: ArkLogRow[] };
+  if (!response.ok || !Array.isArray(payload.rows)) throw new Error("Unable to load ARKER log");
+  return payload.rows;
 }
 
 function mergeIntoStorage(addedStocks: StockInput[]) {
@@ -115,6 +154,37 @@ export default function ArkPage() {
   const [message, setMessage] = useState("尚未上傳截圖");
   const [isImporting, setIsImporting] = useState(false);
   const [savedLogCount, setSavedLogCount] = useState<number | null>(null);
+  const [logRows, setLogRows] = useState<ArkLogRow[]>([]);
+  const [isLogLoading, setIsLogLoading] = useState(true);
+  const [logUnavailable, setLogUnavailable] = useState(false);
+
+  const loadArkLog = useCallback(async () => {
+    try {
+      setLogRows(await fetchArkLogRows());
+      setLogUnavailable(false);
+    } catch {
+      setLogUnavailable(true);
+    } finally {
+      setIsLogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchArkLogRows().then((rows) => {
+      if (!cancelled) {
+        setLogRows(rows);
+        setLogUnavailable(false);
+        setIsLogLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setLogUnavailable(true);
+        setIsLogLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   async function requestValuation(candidate: Omit<ImportCandidate, "status" | "message" | "stock">) {
     const response = await fetch("/api/valuation", {
@@ -205,6 +275,8 @@ export default function ArkPage() {
       const addedStocks = resolved.flatMap((candidate) => candidate.stock ? [candidate.stock] : []);
       mergeIntoStorage(addedStocks);
       setSavedLogCount(await saveImportLog(resolved));
+      setIsLogLoading(true);
+      await loadArkLog();
       setCandidates(resolved);
       setProgress(100);
       const fallbackNote = importPayload.usedFallbackDirectory ? "（已啟用內建名錄備援）" : "";
@@ -280,6 +352,41 @@ export default function ArkPage() {
             </div>
           </section>
         )}
+
+        <section className="ark-log-panel" aria-labelledby="ark-log-title">
+          <div className="ark-log-heading">
+            <div>
+              <p className="section-kicker">ARKER LONG-TERM LOG</p>
+              <h2 id="ark-log-title">{t("方舟運算長期紀錄", "ARKER long-term log")}</h2>
+              <p>{t("每次匯入會保存批次、標的、檔名、匯入時間、上傳價格、市場價格、公允價值、模型差距與信心；原始圖片不保存，方便日後回看方舟名單的前瞻性與實際表現。", "Each import keeps its batch, ticker, source filename, import time, captured price, market price, fair value, model gap, and confidence. Source images are never stored, so the list can be reviewed over time.")}</p>
+            </div>
+            <span className="ark-log-count">{isLogLoading ? t("讀取中…", "Loading…") : `${logRows.length} ${t("筆紀錄", "records")}`}</span>
+          </div>
+          {logUnavailable ? (
+            <p className="ark-log-empty">{t("目前無法讀取長期紀錄；本次匯入仍可繼續。", "The long-term log is temporarily unavailable; imports can still continue.")}</p>
+          ) : logRows.length === 0 && !isLogLoading ? (
+            <p className="ark-log-empty">{t("尚無已保存的方舟運算紀錄；完成一次匯入後會出現在這裡。", "No ARKER records yet. Complete an import and it will appear here.")}</p>
+          ) : (
+            <div className="ark-log-batches">
+              {[...new Map(logRows.map((row) => [row.batchId, logRows.filter((item) => item.batchId === row.batchId)])).values()].map((rows) => (
+                <article className="ark-log-batch" key={rows[0].batchId}>
+                  <div className="ark-log-batch-heading"><strong>{formatLogDate(rows[0].importedAt, language)}</strong><span>{rows.length} {t("檔標的", "symbols")}</span></div>
+                  <div className="ark-log-rows">
+                    {rows.map((row) => (
+                      <div className="ark-log-row" key={row.id}>
+                        <div className="ark-log-symbol"><span className={`ticker-badge market-${row.market.toLowerCase()}`}>{row.market}</span><strong>{row.ticker}</strong><small>{row.name || row.fileName}</small></div>
+                        <div><span>{t("上傳價格", "Captured")}</span><b>{row.capturedPrice ? formatPrice(row.capturedPrice, row.market) : "—"}</b></div>
+                        <div><span>{t("市場價格", "Market")}</span><b>{formatPrice(row.marketPrice, row.market)}</b></div>
+                        <div><span>{t("公允價值", "Fair value")}</span><b>{formatPrice(row.fairValue, row.market)}</b></div>
+                        <div><span>{t("模型差距", "Model gap")}</span><b className={row.valuationGap >= 0 ? "text-positive" : "text-negative"}>{formatGap(row.valuationGap)}</b><small className={`ark-log-confidence confidence-${row.confidence}`}>{confidenceLabel(row.confidence, t)}</small></div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );
