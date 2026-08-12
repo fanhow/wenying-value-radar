@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   aggregateDebtValues,
+  annualMetricHistory,
   latestInstantMetric,
   metricFactsFromConcepts,
   metricFromConcepts,
@@ -13,6 +14,18 @@ import {
 } from "../lib/sec-financials.ts";
 
 const annual = { val: 100, start: "2024-10-01", end: "2025-09-30", filed: "2025-11-01", form: "10-K", frame: "CY2025" };
+
+test("returns distinct complete-year history for normalization", () => {
+  const history = annualMetricHistory([
+    annual,
+    { ...annual, val: 105, filed: "2025-11-15", accn: "amended" },
+    { val: 80, start: "2023-10-01", end: "2024-09-30", filed: "2024-11-01", form: "10-K", frame: "CY2024" },
+    { val: 60, start: "2022-10-01", end: "2023-09-30", filed: "2023-11-01", form: "10-K", frame: "CY2023" },
+    { val: 40, start: "2021-10-01", end: "2022-09-30", filed: "2022-11-01", form: "10-K", frame: "CY2022" },
+  ], 3);
+  assert.deepEqual(history.map((point) => point.value), [105, 80, 60]);
+  assert.equal(history.every((point) => point.basis === "annual"), true);
+});
 
 test("uses the latest annual fact when no newer interim period exists", () => {
   const metric = trailingTwelveMonthsMetric([annual]);

@@ -20,6 +20,7 @@ export type ArkUsSnapshotRow = {
   assetTurnover?: number | null;
   financialLeverage?: number | null;
   dataBasis?: "annual";
+  epsHistory?: Array<{ value: number; start?: string; end?: string; basis?: "annual" | "ltm" }>;
   financialDataDate?: string | null;
   dividendPerShare: number;
   sector: string;

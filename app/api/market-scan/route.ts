@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildComparableMap } from "../../../lib/market-comparables";
 import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
 import type { StockInput } from "../../../lib/valuation";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
@@ -89,6 +90,7 @@ export async function GET() {
         "eps", "bvps", "revenueGrowth", "fcfPerShare", "debtRatio", "revenuePerShare",
         "ebitPerShare", "ebitdaPerShare", "cashPerShare", "debtPerShare", "netMargin",
         "assetTurnover", "financialLeverage", "dividendPerShare", "dataBasis", "financialDataDate",
+        "epsHistory",
       ].filter((key) => parsedFinancial[key] !== undefined).map((key) => [key, parsedFinancial[key]])),
       name: price?.name || String(parsedFinancial.name ?? row.name),
       price: (price?.price ?? parsedFinancial.price ?? row.price) as string | number,
@@ -99,14 +101,15 @@ export async function GET() {
   });
   const refreshedTaiwanUniverse = applySnapshots(taiwanUniverse, "TW");
   const refreshedUsUniverse = applySnapshots(usUniverse, "US");
+  const usComparableMap = buildComparableMap(refreshedUsUniverse);
 
   const candidates = [
     ...selectMarketCandidates(refreshedTaiwanUniverse, "undervalued"),
-    ...selectMarketCandidates(refreshedUsUniverse, "undervalued"),
+    ...selectMarketCandidates(refreshedUsUniverse, "undervalued", 20, usComparableMap),
   ];
   const overvaluedCandidates = [
     ...selectMarketCandidates(refreshedTaiwanUniverse, "overvalued"),
-    ...selectMarketCandidates(refreshedUsUniverse, "overvalued"),
+    ...selectMarketCandidates(refreshedUsUniverse, "overvalued", 20, usComparableMap),
   ];
 
   return NextResponse.json({

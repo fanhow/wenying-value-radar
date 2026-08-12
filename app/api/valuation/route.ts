@@ -4,6 +4,7 @@ import { fallbackUsSymbols, findArkUsSnapshot, type ArkUsSnapshotRow } from "../
 import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
 import {
   aggregateDebtValues,
+  annualMetricHistory,
   metricFactsFromConcepts,
   metricFromConcepts,
   metricsAlign,
@@ -12,8 +13,11 @@ import {
   type SecCompanyFacts,
 } from "../../../lib/sec-financials";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
+import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
 import fundHoldingsSnapshot from "../../../lib/fund-holdings-snapshot.json";
-import { institutionalSignalForTicker } from "../../../lib/fund-signal";
+import { fundPortfolioBusinessPeProfiles, fundPortfolioPeProfiles, fundPortfolioPeSummary, institutionalSignalForTicker } from "../../../lib/fund-signal";
+import { buildComparableMap } from "../../../lib/market-comparables";
+import { normalizeSector } from "../../../lib/sector-normalization";
 
 type Market = "TW" | "US";
 
@@ -55,6 +59,27 @@ let secTickerMapPromise: Promise<Record<string, SecTickerRow>> | null = null;
 function numeric(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(String(value ?? "").replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+const fundPeReferences = [
+  ...usMarketSnapshot.map((row) => ({ ticker: row.ticker, price: row.price, eps: row.eps, sector: row.sector, financialDataDate: row.financialDataDate ?? row.date })),
+  ...tpexSnapshot.map((row) => ({ ticker: row.ticker, pe: numeric(row.pe) })),
+];
+const usComparableMap = buildComparableMap(usMarketSnapshot);
+const fundSectorPeProfiles = fundPortfolioPeProfiles(fundHoldingsSnapshot, fundPeReferences);
+const fundBusinessPeProfiles = fundPortfolioBusinessPeProfiles(fundHoldingsSnapshot, fundPeReferences);
+
+function comparableInputForTicker(ticker: string) {
+  const comparableMultiples = usComparableMap.get(ticker.toUpperCase());
+  return comparableMultiples
+    ? {
+      targetPsMultiple: comparableMultiples.psMedian ?? undefined,
+      targetEvRevenueMultiple: comparableMultiples.evRevenueMedian ?? undefined,
+      targetEvEbitdaMultiple: comparableMultiples.evEbitdaMedian ?? undefined,
+      targetEvEbitMultiple: comparableMultiples.evEbitMedian ?? undefined,
+      comparableMultiples,
+    }
+    : {};
 }
 
 function hasFiniteValue(value: unknown) {
@@ -194,13 +219,15 @@ function valueUsSnapshot(
     name: body.capturedName?.trim() || snapshot.name,
     market: "US" as const,
     assetType: "EQUITY" as const,
-    sector: snapshot.sector || "美股公開發行公司",
+    sector: normalizeSector(ticker, snapshot.name, snapshot.sector || "美股公開發行公司"),
     price,
     eps,
+    epsHistory: snapshot.epsHistory,
     bvps,
     fcfPerShare,
     dividendPerShare: Math.max(numeric(snapshot.dividendPerShare), 0),
     ...targets,
+    ...comparableInputForTicker(ticker),
     revenueGrowth,
     roe,
     debtRatio,
@@ -249,13 +276,15 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     throw new Error("此證券的 SEC 申報不是可直接換算的 US-GAAP 美元每股資料，且尚無內建財務快照");
   }
 
-  const epsMetric = metricFromConcepts(
+  const epsCandidate = metricFactsFromConcepts(
     facts,
     taxonomy,
     isUsGaap ? ["EarningsPerShareDiluted", "EarningsPerShareBasic"] : ["DilutedEarningsLossPerShare", "BasicEarningsLossPerShare"],
     ["USD/shares", "USD / shares"],
     "duration",
   );
+  const epsMetric = epsCandidate?.metric ?? null;
+  const epsHistory = annualMetricHistory(epsCandidate?.facts ?? [], 5);
   const equityMetric = metricFromConcepts(
     facts,
     taxonomy,
@@ -496,9 +525,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     name: body.capturedName?.trim() || facts.entityName || marketQuote.name || company.title,
     market: "US" as const,
     assetType: "EQUITY" as const,
-    sector: submissions?.sicDescription || "美股公開發行公司",
+    sector: normalizeSector(ticker, facts.entityName || marketQuote.name || company.title, submissions?.sicDescription || "美股公開發行公司"),
     price,
     eps,
+    epsHistory,
     bvps,
     fcfPerShare,
     dividendPerShare,
@@ -518,6 +548,7 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
       ? Math.abs(numeric(assetsMetric?.value) / equityMetric.value)
       : undefined,
     ...targets,
+    ...comparableInputForTicker(ticker),
     revenueGrowth: clamp(revenueGrowth, -100, 200),
     roe: clamp(roe, -100, 200),
     debtRatio: clamp(debtRatio, 0, 100),
@@ -660,8 +691,21 @@ export async function POST(request: NextRequest) {
     const market: Market = body.market ?? (/^\d/.test(ticker) ? "TW" : "US");
     const stock = market === "TW" ? await valueTwStock(body, ticker) : await valueUsStock(body, ticker);
     const institutionalSignal = institutionalSignalForTicker(fundHoldingsSnapshot, ticker);
+    const fundPortfolioPe = fundPortfolioPeSummary(fundHoldingsSnapshot, fundPeReferences);
+    const fundSectorPe = market === "US"
+      ? fundSectorPeProfiles.find((profile) => profile.sector === normalizeSector(stock.ticker, stock.name, stock.sector))
+      : undefined;
+    const fundBusinessPe = market === "US"
+      ? fundBusinessPeProfiles.find((profile) => profile.tickers.includes(stock.ticker.toUpperCase()))
+      : undefined;
     return NextResponse.json({
-      stock: institutionalSignal ? { ...stock, institutionalSignal } : stock,
+      stock: {
+        ...stock,
+        ...(institutionalSignal ? { institutionalSignal } : {}),
+        ...(fundPortfolioPe ? { fundPortfolioPe } : {}),
+        ...(fundSectorPe ? { fundSectorPe } : {}),
+        ...(fundBusinessPe ? { fundBusinessPe } : {}),
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "暫時無法取得估值資料";

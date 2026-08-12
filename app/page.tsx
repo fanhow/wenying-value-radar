@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
 import type { InstitutionalSignal } from "../lib/fund-signal";
+import { assessGrowthPremium, type GrowthPremiumAssessment } from "../lib/growth-premium";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
 import { shouldRefreshSavedStock } from "../lib/data-freshness";
 import { useLanguage, type Language } from "./language-context";
@@ -48,6 +49,11 @@ function formatPrice(value: number, market: Market) {
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
+}
+
+function formatMultiple(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return "—";
+  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)}x`;
 }
 
 function RiskPill({ risk, language }: { risk: Stock["risk"]; language: Language }) {
@@ -104,6 +110,50 @@ function InstitutionalSignalPanel({ signal, language }: { signal?: Institutional
   </div>;
 }
 
+function GrowthPremiumPill({ assessment, language }: { assessment: GrowthPremiumAssessment; language: Language }) {
+  if (!assessment.enabled) return null;
+  return <span className="growth-premium-pill">{language === "zh" ? "成長溢價" : "Growth premium"}</span>;
+}
+
+function GrowthPremiumPanel({ assessment, stock, language }: { assessment: GrowthPremiumAssessment; stock: Stock; language: Language }) {
+  if (!assessment.enabled) return null;
+  const triggerLabels: Record<string, { zh: string; en: string }> = {
+    theme: { zh: "結構性主題", en: "Structural theme" },
+    institutional: { zh: "基金持有／加倉", en: "Institutional holding / increase" },
+    growth: { zh: "營收成長", en: "Revenue growth" },
+    "market-multiple": { zh: "高本益比", en: "High P/E" },
+    "price-premium": { zh: "價格高於歷史基準", en: "Price premium to historical base" },
+  };
+  const portfolioPe = assessment.fundPortfolioPe;
+  const marketGap = assessment.marketFairValue !== null && stock.fairValue > 0
+    ? assessment.marketFairValue / stock.fairValue - 1
+    : null;
+  const sectorProfileRejected = stock.fundSectorPe && !stock.marketPricing?.referenceSector;
+  const sectorProfileStatus = stock.fundSectorPe && stock.fundSectorPe.sampleSize >= 5
+    ? (language === "zh" ? "分歧過大" : "High dispersion")
+    : (language === "zh" ? "樣本不足" : "Small sample");
+  return <div className="growth-premium-panel">
+    <div className="growth-premium-heading">
+      <div><span>{language === "zh" ? "市場定價層" : "Market pricing layer"}</span><strong>{language === "zh" ? "成長溢價模式已啟用" : "Growth-premium mode enabled"}</strong></div>
+      <small>{language === "zh" ? `符合 ${assessment.triggerCount} 項條件 · 不直接改動公允價值` : `${assessment.triggerCount} triggers · does not change fair value`}</small>
+    </div>
+    <div className="growth-premium-grid">
+      <div><span>{language === "zh" ? "目前本益比" : "Current P/E"}</span><strong>{formatMultiple(assessment.marketPe)}</strong><small>{language === "zh" ? "目前 EPS 的市場定價" : "Market price on current EPS"}</small></div>
+      {assessment.marketFairValue !== null && <div><span>{language === "zh" ? "市場定價參考（非內在公允價值）" : "Market pricing reference (not intrinsic fair value)"}</span><strong>{formatPrice(assessment.marketFairValue, stock.market)}</strong><small>{language === "zh" ? `市場本益比 ${formatMultiple(stock.marketPricing?.selectedPe)} · 參考區間 ${formatMultiple(stock.marketPricing?.peLow)}–${formatMultiple(stock.marketPricing?.peHigh)} · 上行 ${assessment.marketFairValueUpside !== null ? formatSignedPercent(assessment.marketFairValueUpside) : "—"} · 與模型中心差距 ${marketGap !== null ? formatSignedPercent(marketGap) : "—"}` : `Market P/E ${formatMultiple(stock.marketPricing?.selectedPe)} · reference range ${formatMultiple(stock.marketPricing?.peLow)}–${formatMultiple(stock.marketPricing?.peHigh)} · upside ${assessment.marketFairValueUpside !== null ? formatSignedPercent(assessment.marketFairValueUpside) : "—"} · gap to model center ${marketGap !== null ? formatSignedPercent(marketGap) : "—"}`}</small></div>}
+      {portfolioPe && <div><span>{language === "zh" ? "六大基金持股加權平均" : "Top-six holdings weighted average"}</span><strong>{formatMultiple(portfolioPe.valueWeightedAveragePe ?? portfolioPe.averagePe)}</strong><small>{language === "zh" ? `算術平均 ${formatMultiple(portfolioPe.averagePe)} · ${portfolioPe.sampleSize} 筆正盈餘持股` : `Arithmetic average ${formatMultiple(portfolioPe.averagePe)} · ${portfolioPe.sampleSize} profitable holdings`}</small></div>}
+      {portfolioPe && <div><span>{language === "zh" ? "六大基金不重複持股中位數" : "Top-six unique holdings median"}</span><strong>{formatMultiple(portfolioPe.uniqueMedianPe ?? portfolioPe.medianPe)}</strong><small>{language === "zh" ? `不重複 P25–P75 ${formatMultiple(portfolioPe.uniqueLowerQuartilePe ?? portfolioPe.lowerQuartilePe)}–${formatMultiple(portfolioPe.uniqueUpperQuartilePe ?? portfolioPe.upperQuartilePe)} · 基金觀察中位數 ${formatMultiple(assessment.fundObservationMedianPe)} · P95 ${formatMultiple(portfolioPe.uniqueP95Pe ?? portfolioPe.p95Pe)}` : `Unique-ticker P25–P75 ${formatMultiple(portfolioPe.uniqueLowerQuartilePe ?? portfolioPe.lowerQuartilePe)}–${formatMultiple(portfolioPe.uniqueUpperQuartilePe ?? portfolioPe.upperQuartilePe)} · fund-observation median ${formatMultiple(assessment.fundObservationMedianPe)} · P95 ${formatMultiple(portfolioPe.uniqueP95Pe ?? portfolioPe.p95Pe)}`}</small></div>}
+      {stock.marketPricing?.referenceSector && !stock.marketPricing.referenceBusinessGroup && <div><span>{language === "zh" ? "同產業基金本益比參考" : "Same-sector fund P/E reference"}</span><strong>{formatMultiple(stock.assumptions.marketPeAnchor)}</strong><small>{language === "zh" ? `${stock.marketPricing.referenceSector} · ${stock.marketPricing.referenceUniqueSampleSize ?? "—"} 檔不重複股票（${stock.marketPricing.referenceSampleSize ?? "—"} 筆基金觀察）` : `${stock.marketPricing.referenceSector} · ${stock.marketPricing.referenceUniqueSampleSize ?? "—"} unique tickers (${stock.marketPricing.referenceSampleSize ?? "—"} fund observations)`}</small></div>}
+      {stock.marketPricing?.referenceBusinessGroup && <div><span>{language === "zh" ? "同商業模式基金本益比參考" : "Same-business-model fund P/E reference"}</span><strong>{formatMultiple(stock.assumptions.marketPeAnchor)}</strong><small>{language === "zh" ? `${stock.marketPricing.referenceBusinessGroup} · ${stock.marketPricing.referenceUniqueSampleSize ?? "—"} 檔不重複股票（${stock.marketPricing.referenceSampleSize ?? "—"} 筆基金觀察）` : `${stock.marketPricing.referenceBusinessGroup} · ${stock.marketPricing.referenceUniqueSampleSize ?? "—"} unique tickers (${stock.marketPricing.referenceSampleSize ?? "—"} fund observations)`}</small></div>}
+      {sectorProfileRejected && <div><span>{language === "zh" ? "同產業樣本品質" : "Same-sector sample quality"}</span><strong>{sectorProfileStatus}</strong><small>{language === "zh" ? `P25–P75 ${formatMultiple(stock.fundSectorPe?.lowerQuartilePe)}–${formatMultiple(stock.fundSectorPe?.upperQuartilePe)} · 市場參考改用六大基金整體分布` : `P25–P75 ${formatMultiple(stock.fundSectorPe?.lowerQuartilePe)}–${formatMultiple(stock.fundSectorPe?.upperQuartilePe)} · using the overall top-six distribution instead`}</small></div>}
+      {assessment.impliedEpsAtFundMedianPe !== null && <div><span>{language === "zh" ? "市場隱含 EPS" : "EPS implied by fund median"}</span><strong>{assessment.impliedEpsAtFundMedianPe.toFixed(2)}</strong><small>{language === "zh" ? `需較目前增加 ${formatSignedPercent(assessment.requiredEpsGrowth ?? 0)}` : `Requires ${formatSignedPercent(assessment.requiredEpsGrowth ?? 0)} growth from current EPS`}</small></div>}
+    </div>
+    <div className="growth-premium-tags">{assessment.triggers.map((trigger) => <span key={trigger}>{language === "zh" ? triggerLabels[trigger]?.zh : triggerLabels[trigger]?.en}</span>)}</div>
+    <p>{language === "zh"
+      ? `這表示市場可能正在提前反映未來獲利、產業題材或選擇權價值；市場定價參考只用公開基金本益比分布與財報條件，不會直接改寫模型中心公允價值，也不納入分析師共識。六大基金本益比採公開前十大持股，報告日 ${portfolioPe?.reportDate ?? "—"}，不代表完整持倉，也不代表基金認同本模型。若成長未實現，估值倍數壓縮可能造成較大回撤。`
+      : `The market may be pricing future earnings, structural themes, or optionality ahead of current results. Fund ownership is separate market context, not a direct fair-value bonus. The top-six P/E profile uses published top holdings as of ${portfolioPe?.reportDate ?? "—"}; it is not a complete portfolio or an endorsement of this model. If growth fails to arrive, multiple compression can cause a larger drawdown.`}</p>
+  </div>;
+}
+
 function TrendMark({ positive }: { positive: boolean }) {
   return <span className={`trend-mark ${positive ? "positive" : "negative"}`}>{positive ? "↗" : "↘"}</span>;
 }
@@ -115,13 +165,19 @@ const modelCopy: Record<string, { zh: string; en: string; enDescription: string 
   "etf-inav": { zh: "即時淨值法", en: "iNAV Method", enDescription: "Uses the iNAV captured from the ARKER screenshot." },
   pe: { zh: "本益比法", en: "P/E Method", enDescription: "Applies a target P/E multiple to positive earnings per share." },
   pb: { zh: "股價淨值比法", en: "P/B Method", enDescription: "Applies a target P/B multiple to book value per share." },
+  "p-sales": { zh: "P/S 同業倍數法", en: "Peer P/S Method", enDescription: "Applies a trimmed public peer price-to-sales median to revenue per share." },
   "p-fcf": { zh: "自由現金流倍數法", en: "P/FCF Method", enDescription: "Applies a target multiple to free cash flow per share." },
-  "dcf-fcf-5y": { zh: "5 年折現現金流法", en: "5-Year DCF", enDescription: "Discounts five years of fading free-cash-flow growth and a terminal value using CAPM/WACC." },
-  "dcf-fcf-10y": { zh: "10 年折現現金流法", en: "10-Year DCF", enDescription: "Discounts ten years of fading free-cash-flow growth and a terminal value using CAPM/WACC." },
+  "dcf-fcf-5y": { zh: "5 年折現現金流法", en: "5-Year DCF", enDescription: "Discounts five years of fading free-cash-flow growth and a terminal value using CAPM cost of equity." },
+  "dcf-fcf-10y": { zh: "10 年折現現金流法", en: "10-Year DCF", enDescription: "Discounts ten years of fading free-cash-flow growth and a terminal value using CAPM cost of equity." },
+  "dcf-ebitda-5y": { zh: "5 年 DCF EBITDA 退出法", en: "5-Year EBITDA Exit DCF", enDescription: "Forecasts public historical EBITDA growth, applies an independent public-peer EV/EBITDA terminal multiple, and discounts the FCFF proxy at WACC." },
+  "dcf-ebitda-10y": { zh: "10 年 DCF EBITDA 退出法", en: "10-Year EBITDA Exit DCF", enDescription: "Forecasts public historical EBITDA growth, applies an independent public-peer EV/EBITDA terminal multiple, and discounts the FCFF proxy at WACC." },
+  "dcf-revenue-5y": { zh: "5 年 DCF 營收退出法", en: "5-Year Revenue Exit DCF", enDescription: "Forecasts public historical revenue growth, applies an independent public-peer EV/Revenue terminal multiple, and discounts the FCFF proxy at WACC." },
+  "dcf-revenue-10y": { zh: "10 年 DCF 營收退出法", en: "10-Year Revenue Exit DCF", enDescription: "Forecasts public historical revenue growth, applies an independent public-peer EV/Revenue terminal multiple, and discounts the FCFF proxy at WACC." },
   "ev-revenue": { zh: "EV／營收倍數法", en: "EV/Revenue Method", enDescription: "Applies an enterprise-value multiple to revenue, then adjusts for net debt per share." },
   "ev-ebitda": { zh: "EV／EBITDA 倍數法", en: "EV/EBITDA Method", enDescription: "Applies an enterprise-value multiple to EBITDA, then adjusts for net debt per share." },
   "ev-ebit": { zh: "EV／EBIT 倍數法", en: "EV/EBIT Method", enDescription: "Applies an enterprise-value multiple to EBIT, then adjusts for net debt per share." },
   epv: { zh: "盈餘能力價值法", en: "Earnings Power Value", enDescription: "Capitalizes normalized free cash flow only when the zero-growth, mature-business test is satisfied." },
+  "roe-residual": { zh: "ROE／剩餘收益估值", en: "ROE / Residual Income", enDescription: "Adds book value to the discounted earnings earned above the CAPM cost of equity; no analyst forecast is used." },
   graham: { zh: "Graham 防禦估值", en: "Graham Defensive Value", enDescription: "Uses earnings and book value for mature businesses with suitable leverage and asset intensity." },
   "ddm-stable": { zh: "穩定成長股利折現法", en: "Stable-Growth DDM", enDescription: "Discounts sustainable dividends only when payout and mature-growth conditions are satisfied." },
 };
@@ -148,6 +204,7 @@ function englishExclusionReason(model: ExcludedValuationModel) {
   if (model.id.startsWith("dcf")) return "Free cash flow or a valid WACC and terminal-growth relationship is missing; standard corporate DCF is not used for financial companies.";
   if (model.id.startsWith("ev-")) return "The operating metric or target multiple is missing; standard EV multiples are not used for financial companies.";
   if (model.id === "epv") return "The company does not pass the mature, stable-earnings test, or normalized cash flow is unavailable.";
+  if (model.id === "roe-residual") return "Positive book value and earnings above the cost of equity are required; REITs use FFO/AFFO instead.";
   if (model.id === "graham") return "Earnings, book value, leverage, or asset-intensity conditions are not suitable for this defensive model.";
   if (model.id.startsWith("ddm")) return "Dividend, payout, maturity, or discount-spread conditions are not sustainable enough for this model.";
   return "Required inputs are missing or this model is not appropriate for the company.";
@@ -164,6 +221,16 @@ function formatDataBasis(value: string, language: Language) {
     "market ratio": { zh: "市場比率", en: "Market ratio" },
   };
   return labels[normalized]?.[language] ?? value;
+}
+
+function formatFinancialFreshness(value: string, language: Language) {
+  const labels: Record<string, { zh: string; en: string }> = {
+    fresh: { zh: "近期資料", en: "Fresh" },
+    aging: { zh: "資料漸舊", en: "Aging" },
+    stale: { zh: "資料過舊", en: "Stale" },
+    unknown: { zh: "日期未知", en: "Unknown" },
+  };
+  return labels[value]?.[language] ?? value;
 }
 
 function valuationRangePosition(price: number, low: number, high: number) {
@@ -327,6 +394,7 @@ export default function Home() {
     [overvaluedCandidates],
   );
   const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
+  const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
   const selectedRangePosition = selected
     ? valuationRangePosition(selected.price, selected.rangeLow, selected.rangeHigh)
     : 50;
@@ -658,6 +726,7 @@ export default function Home() {
                   {filteredStocks.map((stock) => {
                     const isSelected = selected?.ticker === stock.ticker;
                     const isWatched = watchlist.includes(stock.ticker);
+                    const growthPremium = assessGrowthPremium(stock);
                     return (
                       <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} role="button" tabIndex={0} onClick={() => openRankedStock(stock.ticker)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRankedStock(stock.ticker); } }}>
                         <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stock.name} · {stock.sector}</small></span></div></td>
@@ -665,7 +734,7 @@ export default function Home() {
                         <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("區間", "Range")} ${formatPrice(stock.rangeLow, stock.market)} – ${formatPrice(stock.rangeHigh, stock.market)}`}</small></td>
                         <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}`}><TrendMark positive={stock.upside >= 0} /> {formatSignedPercent(stock.upside)}</span></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
-                        <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /></div></td>
+                        <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /><GrowthPremiumPill assessment={growthPremium} language={language} /></div></td>
                         <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); openRankedStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
                       </tr>
                     );
@@ -680,16 +749,21 @@ export default function Home() {
           {selected && (
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 03</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
-              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} /></div></div>
+              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong>{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
+              {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
               <div className="fair-value-focus">
-                <div><span className="focus-label">{t("模型中位公允價值", "Median Model Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div>
+                <div><span className="focus-label">{t("模型中心公允價值", "Model Center Fair Value")}</span><strong>{formatPrice(selected.fairValue, selected.market)}</strong></div>
+                {selected.marketPricing?.enabled && selected.marketPricing.fairValue !== null && <div className="market-fair-value-banner"><span>{t("市場定價參考（非內在公允價值）", "Market pricing reference (not intrinsic fair value)")}</span><strong>{formatPrice(selected.marketPricing.fairValue, selected.market)}</strong><small>{t(`依公開基金本益比分布與產業倍數，較模型中心 ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} · 不含分析師共識`, `Based on public fund P/E distribution and peer multiples, ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} versus the model center · no analyst consensus`)}</small></div>}
                 <div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("悲觀", "Bear")} {formatPrice(selected.rangeLow, selected.market)}</span><span>{t("樂觀", "Bull")} {formatPrice(selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>
                 <div className="valuation-meta-grid">
+                  {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
                   <div><span>CAPM / WACC</span><strong>CAPM {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
                   <div><span>{t("資料基礎", "Data Basis")}</span><strong>{formatDataBasis(selected.assumptions.dataBasis, language)}</strong>{selected.assumptions.financialDataDate && <small>{t("財務日期", "Financial date")} {selected.assumptions.financialDataDate}</small>}</div>
+                  <div><span>{t("資料新鮮度", "Data Freshness")}</span><strong>{formatFinancialFreshness(selected.assumptions.financialFreshness, language)}</strong><small>{selected.assumptions.financialAgeDays === null ? t("無法計算資料年齡", "Age unavailable") : t(`距今約 ${selected.assumptions.financialAgeDays} 天`, `About ${selected.assumptions.financialAgeDays} days old`)}</small></div>
                   {selected.assumptions.fcfNormalizationApplied && <div><span>{t("FCF 正規化", "FCF Normalization")}</span><strong>{formatPrice(selected.assumptions.reportedFcfPerShare, selected.market)} → {formatPrice(selected.assumptions.normalizedFcfPerShare, selected.market)}</strong><small>{t("避免單期現金流重複放大多個模型", "Prevents one-period cash flow from amplifying several models")}</small></div>}
+                  {selected.assumptions.epsNormalizationApplied && <div><span>{t("EPS 歷史正常化", "EPS Historical Normalization")}</span><strong>{formatPrice(selected.assumptions.reportedEpsPerShare, selected.market)} → {formatPrice(selected.assumptions.normalizedEpsPerShare, selected.market)}</strong><small>{t(`使用 ${selected.assumptions.epsHistoryCount} 筆公開年度獲利中位數，不是分析師前瞻預估`, `Uses the median of ${selected.assumptions.epsHistoryCount} public annual earnings observations, not analyst forecasts`)}</small></div>}
                 </div>
                 {selected.assumptions.structuralThemes.length > 0 && <div className="structural-theme-panel">
                   <div className="structural-theme-heading"><div><span>{t("結構性趨勢", "Structural Themes")}</span><strong>{selected.assumptions.structuralThemes.map((theme) => language === "zh" ? theme.nameZh : theme.nameEn).join(" · ")}</strong></div><small>{t("資料截至", "As of")} {selected.assumptions.themeAsOf} · {t("下次檢視", "Review")} {selected.assumptions.themeReviewAfter}</small></div>
@@ -699,11 +773,11 @@ export default function Home() {
                 </div>}
               </div>
               <div className="detail-section">
-                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{t("適用模型等權列示 · 中央值採中位數", "Applicable models listed equally · median center")}</span></div>
+                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{t("模型家族平衡 · 家族內等權、家族間等權", "Family-balanced · equal within and across families")}</span></div>
                 <div className="model-list">{selected.models.map((model) => (
                   <div className="model-row" key={model.id || model.label}>
                     <div className="model-label"><span className="model-dot" /><span><strong>{localizedModelLabel(model, language)}</strong><small>{localizedModelExplanation(model, language)}</small></span></div>
-                    <div className="model-value"><span>{t("基準", "Base")}</span><strong>{formatPrice(model.value, selected.market)}</strong><small>{t("區間", "Range")} {formatPrice(model.rangeLow, selected.market)} – {formatPrice(model.rangeHigh, selected.market)}</small><em>{t("等權參考", "Equal reference")} {formatModelWeight(model.weight)}</em></div>
+                    <div className="model-value"><span>{t("基準", "Base")}</span><strong>{formatPrice(model.value, selected.market)}</strong><small>{t("區間", "Range")} {formatPrice(model.rangeLow, selected.market)} – {formatPrice(model.rangeHigh, selected.market)}</small><em>{t(`家族 ${model.family} · 權重`, `Family ${model.family} · weight`)} {formatModelWeight(model.weight)}</em></div>
                   </div>
                 ))}</div>
               </div>
@@ -746,8 +820,8 @@ export default function Home() {
         </section>
 
         <section id="method" className="method-section">
-          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統只納入真正適用的模型，中央公允價值採中位數，降低同一項現金流或單一極端模型重複放大的影響。不適用模型會列出排除原因，robust filter 也不參考目前股價。估值只使用公開 LTM、年度財報與市場比率；公開資料不足時會降低信心，不假裝精準。", "Only applicable models are included, and the central fair value uses the median to reduce repeated amplification from one cash-flow input or an extreme model. Exclusions are explained, and the robust filter does not use the current price. Estimates use only public LTM, annual filings, and market ratios; incomplete public data lowers confidence.")}</p></div>
-              <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("穩健模型組合", "Robust Model Set")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試，再以中位數形成中央公允價值。現金流轉換率異常時先正規化，避免同一異常值同時放大 P/FCF 與兩個 DCF。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests, then form the central fair value by median. Abnormal cash-flow conversion is normalized before it can amplify P/FCF and both DCF models.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
+          <div className="method-intro"><p className="section-kicker">HOW IT WORKS / 06</p><h2>{t("不是預測價格，", "We do not predict prices;")}<br /><em>{t("是建立安全邊際。", "we build a margin of safety.")}</em></h2><p>{t("系統只納入真正適用的模型，中央公允價值採模型家族平衡：同一模型家族內等權，家族之間也等權，避免 5 年與 10 年 DCF 或相關倍數重複放大。不適用模型會列出排除原因，robust filter 也不參考目前股價。估值只使用公開 LTM、年度財報與市場比率；公開資料不足時會降低信心，不假裝精準。", "Only applicable models are included. The central fair value is family-balanced: equal within each model family and equal across families, preventing 5-year/10-year DCFs or related multiples from repeating the same assumption. Exclusions are explained, and the robust filter does not use the current price. Estimates use only public LTM, annual filings, and market ratios; incomplete public data lowers confidence.")}</p></div>
+                  <div className="method-cards"><article><span className="method-number">01</span><h3>{t("CAPM 與內在價值", "CAPM & Intrinsic Value")}</h3><p>{t("股權現金流以 CAPM 股權成本折現；具官方證據的結構性產業趨勢最多只占 DCF 起始成長假設 25%，並逐年收斂。", "Equity cash flow is discounted at the CAPM cost of equity. Evidence-backed structural themes contribute at most 25% of DCF starting growth and fade over time.")}</p><span className="method-weight">{t("可追溯估值假設", "Traceable assumptions")}</span></article><article><span className="method-number">02</span><h3>{t("模型家族平衡", "Family-Balanced Models")}</h3><p>{t("PE、PB、P/FCF、獨立 EV 倍數、DCF、EPV、Graham 與 DDM 先通過適用性測試；同一家族內等權，家族之間等權，避免相同現金流或不同期限被重複計算。沒有獨立產業倍數時，EV 模型會排除。", "P/E, P/B, P/FCF, independent EV multiples, DCF, EPV, Graham, and DDM first pass applicability tests. Models are equal within a family and families are equal across the center, preventing repeated cash-flow or horizon assumptions. EV models are excluded without an independent industry multiple.")}</p><span className="method-weight">{t("價格無關的異常值檢查", "Price-independent outlier check")}</span></article><article><span className="method-number">03</span><h3>{t("公開資料與信心限制", "Public Data & Confidence Limits")}</h3><p>{t("優先採最新可取得的 LTM 或年度公開財報與市場比率。若公開資料的日期、現金流或成長資料不足，仍保留研究結果，但降低信心且不做強烈高低估判定。", "The latest available public LTM or annual filings and market ratios are preferred. Results remain visible when public dates, cash flow, or growth data are incomplete, but confidence is reduced and no strong valuation call is made.")}</p><span className="method-weight">{t("避免假精準", "Avoid false precision")}</span></article></div>
         </section>
 
         <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。每日價格與季度財報由背景快照排程更新，若來源暫時不可用則保留上一份可追溯資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. Background snapshots refresh prices daily and core financials quarterly; if a source is temporarily unavailable, the last traceable snapshot remains in use. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>

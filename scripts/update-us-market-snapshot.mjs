@@ -95,6 +95,13 @@ const [
   json("https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&download=true", browserHeaders),
 ]);
 
+// Keep a short public EPS history alongside the current annual snapshot.  It
+// is used only to detect cyclical outliers; it is never a forward estimate.
+const epsHistoryFrames = await Promise.all(
+  [fiscalYear, fiscalYear - 1, fiscalYear - 2, fiscalYear - 3, fiscalYear - 4]
+    .map((year) => optionalFrame(`${frameBase}/us-gaap/EarningsPerShareDiluted/USD-per-shares/CY${year}.json`)),
+);
+
 function latestByCik(rows) {
   const result = new Map();
   for (const row of rows ?? []) {
@@ -124,6 +131,22 @@ function cleanSecurityName(name) {
 
 const tickerBySymbol = new Map(Object.values(tickers).map((row) => [row.ticker, row]));
 const epsByCik = latestByCik(epsFrame.data);
+const epsHistoryByCik = new Map();
+for (const frame of epsHistoryFrames) {
+  for (const row of frame.data ?? []) {
+    const value = optionalValue(row);
+    if (value === null || !row?.cik || !row?.end) continue;
+    const history = epsHistoryByCik.get(row.cik) ?? [];
+    if (!history.some((point) => point.end === row.end)) {
+      history.push({ value, start: row.start, end: row.end, basis: "annual" });
+    }
+    epsHistoryByCik.set(row.cik, history);
+  }
+}
+for (const history of epsHistoryByCik.values()) {
+  history.sort((left, right) => right.end.localeCompare(left.end));
+  history.splice(5);
+}
 const equityByCik = latestByCik(equityFrame.data);
 const sharesByCik = mergeByPriority(latestByCik(sharesFrame.data), latestByCik(dilutedSharesFrame.data));
 const dividendByCik = latestByCik(dividendFrame.data);
@@ -260,6 +283,9 @@ const snapshot = (nasdaq.data?.rows ?? []).flatMap((quote) => {
     name: cleanSecurityName(quote.name),
     price,
     eps,
+    epsHistory: (epsHistoryByCik.get(ticker.cik_str) ?? []).length >= 3
+      ? epsHistoryByCik.get(ticker.cik_str)
+      : undefined,
     bvps,
     revenueGrowth,
     fcfPerShare,

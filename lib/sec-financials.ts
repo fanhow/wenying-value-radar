@@ -31,6 +31,14 @@ export type FinancialGrowth = {
   basis: "ltm" | "annual";
 };
 
+export type HistoricalMetricPoint = {
+  value: number;
+  start?: string;
+  end?: string;
+  filed?: string;
+  basis: "annual";
+};
+
 export type ConceptMetric = {
   facts: SecFact[];
   metric: FinancialMetric;
@@ -106,6 +114,41 @@ export function latestAnnualMetric(facts: SecFact[]): FinancialMetric | null {
     basis: "annual",
     sourceFacts: [annual],
   };
+}
+
+/**
+ * Return distinct, complete-year observations for a duration fact.
+ *
+ * The valuation engine uses this only as a historical normalization input;
+ * it is deliberately not a forward estimate.  Facts are deduplicated by
+ * period end and the latest filing is retained for each period.
+ */
+export function annualMetricHistory(facts: SecFact[], limit = 5): HistoricalMetricPoint[] {
+  if (limit < 1) return [];
+  const annual = dedupeFacts(facts)
+    .filter((fact) => (
+      ANNUAL_FORMS.has(fact.form ?? "")
+      && (durationDays(fact) >= 300 || /^CY\d{4}$/.test(fact.frame ?? ""))
+      && Number.isFinite(fact.val)
+      && Boolean(fact.end)
+    ))
+    .sort((left, right) => timestamp(right.end) - timestamp(left.end) || sortNewest(left, right));
+  const seenEnds = new Set<string>();
+  const history: HistoricalMetricPoint[] = [];
+  for (const fact of annual) {
+    const end = fact.end ?? "";
+    if (!end || seenEnds.has(end)) continue;
+    seenEnds.add(end);
+    history.push({
+      value: fact.val,
+      start: fact.start,
+      end: fact.end,
+      filed: fact.filed,
+      basis: "annual",
+    });
+    if (history.length >= limit) break;
+  }
+  return history;
 }
 
 export function latestInstantMetric(facts: SecFact[]): FinancialMetric | null {

@@ -40,7 +40,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
-  assert.match(html, /中央公允價值採中位數/);
+  assert.match(html, /中央公允價值採模型家族平衡/);
   assert.match(html, /robust filter 也不參考目前股價/);
   assert.match(html, /估值只使用公開 LTM、年度財報與市場比率/);
 });
@@ -61,11 +61,12 @@ test("keeps the local preview working when Cloudflare env bindings are absent", 
 
 test("valuation details expose the bilingual model audit trail", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const fundsSource = await readFile(new URL("../app/funds/page.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /模型中位公允價值/);
-  assert.match(source, /Median Model Fair Value/);
-  assert.match(source, /適用模型等權列示 · 中央值採中位數/);
-  assert.match(source, /Applicable models listed equally · median center/);
+  assert.match(source, /模型中心公允價值/);
+  assert.match(source, /Model Center Fair Value/);
+  assert.match(source, /模型家族平衡 · 家族內等權、家族間等權/);
+  assert.match(source, /Family-balanced · equal within and across families/);
   assert.match(source, /資料基礎/);
   assert.match(source, /Data Basis/);
   assert.match(source, /排除模型/);
@@ -79,6 +80,18 @@ test("valuation details expose the bilingual model audit trail", async () => {
   assert.match(source, /width <= 0\) return 50/);
   assert.match(source, /model\.rangeLow/);
   assert.match(source, /model\.rangeHigh/);
+  assert.match(source, /reference range \$\{formatMultiple\(stock\.marketPricing\?\.peLow\)\}/);
+  assert.match(source, /同產業樣本品質/);
+  assert.match(source, /comparablePePeerCount/);
+  assert.match(source, /Usable peers by model/);
+  assert.match(fundsSource, /profile\.uniqueSampleSize/);
+assert.match(fundsSource, /fundPortfolioOverlapProfiles/);
+assert.match(fundsSource, /CROWDING SIGNAL \/ 03/);
+assert.match(fundsSource, /stockDetailHref\(profile\.ticker\)/);
+assert.match(fundsSource, /fundManagerPeProfiles/);
+assert.match(fundsSource, /MANAGER SNAPSHOT \/ 04/);
+assert.match(fundsSource, /P25–P75/);
+assert.match(fundsSource, /不是基金預測的合理本益比/);
   assert.match(source, /onClick=\{\(\) => openRankedStock\(stock\.ticker\)\}/);
   assert.match(source, /onKeyDown=/);
 });

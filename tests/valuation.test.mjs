@@ -5,6 +5,9 @@ import {
   calculateWacc,
   discountedCashFlowPerShare,
   fadingGrowthDcfPerShare,
+  fadingGrowthOperatingExitDcfPerShare,
+  normalizeEarningsPerShare,
+  residualIncomePerShare,
   valuationTargets,
 } from "../lib/valuation.ts";
 
@@ -50,6 +53,60 @@ test("fair value and valuation models are independent of the current market pric
   assert.equal(lowPrice.fairValue, highPrice.fairValue);
   assert.deepEqual(modelSnapshot(lowPrice), modelSnapshot(highPrice));
   assert.notEqual(lowPrice.upside, highPrice.upside);
+});
+
+test("normalizes a clear cyclical EPS trough using public history only", () => {
+  const normalized = normalizeEarningsPerShare({
+    ticker: "MU",
+    name: "Micron Technology",
+    sector: "Semiconductors",
+    eps: 2,
+    dataBasis: "annual",
+    epsHistory: [
+      { value: 2, end: "2025-11-27" },
+      { value: 12, end: "2024-11-27" },
+      { value: 10, end: "2023-11-27" },
+      { value: 8, end: "2022-11-27" },
+    ],
+  });
+  assert.equal(normalized.applied, true);
+  assert.equal(normalized.method, "median-history");
+  assert.equal(normalized.normalizedEpsPerShare, 9);
+});
+
+test("does not replace stable LTM EPS when history is not an outlier", () => {
+  const stock = calculateStock({
+    ...base,
+    dataBasis: "ltm",
+    epsHistory: [
+      { value: 4.8, end: "2025-12-31" },
+      { value: 5.1, end: "2024-12-31" },
+      { value: 4.9, end: "2023-12-31" },
+    ],
+  });
+  assert.equal(stock.epsNormalizationApplied, false);
+  assert.equal(stock.normalizedEpsPerShare, 5);
+});
+
+test("uses normalized EPS in PE while retaining reported EPS for display", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "TSLA",
+    name: "Tesla",
+    sector: "Cyclical Automotive",
+    eps: 1,
+    targetPe: 20,
+    dataBasis: "annual",
+    epsHistory: [
+      { value: 1, end: "2025-12-31" },
+      { value: 3, end: "2024-12-31" },
+      { value: 2, end: "2023-12-31" },
+    ],
+  });
+  assert.equal(stock.reportedEpsPerShare, 1);
+  assert.equal(stock.normalizedEpsPerShare, 2);
+  assert.equal(stock.models.find((model) => model.id === "pe")?.value, 40);
+  assert.ok(stock.models.find((model) => model.id === "pe")?.explanation.includes("報告 EPS"));
 });
 
 test("calculates CAPM cost of equity and a capital-structure WACC", () => {
@@ -118,6 +175,64 @@ test("supports five- and ten-year fading-growth FCF DCF models", () => {
   assert.ok(stock.models.some((model) => model.id === "dcf-fcf-10y"));
 });
 
+test("supports a price-independent ROE residual-income cross-check", () => {
+  const value = residualIncomePerShare(20, 5, 0.1, 0.08, 0.025, 5);
+  assert.ok(value > 20);
+  const lowPrice = calculateStock({ ...base, price: 20, eps: 5, bvps: 20, roe: 25 });
+  const highPrice = calculateStock({ ...base, price: 2_000, eps: 5, bvps: 20, roe: 25 });
+  assert.ok(lowPrice.models.some((model) => model.id === "roe-residual"));
+  assert.equal(lowPrice.fairValue, highPrice.fairValue);
+  assert.equal(lowPrice.models.find((model) => model.id === "roe-residual")?.value,
+    highPrice.models.find((model) => model.id === "roe-residual")?.value);
+});
+
+test("does not use ROE residual income when earnings do not cover the cost of equity", () => {
+  const stock = calculateStock({ ...base, eps: 1, bvps: 20, roe: 5 });
+  assert.equal(stock.models.some((model) => model.id === "roe-residual"), false);
+  assert.ok(stock.excludedModels.some((model) => model.id === "roe-residual"));
+});
+
+test("supports five- and ten-year EBITDA and revenue exit DCF models", () => {
+  const exit = fadingGrowthOperatingExitDcfPerShare(6, 20, 0.12, 0.1, 0.025, 14, 2, 5);
+  assert.ok(exit > 0);
+
+  const stock = calculateStock({
+    ...base,
+    revenuePerShare: 25,
+    ebitdaPerShare: 8,
+    ebitPerShare: 6,
+    cashPerShare: 1,
+    debtPerShare: 3,
+    targetEvRevenueMultiple: 6,
+    targetEvEbitdaMultiple: 14,
+    targetEvEbitMultiple: 18,
+    netMargin: 20,
+  });
+  for (const id of [
+    "dcf-ebitda-5y",
+    "dcf-ebitda-10y",
+    "dcf-revenue-5y",
+    "dcf-revenue-10y",
+  ]) {
+    const model = stock.models.find((candidate) => candidate.id === id);
+    assert.ok(model, id + " missing");
+    assert.ok(model.explanation.includes("WACC"));
+    assert.ok(model.explanation.includes("不含分析師"));
+  }
+
+  const incomplete = calculateStock({
+    ...base,
+    revenuePerShare: 25,
+    ebitdaPerShare: 8,
+    targetEvRevenueMultiple: 6,
+    targetEvEbitdaMultiple: 14,
+  });
+  for (const id of ["dcf-ebitda-5y", "dcf-revenue-5y"]) {
+    assert.ok(!incomplete.models.some((model) => model.id === id));
+    assert.ok(incomplete.excludedModels.some((model) => model.id === id));
+  }
+});
+
 test("keeps the legacy constant-growth DCF helper compatible", () => {
   const value = discountedCashFlowPerShare(10, 0, 0.1, 0.02);
   assert.ok(value > 115 && value < 120);
@@ -151,7 +266,7 @@ test("uses normalized FCF for EPV and sustainable payout for DDM", () => {
   assert.ok(stock.models.some((model) => model.id === "ddm-stable"));
 });
 
-test("gives every applicable model a simple equal weight", () => {
+test("balances weights by model family instead of repeating DCF horizons", () => {
   const stock = calculateStock({
     ...base,
     revenuePerShare: 25,
@@ -160,8 +275,16 @@ test("gives every applicable model a simple equal weight", () => {
     netMargin: 0.2,
   });
   assert.ok(stock.models.length >= 6);
-  const expected = 1 / stock.models.length;
-  for (const model of stock.models) closeTo(model.weight, expected);
+  const familyCounts = new Map();
+  for (const model of stock.models) familyCounts.set(model.family, (familyCounts.get(model.family) ?? 0) + 1);
+  const expectedFamilyWeight = 1 / familyCounts.size;
+  for (const family of familyCounts.keys()) {
+    const familyWeight = stock.models
+      .filter((model) => model.family === family)
+      .reduce((sum, model) => sum + model.weight, 0);
+    closeTo(familyWeight, expectedFamilyWeight);
+  }
+  assert.ok(new Set(stock.models.map((model) => model.weight)).size > 1);
   closeTo(stock.models.reduce((sum, model) => sum + model.weight, 0), 1);
 });
 
@@ -177,6 +300,25 @@ test("excludes EV models when no independent multiple is explicitly provided", (
     const excluded = stock.excludedModels.find((model) => model.id === id);
     assert.ok(excluded);
     assert.ok(excluded.reason.includes("獨立且可驗證"));
+  }
+});
+
+test("does not derive an EV multiple from the same PE and margin inputs", () => {
+  const stock = calculateStock({
+    ...base,
+    revenuePerShare: 25,
+    ebitdaPerShare: 7,
+    ebitPerShare: 6,
+    cashPerShare: 2,
+    debtPerShare: 3,
+    netMargin: 20,
+    dataBasis: "ltm",
+  });
+  for (const id of ["ev-revenue", "ev-ebitda", "ev-ebit"]) {
+    assert.ok(!stock.models.some((model) => model.id === id));
+    const excluded = stock.excludedModels.find((model) => model.id === id);
+    assert.ok(excluded, id + " was unexpectedly applied");
+    assert.ok(excluded.reason.includes("獨立") || excluded.reason.includes("independent"));
   }
 });
 
@@ -206,6 +348,81 @@ test("explicit EV multiples convert enterprise value to equity value by deductin
     closeTo(model.value, value);
     assert.ok(model.explanation.includes("扣除每股淨負債 2"));
   }
+});
+
+test("applies public peer P/S and EV medians as separate relative models", () => {
+  const comparableMultiples = {
+    sector: "Technology",
+    market: "US",
+    peerCount: 12,
+    pePeerCount: 12,
+    psPeerCount: 12,
+    evRevenuePeerCount: 12,
+    evEbitdaPeerCount: 12,
+    evEbitPeerCount: 12,
+    peMedian: 24,
+    psMedian: 5,
+    evRevenueMedian: 6,
+    evEbitdaMedian: 14,
+    evEbitMedian: 18,
+    dataBasis: "annual",
+    asOf: "2025-12-31",
+    method: "sector-trimmed-median",
+  };
+  const stock = calculateStock({
+    ...base,
+    eps: 5,
+    revenuePerShare: 20,
+    ebitdaPerShare: 8,
+    ebitPerShare: 6,
+    cashPerShare: 1,
+    debtPerShare: 3,
+    netMargin: 20,
+    comparableMultiples,
+  });
+  assert.equal(stock.models.find((model) => model.id === "p-sales")?.value, 100);
+  assert.equal(stock.models.find((model) => model.id === "ev-revenue")?.value, 118);
+  assert.equal(stock.models.find((model) => model.id === "ev-ebitda")?.value, 110);
+  assert.equal(stock.models.find((model) => model.id === "ev-ebit")?.value, 106);
+  assert.equal(stock.assumptions.comparablePeerCount, 12);
+  assert.equal(stock.assumptions.comparablePePeerCount, 12);
+  assert.equal(stock.assumptions.comparablePsPeerCount, 12);
+  assert.equal(stock.assumptions.comparableEvRevenuePeerCount, 12);
+  assert.equal(stock.assumptions.comparableEvEbitdaPeerCount, 12);
+  assert.equal(stock.assumptions.comparableEvEbitPeerCount, 12);
+  assert.equal(stock.assumptions.comparableAsOf, "2025-12-31");
+});
+
+test("applies an independent peer P/E model only with enough peers", () => {
+  const comparableMultiples = {
+    sector: "Technology",
+    market: "US",
+    peerCount: 8,
+    pePeerCount: 8,
+    psPeerCount: 8,
+    evRevenuePeerCount: 8,
+    evEbitdaPeerCount: 8,
+    evEbitPeerCount: 8,
+    peMedian: 30,
+    psMedian: null,
+    evRevenueMedian: null,
+    evEbitdaMedian: null,
+    evEbitMedian: null,
+    dataBasis: "annual",
+    asOf: "2025-12-31",
+    method: "sector-trimmed-median",
+  };
+  const stock = calculateStock({ ...base, eps: 5, comparableMultiples });
+  assert.equal(stock.models.find((model) => model.id === "pe-peer")?.value, 150);
+
+  const insufficient = calculateStock({
+    ...base,
+    comparableMultiples: { ...comparableMultiples, pePeerCount: 4 },
+  });
+  assert.equal(insufficient.models.some((model) => model.id === "pe-peer"), false);
+  assert.ok(insufficient.excludedModels.some((model) => model.id === "pe-peer"));
+  assert.equal(insufficient.assumptions.comparablePePeerCount, 4);
+  assert.equal(insufficient.assumptions.comparablePsPeerCount, 8);
 });
 
 test("uses model distribution rather than market price to remove an extreme result", () => {
@@ -307,18 +524,51 @@ test("keeps legacy StockInput fields compatible while exposing assumptions", () 
   assert.ok(stock.models.every((model) => model.id && model.category && model.status === "applied"));
   assert.ok(Array.isArray(stock.excludedModels));
   assert.ok(stock.assumptions.defaulted.includes("beta（市場／產業預設）"));
-  assert.equal(stock.assumptions.aggregationMethod, "median");
-  assert.equal(stock.discountRate, stock.wacc);
+  assert.equal(stock.assumptions.aggregationMethod, "family-balanced-average");
+  assert.equal(stock.discountRate, stock.assumptions.costOfEquity);
 });
 
-test("uses the model median as the central fair value", () => {
+test("uses the family-weighted average of validated models as the central fair value", () => {
   const stock = calculateStock(base);
-  const values = stock.models.map((model) => model.value).sort((left, right) => left - right);
-  const middle = Math.floor(values.length / 2);
-  const expected = values.length % 2 === 0
-    ? (values[middle - 1] + values[middle]) / 2
-    : values[middle];
+  const expected = stock.models.reduce((sum, model) => sum + model.value * model.weight, 0);
   closeTo(stock.fairValue, expected);
+});
+
+test("uses P/FFO for REITs and excludes enterprise and EPS models", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "REIT",
+    name: "Example Property Trust",
+    sector: "Real Estate Investment Trust",
+    eps: 1.2,
+    ffoPerShare: 2.4,
+    targetFfoMultiple: 18,
+    targetPsMultiple: 4,
+    revenuePerShare: 12,
+    ebitdaPerShare: 7,
+    ebitPerShare: 5,
+    dividendPerShare: 1.4,
+  });
+  assert.ok(stock.models.some((model) => model.id === "p-ffo"));
+  closeTo(stock.models.find((model) => model.id === "p-ffo")?.value ?? 0, 43.2);
+  for (const id of ["pe", "pe-peer", "p-sales", "p-fcf", "dcf-fcf-5y", "dcf-fcf-10y", "ev-revenue", "ev-ebitda", "ev-ebit", "epv", "graham", "ddm-stable"]) {
+    assert.ok(!stock.models.some((model) => model.id === id), id + " should be excluded for REIT");
+    assert.ok(stock.excludedModels.some((model) => model.id === id), id + " should be recorded as excluded");
+  }
+});
+
+test("does not substitute EPS when a REIT lacks FFO/AFFO", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "REIT-NO-FFO",
+    name: "Example Property Trust",
+    sector: "Real Estate Investment Trust",
+    eps: 4,
+    ffoPerShare: 0,
+    targetFfoMultiple: 18,
+  });
+  assert.ok(!stock.models.some((model) => model.id === "p-ffo"));
+  assert.match(stock.excludedModels.find((model) => model.id === "p-ffo")?.reason ?? "", /FFO/);
 });
 
 test("keeps an AAPL-like LTM valuation near a broad historical model cluster", () => {
@@ -344,14 +594,17 @@ test("keeps an AAPL-like LTM valuation near a broad historical model cluster", (
     revenuePerShare: 31.9869,
     ebitPerShare: 10.611,
     ebitdaPerShare: 11.5086,
+    targetEvRevenueMultiple: 7.7,
+    targetEvEbitdaMultiple: 22,
+    targetEvEbitMultiple: 24.5,
     netMargin: 0.276186,
     source: "自動資料",
     dataBasis: "ltm",
     dataCompleteness: "historical",
   });
   assert.ok(stock.models.some((model) => model.id === "ev-revenue"));
-  assert.ok(stock.fairValue >= 250 && stock.fairValue <= 280, "AAPL-like fair value was " + stock.fairValue);
-  assert.ok(stock.upside >= -0.2 && stock.upside <= -0.08, "AAPL-like gap was " + stock.upside);
+  assert.ok(stock.fairValue >= 220 && stock.fairValue <= 270, "AAPL-like fair value was " + stock.fairValue);
+  assert.ok(stock.upside >= -0.3 && stock.upside <= -0.1, "AAPL-like gap was " + stock.upside);
 });
 
 test("normalizes extreme FCF conversion before it can amplify several models", () => {
@@ -552,4 +805,336 @@ test("keeps theme-adjusted fair value independent of the current price", () => {
   const high = calculateStock({ ...input, price: 2_000 });
   assert.equal(low.assumptions.structuralBlendWeight, 0.15);
   assert.equal(low.fairValue, high.fairValue);
+});
+
+test("builds a separate high-growth market pricing reference without using analyst data", () => {
+  const fundPortfolioPe = {
+    sampleSize: 56,
+    averagePe: 68.6,
+    medianPe: 41.3,
+    lowerQuartilePe: 32.9,
+    upperQuartilePe: 88.6,
+    p90Pe: 113.4,
+    p95Pe: 253.4,
+    valueWeightedAveragePe: 48.4,
+    lowestPe: 1.9,
+    highestPe: 306.4,
+  };
+  const input = {
+    ...base,
+    ticker: "TSLA",
+    name: "Tesla Inc.",
+    sector: "Automotive",
+    eps: 1.08,
+    revenueGrowth: -3,
+    institutionalSignal: { heldByCount: 2, increasedByCount: 2 },
+    fundPortfolioPe,
+  };
+  const stock = calculateStock(input);
+  assert.equal(stock.marketPricing?.enabled, true);
+  assert.ok(stock.marketPricing?.selectedPe > 180 && stock.marketPricing?.selectedPe < 220);
+  assert.ok(stock.marketPricing?.fairValue > 190);
+  assert.equal(stock.marketPricing?.fairValue, calculateStock({ ...input, price: 2_000 }).marketPricing?.fairValue);
+  assert.equal(stock.fairValue, calculateStock({ ...input, price: 2_000 }).fairValue);
+  assert.ok(stock.assumptions.marketPricingNote.includes("分析師"));
+});
+
+test("keeps fund-held sector references distinct across cyclical, AI, mature and optionality names", () => {
+  const fundPortfolioPe = {
+    sampleSize: 56,
+    averagePe: 68.6,
+    medianPe: 41.3217,
+    lowerQuartilePe: 33.0342,
+    upperQuartilePe: 88.5535,
+    p90Pe: 138.3,
+    p95Pe: 253.4176,
+    valueWeightedAveragePe: 48.3836,
+    lowestPe: 1.9,
+    highestPe: 306.4,
+  };
+  const common = { ...base, fundPortfolioPe, institutionalSignal: { heldByCount: 2, increasedByCount: 1 } };
+  const tsla = calculateStock({ ...common, ticker: "TSLA", name: "Tesla Inc.", sector: "Automotive", eps: 1.08, revenueGrowth: -3, roe: 4, netMargin: 4 });
+  const mu = calculateStock({ ...common, ticker: "MU", name: "Micron Technology", sector: "Semiconductors", eps: 7.59, revenueGrowth: 49, roe: 23, netMargin: 23 });
+  const nvda = calculateStock({ ...common, ticker: "NVDA", name: "NVIDIA Corporation", sector: "Technology", eps: 4.9, revenueGrowth: 65, roe: 85, netMargin: 56 });
+  const amzn = calculateStock({ ...common, ticker: "AMZN", name: "Amazon.com Inc.", sector: "Consumer Discretionary", eps: 7.17, revenueGrowth: 12, roe: 18, netMargin: 11 });
+
+  assert.ok(tsla.marketPricing?.selectedPe > 180 && tsla.marketPricing?.selectedPe < 220);
+  assert.ok(mu.marketPricing?.selectedPe >= 100 && mu.marketPricing?.selectedPe <= 140);
+  assert.ok(nvda.marketPricing?.selectedPe >= nvda.assumptions.baseTargetPe && nvda.marketPricing?.selectedPe < 55);
+  assert.ok(amzn.marketPricing?.selectedPe > 20 && amzn.marketPricing?.selectedPe < 30);
+  assert.ok(tsla.marketPricing?.source.includes("P95"));
+  assert.match(mu.marketPricing?.source ?? "", /AI/);
+  assert.match(mu.assumptions.marketPricingNote ?? "", /P95/);
+});
+
+test("prefers a sufficiently broad business-model P/E band over a mixed sector", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "MU",
+    name: "Micron Technology",
+    sector: "Technology",
+    eps: 7.59,
+    revenueGrowth: 49,
+    roe: 23,
+    netMargin: 23,
+    institutionalSignal: { heldByCount: 3, increasedByCount: 3 },
+    fundPortfolioPe: {
+      sampleSize: 56,
+      medianPe: 41.3,
+      lowerQuartilePe: 33,
+      upperQuartilePe: 88.6,
+      p95Pe: 253.4,
+    },
+    fundSectorPe: {
+      sector: "Technology",
+      sampleSize: 20,
+      medianPe: 42,
+      lowerQuartilePe: 35,
+      upperQuartilePe: 95,
+      p95Pe: 220,
+      totalValueUsd: 1,
+      increasedCount: 1,
+      reducedCount: 1,
+    },
+    fundBusinessPe: {
+      group: "memory-cycle",
+      sampleSize: 5,
+      uniqueSampleSize: 2,
+      averagePe: 150,
+      medianPe: 113.4,
+      lowerQuartilePe: 113.4,
+      upperQuartilePe: 253.4,
+      p95Pe: 253.4,
+      increasedCount: 4,
+      reducedCount: 1,
+      freshSampleSize: 0,
+      agingSampleSize: 2,
+      staleSampleSize: 3,
+      unknownSampleSize: 0,
+      medianFinancialAgeDays: 258,
+      dataQuality: "mixed",
+      tickers: ["MU", "SIMO"],
+    },
+  });
+  assert.equal(stock.marketPricing?.referenceBusinessGroup, "memory-cycle");
+  assert.equal(stock.marketPricing?.referenceSector, "Technology");
+  assert.equal(stock.assumptions.marketPeAnchor, 113.4);
+  assert.ok((stock.marketPricing?.fairValue ?? 0) > 1_000);
+  assert.equal(stock.fairValue, calculateStock({ ...stock, price: 2_000 }).fairValue);
+});
+
+test("keeps the AI-cycle premium gated by institutional conviction", () => {
+  const fundPortfolioPe = {
+    sampleSize: 56,
+    medianPe: 41.3217,
+    upperQuartilePe: 88.5535,
+    p95Pe: 253.4176,
+  };
+  const stock = calculateStock({
+    ...base,
+    ticker: "MEMX",
+    name: "Memory Supplier",
+    sector: "Semiconductors",
+    eps: 7.59,
+    revenueGrowth: 49,
+    institutionalSignal: { heldByCount: 0, increasedByCount: 0 },
+    roe: 25,
+    netMargin: 25,
+    fundPortfolioPe,
+  });
+  // A cyclical name without the three-part gate (AI theme, growth, and
+  // multi-fund conviction) remains conservative rather than inheriting the
+  // portfolio upper tail.
+  assert.ok((stock.marketPricing?.selectedPe ?? Infinity) < 30);
+  assert.doesNotMatch(stock.marketPricing?.source ?? "", /AI/);
+});
+
+test("rejects a highly dispersed sector profile instead of applying a misleading median", () => {
+  const globalProfile = {
+    sampleSize: 56,
+    averagePe: 68.6,
+    medianPe: 41.3217,
+    lowerQuartilePe: 33.0342,
+    upperQuartilePe: 88.5535,
+    p90Pe: 138.3,
+    p95Pe: 253.4176,
+    valueWeightedAveragePe: 48.3836,
+    lowestPe: 1.9,
+    highestPe: 306.4,
+  };
+  const industrialProfile = {
+    sector: "Industrials",
+    sampleSize: 6,
+    averagePe: 150.5,
+    medianPe: 109.5893,
+    lowerQuartilePe: 47.7898,
+    upperQuartilePe: 270.5694,
+    p95Pe: 306.3704,
+    valueWeightedAveragePe: 80.0844,
+    totalValueUsd: 17_693_246_217,
+    increasedCount: 3,
+    reducedCount: 1,
+  };
+  const input = {
+    ...base,
+    ticker: "TSLA",
+    name: "Tesla Inc.",
+    sector: "Industrials",
+    eps: 1.08,
+    revenueGrowth: -3,
+    institutionalSignal: { heldByCount: 2, increasedByCount: 2 },
+    fundPortfolioPe: globalProfile,
+    fundSectorPe: industrialProfile,
+  };
+  const stock = calculateStock(input);
+  assert.equal(stock.marketPricing?.referenceSector, undefined);
+  assert.equal(stock.marketPricing?.referenceSampleSize, undefined);
+  assert.ok(stock.marketPricing?.selectedPe > 190 && stock.marketPricing?.selectedPe < 220);
+  assert.equal(stock.assumptions.marketPeAnchor, globalProfile.medianPe);
+  assert.equal(stock.assumptions.marketPeReferenceSector, undefined);
+  assert.match(stock.marketPricing?.source ?? "", /產業樣本分歧過大/);
+});
+
+test("uses a maturity-discounted sector reference for profitable multi-fund holdings", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "AAPL",
+    name: "Apple Inc.",
+    sector: "Technology",
+    price: 308.26,
+    eps: 7.46,
+    bvps: 6,
+    fcfPerShare: 6.7,
+    revenueGrowth: 6.4,
+    roe: 100,
+    netMargin: 26.9,
+    institutionalSignal: { heldByCount: 3, increasedByCount: 1 },
+    fundPortfolioPe: {
+      sampleSize: 56,
+      averagePe: 68.6,
+      medianPe: 41.3,
+      lowerQuartilePe: 33,
+      upperQuartilePe: 88.6,
+      p90Pe: 138.3,
+      p95Pe: 253.4,
+      valueWeightedAveragePe: 48.4,
+      lowestPe: 1.9,
+      highestPe: 306.4,
+    },
+    fundSectorPe: {
+      sector: "Technology",
+      sampleSize: 32,
+      averagePe: 68.4,
+      medianPe: 41.3217,
+      lowerQuartilePe: 36.0941,
+      upperQuartilePe: 88.5535,
+      p95Pe: 211.4938,
+      valueWeightedAveragePe: 51.7,
+      totalValueUsd: 20_000_000_000,
+      increasedCount: 17,
+      reducedCount: 14,
+    },
+  });
+
+  assert.equal(stock.marketPricing?.enabled, true);
+  assert.equal(stock.marketPricing?.referenceSector, "Technology");
+  assert.ok(stock.marketPricing?.selectedPe > 34 && stock.marketPricing?.selectedPe < 38);
+  assert.ok(stock.marketPricing?.fairValue > 250 && stock.marketPricing?.fairValue < 285);
+  assert.ok(stock.marketPricing?.source.includes("成熟品質"));
+});
+
+test("keeps current cyclical EPS in the market layer while normalizing intrinsic models", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "MU",
+    name: "Micron Technology",
+    sector: "Semiconductors",
+    price: 861,
+    eps: 44.24,
+    bvps: 40,
+    fcfPerShare: 25,
+    revenueGrowth: 49,
+    roe: 30,
+    netMargin: 25,
+    dataBasis: "ltm",
+    epsHistory: [
+      { value: 7.59, end: "2025-08-28", basis: "annual" },
+      { value: 0.7, end: "2024-08-29", basis: "annual" },
+      { value: 1.5, end: "2022-08-31", basis: "annual" },
+      { value: -0.4, end: "2023-08-31", basis: "annual" },
+    ],
+    institutionalSignal: { heldByCount: 3, increasedByCount: 3 },
+    fundSectorPe: {
+      sector: "Technology",
+      sampleSize: 32,
+      averagePe: 68.4,
+      medianPe: 41.3217,
+      lowerQuartilePe: 36.0941,
+      upperQuartilePe: 88.5535,
+      p95Pe: 211.4938,
+      valueWeightedAveragePe: 51.7,
+      totalValueUsd: 20_000_000_000,
+      increasedCount: 17,
+      reducedCount: 14,
+    },
+  });
+
+  assert.ok(stock.epsNormalizationApplied);
+  assert.ok(stock.normalizedEpsPerShare < stock.reportedEpsPerShare);
+  assert.ok(stock.marketPricing?.selectedPe >= 100 && stock.marketPricing?.selectedPe <= 140);
+  assert.ok((stock.marketPricing?.fairValue ?? 0) > 4_000);
+  assert.match(stock.marketPricing?.note ?? "", /P95/);
+  assert.ok(stock.fairValue < (stock.marketPricing?.fairValue ?? Number.POSITIVE_INFINITY));
+});
+
+test("does not classify aerospace as the space-economy optionality theme", () => {
+  const stock = calculateStock({
+    ...base,
+    ticker: "GE",
+    name: "GE Aerospace",
+    sector: "Industrials",
+    price: 100,
+    eps: 5,
+    bvps: 20,
+    fcfPerShare: 4,
+    revenueGrowth: 8,
+    roe: 25,
+    debtRatio: 30,
+    institutionalSignal: {
+      trackedFundCount: 6,
+      heldByCount: 2,
+      increasedByCount: 1,
+      reducedByCount: 0,
+      newByCount: 0,
+      unchangedByCount: 1,
+      holdings: [],
+    },
+    fundPortfolioPe: {
+      sampleSize: 20,
+      averagePe: 40,
+      medianPe: 40,
+      lowerQuartilePe: 30,
+      upperQuartilePe: 70,
+      p90Pe: 100,
+      p95Pe: 200,
+      valueWeightedAveragePe: 35,
+      lowestPe: 10,
+      highestPe: 220,
+    },
+  });
+
+  assert.ok(!stock.marketPricing?.triggers.includes("optionality"));
+  assert.ok(!stock.marketPricing?.source.includes("P95"));
+});
+
+test("marks old annual snapshots as stale instead of presenting them as current", () => {
+  const stock = calculateStock({
+    ...base,
+    financialDataDate: "2025-01-01",
+    dataBasis: "annual",
+  });
+  assert.equal(stock.financialFreshness, "stale");
+  assert.ok((stock.financialAgeDays ?? 0) > 365);
+  assert.ok(stock.historicalCautionReasons.some((reason) => reason.includes("超過約八個月")));
+  assert.equal(stock.valuationConfidence, "low");
 });
