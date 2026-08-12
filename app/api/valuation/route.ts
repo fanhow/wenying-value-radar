@@ -65,12 +65,20 @@ const fundPeReferences = [
   ...usMarketSnapshot.map((row) => ({ ticker: row.ticker, price: row.price, eps: row.eps, sector: row.sector, financialDataDate: row.financialDataDate ?? row.date })),
   ...tpexSnapshot.map((row) => ({ ticker: row.ticker, pe: numeric(row.pe) })),
 ];
-const usComparableMap = buildComparableMap(usMarketSnapshot);
+// Building the full public-peer map is intentionally lazy. The snapshot has
+// thousands of rows, and doing this during Worker module startup can exceed
+// the platform's startup CPU budget before the first request is handled.
+let usComparableMapCache: ReturnType<typeof buildComparableMap> | null = null;
+
+function usComparableMultiples() {
+  usComparableMapCache ??= buildComparableMap(usMarketSnapshot);
+  return usComparableMapCache;
+}
 const fundSectorPeProfiles = fundPortfolioPeProfiles(fundHoldingsSnapshot, fundPeReferences);
 const fundBusinessPeProfiles = fundPortfolioBusinessPeProfiles(fundHoldingsSnapshot, fundPeReferences);
 
 function comparableInputForTicker(ticker: string) {
-  const comparableMultiples = usComparableMap.get(ticker.toUpperCase());
+  const comparableMultiples = usComparableMultiples().get(ticker.toUpperCase());
   return comparableMultiples
     ? {
       targetPsMultiple: comparableMultiples.psMedian ?? undefined,

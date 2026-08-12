@@ -19,6 +19,17 @@ const fundPeReferences: FundPeReference[] = [
 const fundPortfolioPe = fundPortfolioPeSummary(fundHoldingsSnapshot, fundPeReferences);
 const fundSectorPeProfiles = fundPortfolioPeProfiles(fundHoldingsSnapshot, fundPeReferences);
 const fundBusinessPeProfiles = fundPortfolioBusinessPeProfiles(fundHoldingsSnapshot, fundPeReferences);
+const comparableMapCache = new WeakMap<MarketScanRow[], ReadonlyMap<string, ComparableMultiples>>();
+
+function comparableMapForUniverse(universe: MarketScanRow[]) {
+  // The U.S. snapshot contains thousands of rows. Build peer multiples once,
+  // on the first market scan request, rather than during Worker startup.
+  const cached = comparableMapCache.get(universe);
+  if (cached) return cached;
+  const built = buildComparableMap(universe);
+  comparableMapCache.set(universe, built);
+  return built;
+}
 
 export type MarketScanRow = {
   ticker: string;
@@ -173,7 +184,7 @@ export function selectMarketCandidates(
   limit = 20,
   comparableMap?: ReadonlyMap<string, ComparableMultiples>,
 ) {
-  const profiles = comparableMap ?? buildComparableMap(universe);
+  const profiles = comparableMap ?? comparableMapForUniverse(universe);
   return universe
     .map((row) => marketStockFromRatio(row, profiles.get(String(row.ticker).trim().toUpperCase())))
     .filter((stock): stock is StockInput => stock !== null)
