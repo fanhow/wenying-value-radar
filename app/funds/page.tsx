@@ -95,6 +95,15 @@ const fundPeReferences: FundPeReference[] = fallbackMarketRows.map((row) => ({
 const fallbackFundPortfolioPe = fundPortfolioPeSummary(snapshot, fundPeReferences);
 const fallbackFundSectorPeProfiles = fundPortfolioPeProfiles(snapshot, fundPeReferences);
 const sectorProfileReportDate = snapshot.funds.map((fund) => fund.reportDate).find(Boolean) ?? "—";
+const fundAbbreviations: Record<string, string> = {
+  citadel: "Citadel",
+  "de-shaw": "DES",
+  bridgewater: "BW",
+  millennium: "MLP",
+  tci: "TCI",
+  elliott: "Elliott",
+};
+const fundAbbreviationByName = new Map(snapshot.funds.map((fund) => [fund.name, fundAbbreviations[fund.slug] ?? fund.name]));
 
 type FundValuationContext = {
   comparableByTicker: ReturnType<typeof buildComparableMap>;
@@ -279,6 +288,13 @@ export default function FundsPage() {
     return t("持股約持平", "Roughly unchanged");
   };
 
+  const overlapChangeLabel = (holding: FundHolding) => {
+    if (holding.changeType === "new") return t("新建", "New");
+    if (holding.changeType === "increased") return t(`加 ${formatPercent(holding.changePercent ?? 0)}`, `Add ${formatPercent(holding.changePercent ?? 0)}`);
+    if (holding.changeType === "reduced") return t(`減 ${formatPercent(holding.changePercent ?? 0)}`, `Cut ${formatPercent(holding.changePercent ?? 0)}`);
+    return t("持平", "Flat");
+  };
+
   const valuationLabel = (stock: Stock | null) => {
     if (!stock) return t("資料不足", "Insufficient data");
     if (stock.valuationConfidence === "low") return t("低信心初估", "Low-confidence estimate");
@@ -294,7 +310,7 @@ export default function FundsPage() {
         <header className="funds-hero">
           <div>
             <p className="eyebrow"><span className="eyebrow-line" />SMART MONEY / 01</p>
-            <h1>{t("追蹤最會賺錢的資金，", "Track the most profitable capital,")}<br /><em>{t("但不盲目跟單。", "without blindly copying it.")}</em></h1>
+            <h1>{t("追蹤最會賺錢的資金", "Track the most profitable capital")}<br /><em>{t("但不盲目跟單", "without blindly copying it")}</em></h1>
             <p>{t(
               "依 LCH／Edmond de Rothschild 截至 2025 年底的累積淨獲利排名，追蹤全球前六大基金經理的公開美股持倉，並以穩盈模型重新檢查公允價值。",
               "Using LCH / Edmond de Rothschild cumulative net-gain rankings through 2025, this page tracks the disclosed U.S. equity holdings of the six leading managers and rechecks them with WenYing fair value.",
@@ -311,7 +327,7 @@ export default function FundsPage() {
           {valuedFunds.map((fund) => (
             <a href={`#${fund.slug}`} className="fund-rank-card" key={fund.slug}>
               <span className="fund-rank-number">#{fund.rank}</span>
-              <div><strong>{fund.name}</strong><small>{t("成立以來淨獲利", "Net gains since inception")}</small></div>
+              <div><strong>{fund.name} <span className="fund-name-abbr">{fundAbbreviations[fund.slug] ?? fund.name}</span></strong><small>{t("成立以來淨獲利", "Net gains since inception")}</small></div>
               <b>US$ {fund.cumulativeGainBn.toFixed(1)}B</b>
               <i>{t(`2025 年 +${fund.gain2025Bn.toFixed(1)}B`, `2025 +$${fund.gain2025Bn.toFixed(1)}B`)}</i>
             </a>
@@ -384,7 +400,7 @@ export default function FundsPage() {
           <div className="fund-pattern-grid">
             {activeFundManagerPeProfiles.map((profile) => (
               <div className="fund-pattern-card" key={profile.fundName}>
-                <div><strong>{profile.fundName}</strong><small>{profile.uniqueSampleSize} {t("檔不重複獲利持股", "unique profitable holdings")} · {profile.increasedCount} {t("加倉／新建", "added/new")}</small></div>
+                <div><strong>{profile.fundName} <span className="fund-name-abbr">{fundAbbreviationByName.get(profile.fundName)}</span></strong><small>{profile.uniqueSampleSize} {t("檔不重複獲利持股", "unique profitable holdings")} · {profile.increasedCount} {t("加倉／新建", "added/new")}</small></div>
                 <b>{formatMultiple(profile.medianPe)}</b>
                 <small>{t("P/E 中位數", "P/E median")} · {formatMultiple(profile.lowerQuartilePe)}–{formatMultiple(profile.upperQuartilePe)} {t("P25–P75", "P25–P75")}</small>
                 <small>{t(`P95 ${formatMultiple(profile.p95Pe)} · 減倉 ${profile.reducedCount}`, `P95 ${formatMultiple(profile.p95Pe)} · reduced ${profile.reducedCount}`)}</small>
@@ -404,21 +420,26 @@ export default function FundsPage() {
             <div><p className="section-kicker">CROWDING SIGNAL / 03</p><h2>{t("多家基金同時持有的股票", "Stocks held by multiple funds")}</h2></div>
             <span>{t("只作方向提示，不改寫公允價值", "Context only; does not change fair value")}</span>
           </div>
-          <div className="fund-overlap-grid">
+          <div className="fund-overlap-list">
             {activeFundOverlapProfiles.map((profile) => {
               const conviction = profile.increasedCount + profile.newCount;
+              const fundPositions = valuedFunds.flatMap((fund) => {
+                const holding = fund.holdings.find((item) => item.ticker === profile.ticker);
+                return holding ? [{ fund, holding }] : [];
+              });
               const direction = conviction > profile.reducedCount
                 ? t("加倉偏多", "Accumulation")
                 : conviction < profile.reducedCount
                   ? t("減倉偏多", "Distribution")
                   : t("方向分歧", "Mixed direction");
               return (
-                <Link className="fund-overlap-card" href={stockDetailHref(profile.ticker)} key={profile.ticker}>
-                  <div><strong>{profile.ticker}</strong><small>{profile.sector} · {profile.fundCount} {t("家基金", "funds")}</small></div>
-                  <b>{profile.pe && Number.isFinite(profile.pe) ? formatMultiple(profile.pe) : "—"}</b>
-                  <small>{t("目前快照 P/E", "Current snapshot P/E")} · {direction}</small>
-                  <span>{t(`加 ${conviction} · 減 ${profile.reducedCount}`, `Added ${conviction} · reduced ${profile.reducedCount}`)}</span>
-                </Link>
+                <div className="fund-overlap-row" key={profile.ticker}>
+                  <Link className="fund-overlap-stock" href={stockDetailHref(profile.ticker)}><strong>{profile.ticker}</strong><small>{profile.sector}</small></Link>
+                  <div className="fund-overlap-summary"><b>{profile.fundCount} {t("家共同持有", "funds")}</b><small>{direction} · P/E {profile.pe && Number.isFinite(profile.pe) ? formatMultiple(profile.pe) : "—"}</small></div>
+                  <div className="fund-overlap-funds" aria-label={t(`${profile.ticker} 基金持倉變化`, `${profile.ticker} manager changes`)}>
+                    {fundPositions.map(({ fund, holding }) => <span className={`fund-position-change change-${holding.changeType}`} key={`${profile.ticker}-${fund.slug}`}><b>{fundAbbreviations[fund.slug] ?? fund.name}</b>{overlapChangeLabel(holding)}</span>)}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -432,7 +453,7 @@ export default function FundsPage() {
           {valuedFunds.map((fund) => (
             <section className="fund-panel" id={fund.slug} key={fund.slug}>
               <div className="fund-panel-heading">
-                <div><p className="section-kicker">FUND #{String(fund.rank).padStart(2, "0")}</p><h2>{fund.name}</h2><p>{fund.legalName}</p></div>
+                <div><p className="section-kicker">FUND #{String(fund.rank).padStart(2, "0")}</p><h2>{fund.name} <span className="fund-heading-abbr">{fundAbbreviations[fund.slug] ?? fund.name}</span></h2><p>{fund.legalName}</p></div>
                 <div className="fund-panel-meta"><span>{t("13F 多頭申報值", "Reported 13F long value")} <b>{compactUsd.format(fund.reportedLongValueUsd)}</b></span><span>{t("持倉日", "Holdings date")} <b>{fund.reportDate}</b></span><a href={fund.sourceUrl} target="_blank" rel="noreferrer">SEC 13F ↗</a></div>
               </div>
               <div className="fund-table-wrap">
