@@ -65,7 +65,7 @@ const worker = {
           const request = new Request("https://snapshot.internal/api/valuation", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ticker, market }),
+            body: JSON.stringify({ ticker, market, refresh: true }),
           });
           const response = await handler.fetch(request, env, ctx);
           if (!response.ok) return null;

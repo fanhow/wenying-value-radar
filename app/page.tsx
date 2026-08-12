@@ -5,7 +5,7 @@ import { calculateStock, clamp, type Market, type Stock, type StockInput } from 
 import type { InstitutionalSignal } from "../lib/fund-signal";
 import { assessGrowthPremium, type GrowthPremiumAssessment } from "../lib/growth-premium";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
-import { shouldRefreshSavedStock } from "../lib/data-freshness";
+import { valuationDirection, valuationDirectionSymbol, type ValuationDirection } from "../lib/valuation-direction";
 import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
@@ -32,6 +32,7 @@ type ValuationCandidate = {
   capturedPrice?: number;
   capturedNav?: number;
   capturedName?: string;
+  refresh?: boolean;
 };
 
 const seedInputs: StockInput[] = [];
@@ -155,8 +156,24 @@ function GrowthPremiumPanel({ assessment, stock, language }: { assessment: Growt
   </div>;
 }
 
-function TrendMark({ positive }: { positive: boolean }) {
-  return <span className={`trend-mark ${positive ? "positive" : "negative"}`}>{positive ? "↗" : "↘"}</span>;
+function directionTextClass(direction: ValuationDirection) {
+  return direction === "up" ? "text-positive" : direction === "down" ? "text-negative" : "text-flat";
+}
+
+function directionLabel(direction: ValuationDirection, language: Language) {
+  if (direction === "up") return language === "zh" ? "上行空間" : "Upside";
+  if (direction === "down") return language === "zh" ? "下行空間" : "Downside";
+  return language === "zh" ? "持平" : "Flat";
+}
+
+function modelDirectionLabel(direction: ValuationDirection, language: Language) {
+  if (direction === "up") return language === "zh" ? "模型上行空間" : "Model Upside";
+  if (direction === "down") return language === "zh" ? "模型下行空間" : "Model Downside";
+  return language === "zh" ? "模型持平區間" : "Model Near Fair Value";
+}
+
+function TrendMark({ direction }: { direction: ValuationDirection }) {
+  return <span className={`trend-mark direction-${direction}`}>{valuationDirectionSymbol(direction)}</span>;
 }
 
 type AppliedValuationModel = Stock["models"][number];
@@ -265,7 +282,7 @@ export default function Home() {
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const initialTickerHandled = useRef(false);
-  const initialSavedRefreshHandled = useRef(false);
+  const lookupRequest = useRef<AbortController | null>(null);
   const [form, setForm] = useState({
     ticker: "",
     name: "",
@@ -396,6 +413,7 @@ export default function Home() {
   );
   const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
   const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
+  const selectedDirection = valuationDirection(selected?.upside ?? 0);
   const selectedRangePosition = selected
     ? valuationRangePosition(selected.price, selected.rangeLow, selected.rangeHigh)
     : 50;
@@ -487,27 +505,23 @@ export default function Home() {
 
   function openWatchlistStock(ticker: string) {
     const local = stocks.find((stock) => stock.ticker === ticker);
-    if (local && local.source !== "手動輸入" && local.source !== "方舟截圖") {
-      void lookupTicker(ticker, true);
-      return;
-    }
-    selectStock(ticker);
+    if (local) selectStock(ticker);
   }
 
   function openRankedStock(ticker: string) {
     selectStock(ticker);
-    void lookupTicker(ticker, true);
   }
 
   function toggleWatchlist(ticker: string) {
     setWatchlist((current) => (current.includes(ticker) ? current.filter((item) => item !== ticker) : [...current, ticker]));
   }
 
-  async function requestValuation(candidate: ValuationCandidate) {
+  async function requestValuation(candidate: ValuationCandidate, signal?: AbortSignal) {
     const response = await fetch("/api/valuation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(candidate),
+      signal,
     });
     const payload = await response.json() as { stock?: StockInput; error?: string };
     if (!response.ok || !payload.stock) throw new Error(payload.error || "暫時無法建立估值");
@@ -524,26 +538,31 @@ export default function Home() {
     }
     setIsLookupLoading(true);
     setLookupError("");
+    lookupRequest.current?.abort();
+    const controller = new AbortController();
+    lookupRequest.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const stock = await requestValuation({ ticker, market: /^\d/.test(ticker) ? "TW" : "US" });
+      const stock = await requestValuation({ ticker, market: /^\d/.test(ticker) ? "TW" : "US", refresh: forceRefresh }, controller.signal);
       setStockInputs((current) => [...current.filter((item) => item.ticker !== stock.ticker), stock]);
       setWatchlist((current) => current.includes(stock.ticker) ? current : [...current, stock.ticker]);
       setSelectedTicker(stock.ticker);
       setQuery(stock.ticker);
       window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     } catch (error) {
-      setLookupError(safeLookupError(error instanceof Error ? error.message : "", language));
+      if (lookupRequest.current === controller) {
+        setLookupError(controller.signal.aborted
+          ? (language === "zh" ? "查詢超過 12 秒，已停止；請稍後再試。" : "The lookup exceeded 12 seconds and was stopped. Please try again.")
+          : safeLookupError(error instanceof Error ? error.message : "", language));
+      }
     } finally {
-      setIsLookupLoading(false);
+      window.clearTimeout(timeout);
+      if (lookupRequest.current === controller) {
+        lookupRequest.current = null;
+        setIsLookupLoading(false);
+      }
     }
   }, [language, query, stocks]);
-
-  useEffect(() => {
-    if (!hasLoadedStorage || initialSavedRefreshHandled.current) return;
-    initialSavedRefreshHandled.current = true;
-    const saved = stockInputs.find((stock) => stock.ticker === selectedTicker);
-    if (saved && shouldRefreshSavedStock(saved)) void lookupTicker(saved.ticker, true);
-  }, [hasLoadedStorage, lookupTicker, selectedTicker, stockInputs]);
 
   useEffect(() => {
     if (!hasLoadedStorage || initialTickerHandled.current) return;
@@ -673,7 +692,7 @@ export default function Home() {
             {query && !exactMatch && searchSuggestions.length > 0 && (
               <div className="search-results-popover">
                 {searchSuggestions.map((suggestion) => (
-                  <button type="button" key={suggestion.ticker} onClick={() => suggestion.isLoaded && !suggestion.isRefreshable ? selectStock(suggestion.ticker) : void lookupTicker(suggestion.ticker, Boolean(suggestion.isLoaded))}>
+                  <button type="button" key={suggestion.ticker} onClick={() => suggestion.isLoaded ? selectStock(suggestion.ticker) : void lookupTicker(suggestion.ticker)}>
                     <span><strong>{suggestion.ticker}</strong> <span className="suggestion-name">{suggestion.name}</span></span>
                     {suggestion.upside === null
                       ? <span className="suggestion-market">{suggestion.market === "TW" ? t("台股", "Taiwan") : t("美股", "U.S.")}</span>
@@ -728,12 +747,13 @@ export default function Home() {
                     const isSelected = selected?.ticker === stock.ticker;
                     const isWatched = watchlist.includes(stock.ticker);
                     const growthPremium = assessGrowthPremium(stock);
+                    const direction = valuationDirection(stock.upside);
                     return (
                       <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} role="button" tabIndex={0} onClick={() => openRankedStock(stock.ticker)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRankedStock(stock.ticker); } }}>
                         <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stock.name} · {stock.sector}</small></span></div></td>
                         <td data-label={t("目前價格", "Current Price")}><span className="table-number">{formatPrice(stock.price, stock.market)}</span></td>
                         <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("區間", "Range")} ${formatPrice(stock.rangeLow, stock.market)} – ${formatPrice(stock.rangeHigh, stock.market)}`}</small></td>
-                        <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}`}><TrendMark positive={stock.upside >= 0} /> {formatSignedPercent(stock.upside)}</span></td>
+                        <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : directionTextClass(direction)}`}><TrendMark direction={direction} /> {formatSignedPercent(stock.upside)}</span></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
                         <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.valuationConfidence} language={language} /><GrowthPremiumPill assessment={growthPremium} language={language} /></div></td>
                         <td><button type="button" className="row-arrow" onClick={(event) => { event.stopPropagation(); openRankedStock(stock.ticker); }} aria-label={t(`查看 ${stock.ticker} 估值明細`, `View valuation details for ${stock.ticker}`)}>→</button></td>
@@ -751,7 +771,7 @@ export default function Home() {
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 03</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
               <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
-              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong>{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selected.upside >= 0 ? "hero-upside positive-box" : "hero-upside negative-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : t("模型上行空間", "Model Upside")}</span><strong>{formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selected.upside >= 0 ? t("價格低於估值", "Price below fair value") : t("價格高於估值", "Price above fair value")}</small></div></div>
+              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong>{formatPrice(selected.price, selected.market)}</strong>{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : modelDirectionLabel(selectedDirection, language)}</span><strong><TrendMark direction={selectedDirection} /> {formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
               <div className="fair-value-focus">
@@ -817,7 +837,11 @@ export default function Home() {
         <section id="watchlist" className="watchlist-section">
           <div className="section-heading-row"><div><p className="section-kicker">YOUR WATCHLIST / 05</p><h2>{t("我的觀察清單", "My Watchlist")}</h2><p>{t("把你正在研究的股票集中在這裡，搜尋代碼即可回到估值明細", "Keep the stocks you are researching together and return to their valuation details in one click")}</p></div><button type="button" className="outline-button" onClick={() => setShowAddForm(true)}><span>＋</span> {t("新增自訂標的", "Add custom stock")}</button></div>
           <div className="watchlist-cards">
-            {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => <button key={stock.ticker} type="button" className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`} onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}>{formatSignedPercent(stock.upside)}</strong><small>{stock.valuationConfidence === "low" ? t("低信心初估", "Low-confidence estimate") : t("上行空間", "Upside")}</small></div><span className="card-arrow">↗</span></button>) : <div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>}
+            {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => {
+              const direction = valuationDirection(stock.upside);
+              const label = directionLabel(direction, language);
+              return <button key={stock.ticker} type="button" className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`} onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={stock.valuationConfidence === "low" ? "text-uncertain" : directionTextClass(direction)}>{formatSignedPercent(stock.upside)}</strong><small>{stock.valuationConfidence === "low" ? `${t("低信心初估", "Low-confidence estimate")} · ${label}` : label}</small></div><span className={`card-arrow direction-${direction}`}>{valuationDirectionSymbol(direction)}</span></button>;
+            }) : <div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>}
           </div>
         </section>
 

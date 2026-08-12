@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clamp, valuationTargets } from "../../../lib/valuation";
+import { clamp, valuationTargets, type StockInput } from "../../../lib/valuation";
 import { fallbackUsSymbols, findArkUsSnapshot, type ArkUsSnapshotRow } from "../../../lib/ark-directory";
 import { parseYahooTaiwanHtml } from "../../../lib/stock-directory";
 import {
@@ -18,6 +18,8 @@ import fundHoldingsSnapshot from "../../../lib/fund-holdings-snapshot.json";
 import { fundPortfolioBusinessPeProfiles, fundPortfolioPeProfiles, fundPortfolioPeSummary, institutionalSignalForTicker } from "../../../lib/fund-signal";
 import { buildComparableMap } from "../../../lib/market-comparables";
 import { normalizeSector } from "../../../lib/sector-normalization";
+import { financialInputsFromTaiwanHistory, loadTaiwanFinancialHistory } from "../../../lib/taiwan-financials";
+import { readValuationQueryCache, saveValuationQueryCache } from "../../../lib/valuation-cache";
 
 type Market = "TW" | "US";
 
@@ -27,6 +29,7 @@ type ValuationRequest = {
   capturedPrice?: number | null;
   capturedNav?: number | null;
   capturedName?: string | null;
+  refresh?: boolean;
 };
 
 type TwseRatioRow = { Date: string; Code: string; Name: string; PEratio: string; PBratio: string };
@@ -45,6 +48,9 @@ type TpexQuoteRow = {
   Close: string;
 };
 
+type TaiwanListedData = { twseRatios: TwseRatioRow[]; twseDaily: TwseDailyRow[] };
+type TaiwanOtcData = { tpexRatios: TpexRatioRow[]; tpexQuotes: TpexQuoteRow[] };
+
 type SecSubmissions = { sicDescription?: string };
 
 type SecTickerRow = { cik_str: number; ticker: string; title: string };
@@ -55,6 +61,11 @@ const SEC_HEADERS = {
 };
 
 let secTickerMapPromise: Promise<Record<string, SecTickerRow>> | null = null;
+let taiwanMarketDataCache: {
+  expiresAt: number;
+  listed: Promise<TaiwanListedData>;
+  otc: Promise<TaiwanOtcData>;
+} | null = null;
 
 function numeric(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(String(value ?? "").replaceAll(",", ""));
@@ -141,6 +152,25 @@ async function fetchOptionalValue<T>(url: string, headers?: HeadersInit): Promis
   } catch {
     return null;
   }
+}
+
+function taiwanMarketData() {
+  const now = Date.now();
+  if (taiwanMarketDataCache && taiwanMarketDataCache.expiresAt > now) return taiwanMarketDataCache;
+  const tpexHeaders = {
+    Accept: "application/json",
+    "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)",
+  };
+  const listed = Promise.all([
+    fetchOptionalJson<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
+    fetchOptionalJson<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
+  ]).then(([twseRatios, twseDaily]) => ({ twseRatios, twseDaily }));
+  const otc = Promise.all([
+    fetchOptionalJson<TpexRatioRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", tpexHeaders),
+    fetchOptionalJson<TpexQuoteRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", tpexHeaders),
+  ]).then(([tpexRatios, tpexQuotes]) => ({ tpexRatios, tpexQuotes }));
+  taiwanMarketDataCache = { expiresAt: now + 10 * 60 * 1_000, listed, otc };
+  return taiwanMarketDataCache;
 }
 
 async function yahooTaiwanSnapshot(ticker: string) {
@@ -574,22 +604,13 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
 }
 
 async function valueTwStock(body: ValuationRequest, ticker: string) {
-  const [twseRatios, twseDaily] = await Promise.all([
-    fetchOptionalJson<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
-    fetchOptionalJson<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
-  ]);
+  const marketData = taiwanMarketData();
+  const { twseRatios, twseDaily } = await marketData.listed;
   const twseRatio = twseRatios.find((row) => row.Code === ticker);
   const twseQuote = twseDaily.find((row) => row.Code === ticker);
-  const tpexHeaders = {
-    Accept: "application/json",
-    "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)",
-  };
-  const [tpexRatios, tpexQuotes] = twseRatio && twseQuote
-    ? [[], []] as [TpexRatioRow[], TpexQuoteRow[]]
-    : await Promise.all([
-      fetchOptionalJson<TpexRatioRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", tpexHeaders),
-      fetchOptionalJson<TpexQuoteRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", tpexHeaders),
-    ]);
+  const { tpexRatios, tpexQuotes } = twseRatio && twseQuote
+    ? { tpexRatios: [] as TpexRatioRow[], tpexQuotes: [] as TpexQuoteRow[] }
+    : await marketData.otc;
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
   const snapshot = tpexSnapshot.find((row) => row.ticker === ticker);
@@ -660,8 +681,13 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
   const eps = pe > 0 ? price / pe : 0;
   const bvps = pb > 0 ? price / pb : 0;
   if (!eps && !bvps) throw new Error("目前沒有足夠的本益比／淨值比資料可建立估值");
+  const financialHistory = await loadTaiwanFinancialHistory(ticker);
+  const historicalInputs = financialInputsFromTaiwanHistory(financialHistory);
+  const revenueGrowth = historicalInputs?.revenueGrowth ?? 0;
+  const debtRatio = historicalInputs?.debtRatio ?? 0;
   const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
-  const targets = valuationTargets(0, roe, 0);
+  const targets = valuationTargets(revenueGrowth, roe, debtRatio);
+  const hasHistoricalFinancials = financialHistory.length >= 3 && Boolean(historicalInputs);
 
   return {
     ticker,
@@ -671,23 +697,34 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     sector: ratio.exchange === "TWSE" ? "台灣上市公司" : "台灣上櫃公司",
     price,
     eps,
+    epsHistory: historicalInputs?.epsHistory,
     bvps,
-    fcfPerShare: 0,
+    fcfPerShare: historicalInputs?.fcfPerShare ?? 0,
     dividendPerShare: 0,
     targetPe: targets.targetPe,
     targetPb: targets.targetPb,
     targetFcfMultiple: 0,
-    revenueGrowth: 0,
+    revenueGrowth,
     roe,
-    debtRatio: 0,
-    uncertainty: eps > 0 && bvps > 0 ? 0.3 : 0.36,
-    qualityAvailable: false,
-    dataCompleteness: "limited" as const,
-    dataBasis: "market-ratio" as const,
-    financialDataDate: formatTaiwanDate(ratio.date),
+    debtRatio,
+    revenuePerShare: historicalInputs?.revenuePerShare,
+    ebitPerShare: historicalInputs?.ebitPerShare,
+    cashPerShare: historicalInputs?.cashPerShare,
+    debtPerShare: historicalInputs?.debtPerShare,
+    netMargin: historicalInputs?.netMargin,
+    assetTurnover: historicalInputs?.assetTurnover,
+    financialLeverage: historicalInputs?.financialLeverage,
+    taxRate: historicalInputs?.taxRate,
+    uncertainty: hasHistoricalFinancials ? 0.25 : eps > 0 && bvps > 0 ? 0.3 : 0.36,
+    qualityAvailable: hasHistoricalFinancials,
+    dataCompleteness: hasHistoricalFinancials ? "historical" as const : "limited" as const,
+    dataBasis: hasHistoricalFinancials ? "estimated" as const : "market-ratio" as const,
+    financialDataDate: historicalInputs?.financialDataDate ?? formatTaiwanDate(ratio.date),
     updatedAt: formatTaiwanDate(ratio.date),
     source: "自動資料" as const,
-    sourceNote: `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；因未取得現金流、營收成長與負債資料，僅作初步估值且不提供品質分數`,
+    sourceNote: hasHistoricalFinancials
+      ? `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；另以 Yahoo Finance 公開年度財務序列補充 ${financialHistory.length} 年 EPS、營收、現金流及資產負債資料。不同來源與期間可能不完全對齊，因此標示為混合期間估算並保留不確定性。`
+      : `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；多年財報暫時無法取得，因此僅作初步估值且不提供品質分數`,
   };
 }
 
@@ -699,6 +736,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "股票代碼格式不正確" }, { status: 400 });
     }
     const market: Market = body.market ?? (/^\d/.test(ticker) ? "TW" : "US");
+    const canUseCache = !body.refresh && !numeric(body.capturedPrice) && !numeric(body.capturedNav) && !body.capturedName?.trim();
+    if (canUseCache) {
+      const cached = await readValuationQueryCache(market, ticker);
+      if (cached) return NextResponse.json({ stock: cached, cache: "d1" });
+    }
     const stock = market === "TW" ? await valueTwStock(body, ticker) : await valueUsStock(body, ticker);
     const institutionalSignal = institutionalSignalForTicker(fundHoldingsSnapshot, ticker);
     const fundPortfolioPe = fundPortfolioPeSummary(fundHoldingsSnapshot, fundPeReferences);
@@ -708,15 +750,17 @@ export async function POST(request: NextRequest) {
     const fundBusinessPe = market === "US"
       ? fundBusinessPeProfiles.find((profile) => profile.tickers.includes(stock.ticker.toUpperCase()))
       : undefined;
-    return NextResponse.json({
-      stock: {
+    const enrichedStock: StockInput = {
         ...stock,
         ...(institutionalSignal ? { institutionalSignal } : {}),
         ...(fundPortfolioPe ? { fundPortfolioPe } : {}),
         ...(fundSectorPe ? { fundSectorPe } : {}),
         ...(fundBusinessPe ? { fundBusinessPe } : {}),
-      },
-    });
+    };
+    if (!numeric(body.capturedPrice) && !numeric(body.capturedNav) && !body.capturedName?.trim()) {
+      await saveValuationQueryCache(enrichedStock);
+    }
+    return NextResponse.json({ stock: enrichedStock, cache: "live" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "暫時無法取得估值資料";
     return NextResponse.json({ error: message }, { status: 422 });

@@ -93,15 +93,18 @@ async function saveImportLog(rows: ImportCandidate[]) {
       confidence: stock.valuationConfidence,
     }];
   });
-  if (!observations.length) return;
+  if (!observations.length) return 0;
   try {
-    await fetch("/api/ark-log", {
+    const response = await fetch("/api/ark-log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ observations }),
     });
+    const payload = await response.json() as { saved?: number };
+    return response.ok && Number.isFinite(payload.saved) ? Number(payload.saved) : null;
   } catch {
     // The import itself remains successful when the optional research log is unavailable.
+    return null;
   }
 }
 
@@ -111,6 +114,7 @@ export default function ArkPage() {
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("尚未上傳截圖");
   const [isImporting, setIsImporting] = useState(false);
+  const [savedLogCount, setSavedLogCount] = useState<number | null>(null);
 
   async function requestValuation(candidate: Omit<ImportCandidate, "status" | "message" | "stock">) {
     const response = await fetch("/api/valuation", {
@@ -136,6 +140,7 @@ export default function ArkPage() {
     setProgress(2);
     setMessage(`準備辨識 ${files.length} 張截圖`);
     setCandidates([]);
+    setSavedLogCount(null);
 
     try {
       const { createWorker } = await import("tesseract.js");
@@ -199,7 +204,7 @@ export default function ArkPage() {
 
       const addedStocks = resolved.flatMap((candidate) => candidate.stock ? [candidate.stock] : []);
       mergeIntoStorage(addedStocks);
-      await saveImportLog(resolved);
+      setSavedLogCount(await saveImportLog(resolved));
       setCandidates(resolved);
       setProgress(100);
       const fallbackNote = importPayload.usedFallbackDirectory ? "（已啟用內建名錄備援）" : "";
@@ -242,6 +247,9 @@ export default function ArkPage() {
             <div className="import-status" aria-live="polite">
               <div><span>{language === "zh" ? message : translateMessage(message)}</span><b>{progress}%</b></div>
               <span className="import-progress"><i style={{ width: `${progress}%` }} /></span>
+              {savedLogCount !== null && <small className={savedLogCount > 0 ? "ark-log-saved" : "ark-log-unavailable"}>{savedLogCount > 0
+                ? t(`已保存 ${savedLogCount} 筆當下估值紀錄；原始圖片不保存`, `${savedLogCount} point-in-time valuation record(s) saved; source images are not stored`)
+                : t("本次未保存長期紀錄；估值匯入仍已完成", "The long-term log was not saved; valuation import still completed")}</small>}
             </div>
           </div>
         </section>

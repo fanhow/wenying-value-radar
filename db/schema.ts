@@ -47,3 +47,32 @@ export const arkImportObservations = sqliteTable("ark_import_observations", {
   index("idx_ark_import_observations_ticker_time").on(table.ticker, table.importedAt),
   index("idx_ark_import_observations_batch").on(table.batchId),
 ]);
+
+export const valuationQueryCache = sqliteTable("valuation_query_cache", {
+  market: text("market").notNull(),
+  ticker: text("ticker").notNull(),
+  payload: text("payload").notNull(),
+  cachedAt: text("cached_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.market, table.ticker] })]);
+
+export const taiwanFinancialHistory = sqliteTable("taiwan_financial_history", {
+  ticker: text("ticker").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  periodEnd: text("period_end").notNull(),
+  eps: real("eps"),
+  revenue: real("revenue"),
+  operatingCashFlow: real("operating_cash_flow"),
+  capitalExpenditure: real("capital_expenditure"),
+  assets: real("assets"),
+  liabilities: real("liabilities"),
+  equity: real("equity"),
+  shares: real("shares"),
+  netIncome: real("net_income"),
+  ebit: real("ebit"),
+  cashAndInvestments: real("cash_and_investments"),
+  totalDebt: real("total_debt"),
+  taxProvision: real("tax_provision"),
+  pretaxIncome: real("pretax_income"),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.ticker, table.fiscalYear] })]);

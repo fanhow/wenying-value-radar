@@ -88,3 +88,26 @@ test("keeps a partial daily price run when one public source is unavailable", as
   assert.equal(result.status, "partial");
   assert.equal(result.priceCount, 2);
 });
+
+test("maps each public source's volume field into price snapshots", async () => {
+  const database = fakeDatabase();
+  const fetcher = async (url) => {
+    if (url.includes("tpex.org.tw")) {
+      return { ok: true, status: 200, json: async () => [{ SecuritiesCompanyCode: "6488", CompanyName: "GlobalWafers", Close: "500", TradingShares: "1,234" }] };
+    }
+    if (url.includes("twse.com.tw")) {
+      return { ok: true, status: 200, json: async () => [{ Code: "2330", Name: "TSMC", ClosingPrice: "100", TradeVolume: "2,345" }] };
+    }
+    return { ok: true, status: 200, json: async () => ({ data: { rows: [{ symbol: "AAPL", name: "Apple Inc.", lastsale: "$300", volume: "3,456" }] } }) };
+  };
+
+  const result = await runSnapshotJob("daily-price", { database, fetcher });
+  const priceWrites = database.calls.filter((call) => String(call.sql ?? "").includes("INSERT INTO market_price_snapshots"));
+  const volumeByTicker = new Map(priceWrites.map((call) => [call.args[1], call.args[5]]));
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.priceCount, 3);
+  assert.equal(volumeByTicker.get("2330"), 2345);
+  assert.equal(volumeByTicker.get("6488"), 1234);
+  assert.equal(volumeByTicker.get("AAPL"), 3456);
+});

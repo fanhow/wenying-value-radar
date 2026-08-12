@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseYahooDailyCandles, yahooHistorySymbols } from "../../../lib/price-history";
+import {
+  parseYahooDailyCandles,
+  parseYahooCorporateActions,
+  tradingViewSymbolFromYahoo,
+  yahooHistorySymbols,
+  type YahooChartPayload,
+} from "../../../lib/price-history";
 
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker")?.trim().toUpperCase() ?? "";
@@ -9,7 +15,7 @@ export async function GET(request: NextRequest) {
   for (const symbol of yahooHistorySymbols(ticker, market)) {
     try {
       const response = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=6mo&events=history`,
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5y&events=div%2Csplits`,
         {
           headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)" },
           next: { revalidate: 60 * 60 },
@@ -17,8 +23,13 @@ export async function GET(request: NextRequest) {
         },
       );
       if (!response.ok) continue;
-      const candles = parseYahooDailyCandles(await response.json());
-      if (candles.length >= 20) return NextResponse.json({ ticker, market, symbol, candles });
+      const payload = await response.json() as YahooChartPayload;
+      const candles = parseYahooDailyCandles(payload);
+      const corporateActions = parseYahooCorporateActions(payload);
+      const tradingViewSymbol = tradingViewSymbolFromYahoo(payload, symbol);
+      if (candles.length >= 20 && tradingViewSymbol) {
+        return NextResponse.json({ ticker, market, symbol, tradingViewSymbol, candles, corporateActions });
+      }
     } catch {
       // Try the next exchange suffix. Taiwan listed stocks use .TW while OTC
       // stocks use .TWO, and the valuation object intentionally stays exchange-neutral.
@@ -27,4 +38,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ ticker, market, candles: [], error: "history unavailable" }, { status: 404 });
 }
-

@@ -149,6 +149,9 @@ a { color: inherit; text-decoration: none; }
 .import-status b { color: var(--green); }
 .import-progress { height: 4px; display: block; margin-top: 8px; overflow: hidden; border-radius: 9px; background: #e4ece7; }
 .import-progress i { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--green), #70b89a); transition: width .25s ease; }
+.import-status > small { display: block; margin-top: 8px; font-size: 9px; }
+.ark-log-saved { color: var(--green); }
+.ark-log-unavailable { color: var(--red); }
 .import-results { max-height: 205px; margin-top: 12px; overflow: auto; border-top: 1px solid var(--line); }
 .import-row { display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: center; padding: 9px 3px; border-bottom: 1px solid #edf1ee; }
 .import-row strong { display: block; color: var(--ink); font-size: 11px; }
@@ -232,8 +235,12 @@ a { color: inherit; text-decoration: none; }
 .range-hint { font-size: 9px; }
 .upside-value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .trend-mark { margin-right: 3px; font-size: 20px; font-weight: 500; }
+.trend-mark.direction-up, .card-arrow.direction-up { color: var(--red) !important; }
+.trend-mark.direction-down, .card-arrow.direction-down { color: var(--green) !important; }
+.trend-mark.direction-flat, .card-arrow.direction-flat { color: var(--ink-faint) !important; }
 .text-positive { color: var(--green) !important; }
 .text-negative { color: var(--red) !important; }
+.text-flat { color: var(--ink-soft) !important; }
 .text-uncertain { color: #956f2b !important; }
 .quality-score { display: flex; align-items: center; gap: 8px; }
 .quality-score strong { width: 22px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
@@ -369,16 +376,18 @@ a { color: inherit; text-decoration: none; }
 .quality-meter { margin-top: 17px; }
 .quality-meter > div:first-child { color: var(--ink-faint); font-size: 9px; }
 .quality-meter strong { color: var(--green); font-size: 11px; }
-.price-chart-section { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfb; }
+.price-chart-section { min-width: 0; grid-column: 2; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #fbfcfb; }
 .chart-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .chart-title-row > div { min-width: 0; }
-.chart-title-row strong { flex: 0 0 auto; font-size: 12px; font-variant-numeric: tabular-nums; }
-.chart-up { color: var(--red); }
-.chart-down { color: var(--green); }
-.price-chart-canvas { width: 100%; display: block; margin-top: 10px; }
-.price-chart-canvas.is-hidden { display: none; }
+.chart-title-row a { flex: 0 0 auto; color: var(--blue); font-size: 9px; }
+.chart-title-row a:hover { text-decoration: underline; }
+.corporate-action-warning { margin-top: 10px; padding: 10px 11px; border: 1px solid #e6c98b; border-radius: 7px; background: #fff9ea; }
+.corporate-action-warning strong { color: #8a641f; font-size: 10px; }
+.corporate-action-warning p { margin: 5px 0 0; color: #7a683f; font-size: 9px; line-height: 1.6; }
+.public-chart-widget { width: 100%; height: 420px; margin-top: 10px; overflow: hidden; border-radius: 6px; }
 .chart-state { min-height: 250px; display: grid; place-items: center; color: var(--ink-faint); font-size: 10px; text-align: center; }
 .chart-footnote { margin: 4px 0 0; color: var(--ink-faint); font-size: 8px; line-height: 1.5; }
+.chart-footnote a { color: var(--blue); }
 .meter { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 7px; background: #e8efeb; }
 .meter span { height: 100%; display: block; border-radius: inherit; background: var(--green); }
 .confidence-warning { margin-top: 20px; padding: 14px 15px; border: 1px solid #ead8a9; border-radius: 8px; background: #fffbf1; }
@@ -615,6 +624,7 @@ a { color: inherit; text-decoration: none; }
   .range-hint { line-height: 1.45; }
   .table-footer { padding-inline: 18px; }
   .detail-panel { display: block; padding: 20px 18px; }
+  .price-chart-section { grid-column: auto; }
   .price-hero { grid-template-columns: 1fr; }
   .price-hero strong { white-space: nowrap; }
   .institutional-signal-heading { display: block; }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseYahooDailyCandles, yahooHistorySymbols } from "../lib/price-history.ts";
+import { parseYahooCorporateActions, parseYahooDailyCandles, tradingViewSymbolFromYahoo, yahooHistorySymbols } from "../lib/price-history.ts";
 
 test("parses aligned Yahoo daily OHLCV rows and drops incomplete candles", () => {
   const candles = parseYahooDailyCandles({ chart: { result: [{
@@ -17,3 +17,20 @@ test("tries listed then OTC suffixes for Taiwan tickers", () => {
   assert.deepEqual(yahooHistorySymbols("AAPL", "US"), ["AAPL"]);
 });
 
+test("maps Yahoo exchange metadata to TradingView symbols", () => {
+  assert.equal(tradingViewSymbolFromYahoo({ chart: { result: [{ meta: { symbol: "1808.TW", exchangeName: "TAI" } }] } }, "1808.TW"), "TWSE:1808");
+  assert.equal(tradingViewSymbolFromYahoo({ chart: { result: [{ meta: { symbol: "6488.TWO", exchangeName: "TWO" } }] } }, "6488.TWO"), "TPEX:6488");
+  assert.equal(tradingViewSymbolFromYahoo({ chart: { result: [{ meta: { symbol: "AMAT", exchangeName: "NMS" } }] } }, "AMAT"), "NASDAQ:AMAT");
+  assert.equal(tradingViewSymbolFromYahoo({ chart: { result: [{ meta: { symbol: "SO", exchangeName: "NYQ" } }] } }, "SO"), "NYSE:SO");
+});
+
+test("detects stock distributions and capital adjustments without changing valuation", () => {
+  const actions = parseYahooCorporateActions({ chart: { result: [{ events: { splits: {
+    a: { date: 1_727_312_400, numerator: 2200, denominator: 1000, splitRatio: "2200:1000" },
+    b: { date: 1_762_995_600, numerator: 900, denominator: 1000, splitRatio: "900:1000" },
+  } } }] } }, new Date("2026-08-12T00:00:00.000Z"));
+  assert.deepEqual(actions.map((action) => [action.type, action.ratio]), [
+    ["capital-adjustment", 0.9],
+    ["stock-distribution", 2.2],
+  ]);
+});
