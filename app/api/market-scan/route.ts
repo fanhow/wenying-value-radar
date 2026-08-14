@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildComparableMap } from "../../../lib/market-comparables";
 import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
 import type { StockInput } from "../../../lib/valuation";
+import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
 import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
 import {
@@ -14,6 +15,7 @@ import {
 
 type TwseRatioRow = { Date?: string; Code?: string; Name?: string; PEratio?: string; PBratio?: string };
 type TwseDailyRow = { Date?: string; Code?: string; Name?: string; ClosingPrice?: string; TradeVolume?: string };
+type TaiwanCompanyRow = Record<string, unknown>;
 
 async function optionalRows<T>(url: string): Promise<T[]> {
   try {
@@ -26,10 +28,14 @@ async function optionalRows<T>(url: string): Promise<T[]> {
 }
 
 export async function GET() {
-  const [twseRatios, twseDaily] = await Promise.all([
+  const [twseRatios, twseDaily, twseCompanyData, tpexCompanyData] = await Promise.all([
     optionalRows<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
     optionalRows<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
+    optionalRows<TaiwanCompanyRow>("https://openapi.twse.com.tw/v1/opendata/t187ap03_L"),
+    optionalRows<TaiwanCompanyRow>("https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"),
   ]);
+  const twseIndustryByTicker = buildTaiwanIndustryMap(twseCompanyData, "TWSE");
+  const tpexIndustryByTicker = buildTaiwanIndustryMap(tpexCompanyData, "TPEx");
   const twsePriceByTicker = new Map(twseDaily.map((row) => [row.Code, row]));
   const listed: MarketScanRow[] = twseRatios.map((row) => {
     const quote = twsePriceByTicker.get(row.Code);
@@ -42,6 +48,8 @@ export async function GET() {
       date: row.Date || quote?.Date,
       sector: "台灣上市公司",
       market: "TW",
+      industry: twseIndustryByTicker.get(row.Code ?? ""),
+      listingBoard: "TWSE",
       volume: quote?.TradeVolume ?? 0,
     };
   });
@@ -54,6 +62,8 @@ export async function GET() {
     date: row.date,
     sector: "台灣上櫃公司",
     market: "TW",
+    industry: tpexIndustryByTicker.get(row.ticker),
+    listingBoard: "TPEx",
     volume: row.volume,
   }));
   const taiwanUniverse = [...listed, ...otc].filter((row) => /^\d{4}$/.test(row.ticker) && Number(row.price) > 0);

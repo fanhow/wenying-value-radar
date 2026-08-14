@@ -40,6 +40,9 @@ export type MarketScanRow = {
   date?: string;
   sector: string;
   market?: Market;
+  /** Display-only classification metadata from the exchange feed. */
+  industry?: string;
+  listingBoard?: "TWSE" | "TPEx";
   eps?: string | number;
   bvps?: string | number;
   revenueGrowth?: string | number | null;
@@ -134,6 +137,8 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     name: row.name,
     market,
     sector: normalizeSector(row.ticker, row.name, row.sector),
+    industry: row.industry,
+    listingBoard: row.listingBoard,
     price,
     eps,
     epsHistory: row.epsHistory,

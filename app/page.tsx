@@ -50,6 +50,18 @@ function formatPrice(value: number, market: Market) {
   return market === "TW" ? `NT$ ${numberFormatter.format(value)}` : `US$ ${numberFormatter.format(value)}`;
 }
 
+function listingLabel(stock: Pick<StockInput, "market" | "listingBoard">, language: Language) {
+  if (stock.market === "US") return language === "zh" ? "美國公開發行公司" : "U.S. public company";
+  if (stock.listingBoard === "TWSE") return language === "zh" ? "台灣上市公司" : "Taiwan listed company";
+  if (stock.listingBoard === "TPEx") return language === "zh" ? "台灣上櫃公司" : "Taiwan OTC company";
+  return language === "zh" ? "台灣公司" : "Taiwan company";
+}
+
+function stockDescriptor(stock: Pick<StockInput, "name" | "market" | "sector" | "industry" | "listingBoard">, language: Language) {
+  const industry = stock.industry || (stock.market === "US" ? stock.sector : undefined);
+  return [stock.name, industry, listingLabel(stock, language)].filter(Boolean).join(" · ");
+}
+
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
 }
@@ -450,7 +462,8 @@ export default function Home() {
         !normalizedQuery ||
         stock.ticker.toLowerCase().includes(normalizedQuery) ||
         stock.name.toLowerCase().includes(normalizedQuery) ||
-        stock.sector.toLowerCase().includes(normalizedQuery);
+        stock.sector.toLowerCase().includes(normalizedQuery) ||
+        stock.industry?.toLowerCase().includes(normalizedQuery);
       const matchesFilter =
         filter === "all" ||
         (filter === "undervalued" && stock.upside >= 0.1) ||
@@ -771,7 +784,7 @@ export default function Home() {
                     const direction = valuationDirection(stock.upside);
                     return (
                       <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} role="button" tabIndex={0} onClick={() => openRankedStock(stock.ticker)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRankedStock(stock.ticker); } }}>
-                        <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stock.name} · {stock.sector}</small></span></div></td>
+                        <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stockDescriptor(stock, language)}</small></span></div></td>
                         <td data-label={t("目前價格", "Current Price")}><span className="table-number">{formatPrice(stock.price, stock.market)}</span></td>
                         <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(stock.fairValue, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("區間", "Range")} ${formatPrice(stock.rangeLow, stock.market)} – ${formatPrice(stock.rangeHigh, stock.market)}`}</small></td>
                         <td data-label={t("估值差距", "Valuation Gap")}><span className={`upside-value ${stock.valuationConfidence === "low" ? "text-uncertain" : directionTextClass(direction)}`}><TrendMark direction={direction} /> {formatSignedPercent(stock.upside)}</span></td>
@@ -790,7 +803,7 @@ export default function Home() {
           {selected && (
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 01</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
-              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{selected.name} · {selected.sector}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
+              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{stockDescriptor(selected, language)}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong className={selected.isLimitUp ? "limit-up-price" : ""}>{formatPrice(selected.price, selected.market)}</strong>{selected.priceChangePercent !== undefined && <small className={selected.priceChangePercent >= 0 ? "quote-up" : "quote-down"}>{selected.priceChange !== undefined ? `${selected.priceChange >= 0 ? "+" : ""}${formatNumber(selected.priceChange)} ` : ""}({formatSignedPercent(selected.priceChangePercent)}){selected.isLimitUp ? ` · ${t("漲停", "Limit up")}` : ""}</small>}{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}{selected.priceSource ? ` · ${selected.priceSource}` : ""}</small>}</div><div className={selected.valuationConfidence === "low" ? "hero-upside neutral-box" : selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : modelDirectionLabel(selectedDirection, language)}</span><strong><TrendMark direction={selectedDirection} /> {formatSignedPercent(selected.upside)}</strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}

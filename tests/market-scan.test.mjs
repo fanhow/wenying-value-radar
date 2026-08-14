@@ -8,6 +8,7 @@ import {
   selectTopMarketCandidates,
 } from "../lib/market-scan.ts";
 import { buildComparableMap } from "../lib/market-comparables.ts";
+import { buildTaiwanIndustryMap } from "../lib/taiwan-industry.ts";
 import fundHoldingsSnapshot from "../lib/fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "../lib/us-market-snapshot.json" with { type: "json" };
 
@@ -168,6 +169,27 @@ test("marks Taiwan ratio rows as market-ratio data", () => {
 
   assert.equal(stock?.dataBasis, "market-ratio");
   assert.equal(stock?.revenuePerShare, undefined);
+});
+
+test("carries Taiwan industry and listing-board metadata without changing the valuation sector", () => {
+  const industry = buildTaiwanIndustryMap([
+    { "公司代號": "2605", "產業別": "15" },
+  ], "TWSE");
+  const stock = marketStockFromRatio({
+    ticker: "2605",
+    name: "新興",
+    price: 50,
+    pe: 8,
+    pb: 1,
+    sector: "台灣上市公司",
+    industry: industry.get("2605"),
+    listingBoard: "TWSE",
+    volume: 1_000_000,
+  });
+
+  assert.equal(stock?.industry, "航運業");
+  assert.equal(stock?.listingBoard, "TWSE");
+  assert.equal(stock?.sector, "台灣上市公司");
 });
 
 test("selects and sorts the most overvalued candidates", () => {

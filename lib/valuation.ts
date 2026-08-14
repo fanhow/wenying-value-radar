@@ -4,6 +4,7 @@ import type { ComparableMultiples } from "./market-comparables.ts";
 import { classifyFinancialFreshness, financialAgeDays, type FinancialFreshness } from "./data-freshness.ts";
 
 export type Market = "TW" | "US";
+export type TaiwanListingBoard = "TWSE" | "TPEx";
 export type RiskLevel = "低" | "中" | "高";
 export type DataCompleteness = "complete" | "historical" | "limited";
 export type ValuationConfidence = "high" | "medium" | "low";
@@ -57,6 +58,10 @@ export type StockInput = {
   name: string;
   market: Market;
   sector: string;
+  /** Display-only Taiwan industry metadata; it does not alter valuation inputs. */
+  industry?: string;
+  /** Display-only exchange board metadata for Taiwan listings. */
+  listingBoard?: TaiwanListingBoard;
   price: number;
   eps: number;
   bvps: number;

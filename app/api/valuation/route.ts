@@ -18,6 +18,7 @@ import fundHoldingsSnapshot from "../../../lib/fund-holdings-snapshot.json";
 import { fundPortfolioBusinessPeProfiles, fundPortfolioPeProfiles, fundPortfolioPeSummary, institutionalSignalForTicker } from "../../../lib/fund-signal";
 import { buildComparableMap } from "../../../lib/market-comparables";
 import { normalizeSector } from "../../../lib/sector-normalization";
+import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry";
 import { financialInputsFromTaiwanHistory, loadTaiwanFinancialHistory } from "../../../lib/taiwan-financials";
 import { readValuationQueryCache, saveValuationQueryCache } from "../../../lib/valuation-cache";
 import {
@@ -54,8 +55,17 @@ type TpexQuoteRow = {
   Close: string;
 };
 
-type TaiwanListedData = { twseRatios: TwseRatioRow[]; twseDaily: TwseDailyRow[] };
-type TaiwanOtcData = { tpexRatios: TpexRatioRow[]; tpexQuotes: TpexQuoteRow[] };
+type TaiwanListedData = {
+  twseRatios: TwseRatioRow[];
+  twseDaily: TwseDailyRow[];
+  twseCompanyData: TaiwanCompanyRow[];
+};
+type TaiwanOtcData = {
+  tpexRatios: TpexRatioRow[];
+  tpexQuotes: TpexQuoteRow[];
+  tpexCompanyData: TaiwanCompanyRow[];
+};
+type TaiwanCompanyRow = Record<string, unknown>;
 
 type SecSubmissions = { sicDescription?: string };
 
@@ -170,11 +180,13 @@ function taiwanMarketData() {
   const listed = Promise.all([
     fetchOptionalJson<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
     fetchOptionalJson<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
-  ]).then(([twseRatios, twseDaily]) => ({ twseRatios, twseDaily }));
+    fetchOptionalJson<TaiwanCompanyRow>("https://openapi.twse.com.tw/v1/opendata/t187ap03_L"),
+  ]).then(([twseRatios, twseDaily, twseCompanyData]) => ({ twseRatios, twseDaily, twseCompanyData }));
   const otc = Promise.all([
     fetchOptionalJson<TpexRatioRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis", tpexHeaders),
     fetchOptionalJson<TpexQuoteRow>("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", tpexHeaders),
-  ]).then(([tpexRatios, tpexQuotes]) => ({ tpexRatios, tpexQuotes }));
+    fetchOptionalJson<TaiwanCompanyRow>("https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O", tpexHeaders),
+  ]).then(([tpexRatios, tpexQuotes, tpexCompanyData]) => ({ tpexRatios, tpexQuotes, tpexCompanyData }));
   taiwanMarketDataCache = { expiresAt: now + 10 * 60 * 1_000, listed, otc };
   return taiwanMarketDataCache;
 }
@@ -630,11 +642,11 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
 
 async function valueTwStock(body: ValuationRequest, ticker: string) {
   const marketData = taiwanMarketData();
-  const { twseRatios, twseDaily } = await marketData.listed;
+  const { twseRatios, twseDaily, twseCompanyData } = await marketData.listed;
   const twseRatio = twseRatios.find((row) => row.Code === ticker);
   const twseQuote = twseDaily.find((row) => row.Code === ticker);
-  const { tpexRatios, tpexQuotes } = twseRatio && twseQuote
-    ? { tpexRatios: [] as TpexRatioRow[], tpexQuotes: [] as TpexQuoteRow[] }
+  const { tpexRatios, tpexQuotes, tpexCompanyData } = twseRatio && twseQuote
+    ? { tpexRatios: [] as TpexRatioRow[], tpexQuotes: [] as TpexQuoteRow[], tpexCompanyData: [] as TaiwanCompanyRow[] }
     : await marketData.otc;
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
@@ -664,6 +676,12 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       : yahoo
         ? { date: yahoo.updatedAt, name: yahoo.name, close: String(yahoo.price), exchange: "TPEx" }
       : null;
+  const listingBoard = ratio?.exchange === "TWSE" ? "TWSE" as const : ratio?.exchange === "TPEx" ? "TPEx" as const : undefined;
+  const industry = listingBoard === "TWSE"
+    ? buildTaiwanIndustryMap(twseCompanyData, "TWSE").get(ticker)
+    : listingBoard === "TPEx"
+      ? buildTaiwanIndustryMap(tpexCompanyData, "TPEx").get(ticker)
+      : undefined;
   const liveQuote = await yahooTaiwanMarketQuote(ticker, ratio?.exchange ?? quote?.exchange, Boolean(body.refresh));
   const capturedNav = numeric(body.capturedNav);
   const closingPrice = numeric(quote?.close);
@@ -683,6 +701,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       market: "TW" as const,
       assetType: "ETF" as const,
       sector: "ETF",
+      listingBoard,
       price: price || capturedNav,
       ...(useLiveQuote && liveQuote ? {
         priceChange: liveQuote.change,
@@ -736,6 +755,8 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     market: "TW" as const,
     assetType: "EQUITY" as const,
     sector: ratio.exchange === "TWSE" ? "台灣上市公司" : "台灣上櫃公司",
+    industry,
+    listingBoard,
     price,
     ...(useLiveQuote && liveQuote ? {
       priceChange: liveQuote.change,
