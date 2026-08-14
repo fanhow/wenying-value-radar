@@ -6,6 +6,7 @@ const developmentPreviewMeta =
   /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
 
 test("renders development preview metadata", async () => {
+  const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -36,13 +37,16 @@ test("renders development preview metadata", async () => {
   assert.match(html, /關於我們/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
-  assert.match(html, /MARKET SCAN \/ 04/);
+  assert.match(html, /MARKET SCAN \/ 02/);
+  assert.match(source, /VALUATION \/ 01/);
+  assert.match(source, /MY WATCHLIST \/ 03/);
+  assert.match(source, /ticker: firstCandidate\.ticker, market: firstCandidate\.market, refresh: true/);
   assert.doesNotMatch(html, /我們不是賭徒/);
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.13\.1/);
+  assert.match(html, /Rev\. 2026\.08\.14\.1/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
@@ -56,7 +60,7 @@ test("keeps the local preview working when Cloudflare env bindings are absent", 
   );
 
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /MARKET SCAN \/ 04/);
+  assert.match(await response.text(), /MARKET SCAN \/ 02/);
 });
 
 test("valuation details expose the bilingual model audit trail", async () => {

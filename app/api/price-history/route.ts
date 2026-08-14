@@ -6,6 +6,7 @@ import {
   yahooHistorySymbols,
   type YahooChartPayload,
 } from "../../../lib/price-history";
+import { analyzeTechnicalSetup } from "../../../lib/technical-analysis";
 
 export async function GET(request: NextRequest) {
   const ticker = request.nextUrl.searchParams.get("ticker")?.trim().toUpperCase() ?? "";
@@ -24,11 +25,20 @@ export async function GET(request: NextRequest) {
       );
       if (!response.ok) continue;
       const payload = await response.json() as YahooChartPayload;
-      const candles = parseYahooDailyCandles(payload);
+      const allCandles = parseYahooDailyCandles(payload, 1_300);
+      const candles = allCandles.slice(-120);
       const corporateActions = parseYahooCorporateActions(payload);
       const tradingViewSymbol = tradingViewSymbolFromYahoo(payload, symbol);
       if (candles.length >= 20 && tradingViewSymbol) {
-        return NextResponse.json({ ticker, market, symbol, tradingViewSymbol, candles, corporateActions });
+        return NextResponse.json({
+          ticker,
+          market,
+          symbol,
+          tradingViewSymbol,
+          candles,
+          corporateActions,
+          technicalAnalysis: analyzeTechnicalSetup(allCandles),
+        });
       }
     } catch {
       // Try the next exchange suffix. Taiwan listed stocks use .TW while OTC

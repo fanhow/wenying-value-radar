@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CorporateAction, DailyCandle } from "../lib/price-history";
+import type { TechnicalAnalysis } from "../lib/technical-analysis";
 import type { Language } from "./language-context";
 
 type Props = { ticker: string; market: "TW" | "US"; language: Language };
@@ -11,6 +12,7 @@ type ChartResult = {
   tradingViewSymbol: string;
   candles: DailyCandle[];
   corporateActions: CorporateAction[];
+  technicalAnalysis: TechnicalAnalysis | null;
   state: "ready" | "empty";
 };
 
@@ -119,6 +121,49 @@ function TradingViewChart({ symbol, language }: { symbol: string; language: Lang
   return <div ref={containerRef} className="tradingview-widget-container public-chart-widget" />;
 }
 
+function formatIndicator(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return value.toFixed(value >= 100 ? 1 : 2);
+}
+
+function TechnicalAnalysisPanel({ analysis, language }: { analysis: TechnicalAnalysis; language: Language }) {
+  const movingAverageTitle = analysis.movingAverageSignal === "recent-golden-cross"
+    ? (language === "zh" ? "近期黃金交叉" : "Recent golden cross")
+    : analysis.movingAverageSignal === "bullish-alignment"
+      ? (language === "zh" ? "均線多頭排列" : "Bullish MA alignment")
+      : analysis.movingAverageSignal === "bearish"
+        ? (language === "zh" ? "短線均線偏弱" : "Short MAs weakening")
+        : (language === "zh" ? "均線仍在整理" : "Mixed moving averages");
+  const movingAverageTone = analysis.movingAverageSignal === "recent-golden-cross" || analysis.movingAverageSignal === "bullish-alignment"
+    ? "positive"
+    : analysis.movingAverageSignal === "bearish" ? "caution" : "neutral";
+  const wTitle = analysis.wBottom === "confirmed"
+    ? (language === "zh" ? "疑似 W 底已突破" : "Possible W-bottom breakout")
+    : analysis.wBottom === "forming"
+      ? (language === "zh" ? "疑似 W 底成形中" : "Possible W-bottom forming")
+      : (language === "zh" ? "尚未確認 W 底" : "No confirmed W-bottom");
+  const weeklyPosition = analysis.weeklyRangePosition === null ? null : Math.round(analysis.weeklyRangePosition * 100);
+  const monthlyPosition = analysis.monthlyRangePosition === null ? null : Math.round(analysis.monthlyRangePosition * 100);
+  const positionText = (value: number | null, periodZh: string, periodEn: string) => value === null
+    ? (language === "zh" ? "資料不足" : "Insufficient data")
+    : language === "zh"
+      ? `${periodZh}價格區間第 ${value}% 位置${value <= 35 ? "，仍在相對低檔" : value >= 70 ? "，已接近相對高檔" : "，位於中段"}`
+      : `${value}% of the ${periodEn} range${value <= 35 ? "; still relatively low" : value >= 70 ? "; near the upper range" : "; mid-range"}`;
+
+  return <div className="technical-analysis-panel" role="note">
+    <div className="technical-analysis-heading">
+      <div><strong>{language === "zh" ? "規則式技術提示" : "Rule-based technical signals"}</strong><span>{language === "zh" ? `資料截至 ${analysis.asOf}` : `Data through ${analysis.asOf}`}</span></div>
+      <small>{language === "zh" ? "只提示型態，不是買賣建議" : "Pattern hints, not trading advice"}</small>
+    </div>
+    <div className="technical-analysis-grid">
+      <div className={`technical-signal ${movingAverageTone}`}><span>{language === "zh" ? "日線均線" : "Daily averages"}</span><strong>{movingAverageTitle}</strong><small>MA5 {formatIndicator(analysis.ma5)} · MA20 {formatIndicator(analysis.ma20)} · MA60 {formatIndicator(analysis.ma60)}{analysis.volumeRatio20 !== null ? ` · ${language === "zh" ? "量能" : "Volume"} ${analysis.volumeRatio20.toFixed(1)}x` : ""}</small></div>
+      <div className={`technical-signal ${analysis.wBottom === "confirmed" ? "positive" : analysis.wBottom === "forming" ? "neutral" : "muted"}`}><span>{language === "zh" ? "日線型態" : "Daily pattern"}</span><strong>{wTitle}</strong><small>{analysis.wBottomNeckline !== null ? `${language === "zh" ? "頸線約" : "Neckline near"} ${formatIndicator(analysis.wBottomNeckline)} · ${language === "zh" ? "雙低約" : "Twin lows near"} ${formatIndicator(analysis.wBottomLow)}` : (language === "zh" ? "規則尚未找到兩個接近低點與有效頸線" : "No two comparable lows and valid neckline detected")}</small></div>
+      <div className={`technical-signal ${weeklyPosition !== null && weeklyPosition <= 35 ? "positive" : "neutral"}`}><span>{language === "zh" ? "週線位置" : "Weekly position"}</span><strong>{weeklyPosition === null ? "—" : `${weeklyPosition}%`}</strong><small>{positionText(weeklyPosition, "近 52 週", "52-week")}</small></div>
+      <div className={`technical-signal ${monthlyPosition !== null && monthlyPosition <= 35 ? "positive" : monthlyPosition !== null && monthlyPosition >= 70 ? "caution" : "neutral"}`}><span>{language === "zh" ? "月線位置" : "Monthly position"}</span><strong>{monthlyPosition === null ? "—" : `${monthlyPosition}%`}</strong><small>{positionText(monthlyPosition, "近 36 個月", "36-month")}</small></div>
+    </div>
+  </div>;
+}
+
 export function DailyCandlestickChart({ ticker, market, language }: Props) {
   const requestUrl = `/api/price-history?ticker=${encodeURIComponent(ticker)}&market=${market}`;
   const [result, setResult] = useState<ChartResult | null>(null);
@@ -129,7 +174,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
     const controller = new AbortController();
     void fetch(requestUrl, { signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { symbol?: string; tradingViewSymbol?: string; candles?: DailyCandle[]; corporateActions?: CorporateAction[] };
+        const payload = await response.json() as { symbol?: string; tradingViewSymbol?: string; candles?: DailyCandle[]; corporateActions?: CorporateAction[]; technicalAnalysis?: TechnicalAnalysis | null };
         const yahooSymbol = String(payload.symbol ?? "").trim();
         const tradingViewSymbol = String(payload.tradingViewSymbol ?? "").trim();
         const candles = Array.isArray(payload.candles) ? payload.candles : [];
@@ -139,12 +184,13 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
           tradingViewSymbol,
           candles,
           corporateActions: Array.isArray(payload.corporateActions) ? payload.corporateActions : [],
+          technicalAnalysis: payload.technicalAnalysis ?? null,
           state: response.ok && yahooSymbol && (market === "TW" ? candles.length >= 20 : Boolean(tradingViewSymbol)) ? "ready" : "empty",
         });
       })
       .catch((error) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setResult({ requestUrl, yahooSymbol: "", tradingViewSymbol: "", candles: [], corporateActions: [], state: "empty" });
+          setResult({ requestUrl, yahooSymbol: "", tradingViewSymbol: "", candles: [], corporateActions: [], technicalAnalysis: null, state: "empty" });
         }
       });
     return () => controller.abort();
@@ -158,6 +204,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
   const yahooHref = `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol)}/chart/`;
   const corporateActions = currentResult?.corporateActions ?? [];
   const candles = currentResult?.candles ?? [];
+  const technicalAnalysis = currentResult?.technicalAnalysis ?? null;
 
   return (
     <section className="detail-section price-chart-section" aria-label={language === "zh" ? `${ticker} 公開 K 線` : `${ticker} public candlestick chart`}>
@@ -176,6 +223,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
             : `${action.date} 股本調整 ${action.ratio.toFixed(2)}x`).join("；")}。K 線跳空可能是價格機械調整，不應直接視為基本面崩跌。此警示不改動公允價值。`
           : `Detected: ${corporateActions.map((action) => `${action.date} ${action.type === "stock-distribution" ? "stock distribution" : "capital adjustment"} ${action.ratio.toFixed(2)}x`).join("; ")}. Chart gaps may reflect mechanical price adjustments rather than a fundamental collapse. This warning does not change fair value.`}</p>
       </div>}
+      {technicalAnalysis && <TechnicalAnalysisPanel analysis={technicalAnalysis} language={language} />}
       {state === "loading" && <div className="chart-state">{language === "zh" ? "正在載入公開 K 線…" : "Loading public chart…"}</div>}
       {state === "empty" && <div className="chart-state">{language === "zh" ? "目前無法載入公開 K 線，估值資料不受影響" : "The public chart is unavailable; valuation is unaffected"}</div>}
       {state === "ready" && (market === "TW" ? <YahooCandlestickChart candles={candles} ticker={ticker} language={language} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}

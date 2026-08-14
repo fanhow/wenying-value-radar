@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseYahooCorporateActions, parseYahooDailyCandles, tradingViewSymbolFromYahoo, yahooHistorySymbols } from "../lib/price-history.ts";
+import { latestMarketQuoteFromCandles, parseYahooCorporateActions, parseYahooDailyCandles, taiwanLimitUpPrice, tradingViewSymbolFromYahoo, yahooHistorySymbols } from "../lib/price-history.ts";
 
 test("parses aligned Yahoo daily OHLCV rows and drops incomplete candles", () => {
   const candles = parseYahooDailyCandles({ chart: { result: [{
@@ -33,4 +33,15 @@ test("detects stock distributions and capital adjustments without changing valua
     ["capital-adjustment", 0.9],
     ["stock-distribution", 2.2],
   ]);
+});
+
+test("calculates the Taiwan limit-up price using the local tick size", () => {
+  assert.equal(taiwanLimitUpPrice(54.1), 59.5);
+  const quote = latestMarketQuoteFromCandles([
+    { date: "2026-08-13", open: 54.8, high: 55, low: 53.8, close: 54.1, volume: 2_692_826 },
+    { date: "2026-08-14", open: 57.3, high: 59.5, low: 57.2, close: 59.5, volume: 14_039_503 },
+  ], "TW");
+  assert.equal(quote?.limitUpPrice, 59.5);
+  assert.equal(quote?.isLimitUp, true);
+  assert.ok(Math.abs((quote?.changePercent ?? 0) - 0.099815) < 0.00001);
 });

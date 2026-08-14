@@ -20,6 +20,12 @@ import { buildComparableMap } from "../../../lib/market-comparables";
 import { normalizeSector } from "../../../lib/sector-normalization";
 import { financialInputsFromTaiwanHistory, loadTaiwanFinancialHistory } from "../../../lib/taiwan-financials";
 import { readValuationQueryCache, saveValuationQueryCache } from "../../../lib/valuation-cache";
+import {
+  latestMarketQuoteFromCandles,
+  parseYahooDailyCandles,
+  type LatestMarketQuote,
+  type YahooChartPayload,
+} from "../../../lib/price-history";
 
 type Market = "TW" | "US";
 
@@ -182,6 +188,25 @@ async function yahooTaiwanSnapshot(ticker: string) {
     });
     if (!response.ok) return null;
     return parseYahooTaiwanHtml(await response.text());
+  } catch {
+    return null;
+  }
+}
+
+async function yahooTaiwanMarketQuote(ticker: string, exchange: string | undefined, forceRefresh = false): Promise<LatestMarketQuote | null> {
+  const symbol = `${ticker}.${exchange === "TPEx" ? "TWO" : "TW"}`;
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&events=div%2Csplits`,
+      {
+        headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)" },
+        ...(forceRefresh ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
+        signal: AbortSignal.timeout(4_000),
+      },
+    );
+    if (!response.ok) return null;
+    const payload = await response.json() as YahooChartPayload;
+    return latestMarketQuoteFromCandles(parseYahooDailyCandles(payload, 5), "TW");
   } catch {
     return null;
   }
@@ -639,9 +664,14 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       : yahoo
         ? { date: yahoo.updatedAt, name: yahoo.name, close: String(yahoo.price), exchange: "TPEx" }
       : null;
+  const liveQuote = await yahooTaiwanMarketQuote(ticker, ratio?.exchange ?? quote?.exchange, Boolean(body.refresh));
   const capturedNav = numeric(body.capturedNav);
   const closingPrice = numeric(quote?.close);
-  const price = preferCapturedPrice(body.capturedPrice, closingPrice);
+  const officialPriceDate = formatTaiwanDate(quote?.date);
+  const useLiveQuote = Boolean(liveQuote && (!closingPrice || liveQuote.date >= officialPriceDate));
+  const currentMarketPrice = useLiveQuote ? liveQuote?.price ?? closingPrice : closingPrice;
+  const price = preferCapturedPrice(body.capturedPrice, currentMarketPrice);
+  const priceDate = useLiveQuote ? liveQuote?.date : officialPriceDate;
 
   if (isTaiwanEtf(ticker)) {
     if (!capturedNav) throw new Error("ETF 需要含「即時淨值」欄位的方舟截圖才能估值");
@@ -654,6 +684,14 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       assetType: "ETF" as const,
       sector: "ETF",
       price: price || capturedNav,
+      ...(useLiveQuote && liveQuote ? {
+        priceChange: liveQuote.change,
+        priceChangePercent: liveQuote.changePercent,
+        previousClose: liveQuote.previousClose,
+        limitUpPrice: liveQuote.limitUpPrice ?? undefined,
+        isLimitUp: liveQuote.isLimitUp,
+        priceSource: "Yahoo Finance",
+      } : {}),
       eps: capturedNav,
       bvps: capturedNav,
       fcfPerShare: capturedNav,
@@ -669,7 +707,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
       riskOverride: isLeveragedOrInverse ? "高" as const : "中" as const,
       dataBasis: "market-ratio" as const,
       financialDataDate: ratio?.date || quote?.date,
-      updatedAt: ratio?.date || quote?.date || new Date().toISOString().slice(0, 10),
+      updatedAt: priceDate || formatTaiwanDate(ratio?.date),
       source: "方舟截圖" as const,
       sourceNote: `ETF 以方舟畫面中的即時淨值（iNAV）作為參考值；它不是股票企業價值估算，且盤後可能失去時效${isLeveragedOrInverse ? "。此標的是槓桿或反向 ETF，已標示為高風險" : ""}`,
     };
@@ -678,8 +716,11 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
   if (!ratio || !price) throw new Error("TWSE／TPEx 公開資料中找不到此代碼或最新價格");
   const pe = numeric(ratio.pe);
   const pb = numeric(ratio.pb);
-  const eps = pe > 0 ? price / pe : 0;
-  const bvps = pb > 0 ? price / pb : 0;
+  // The latest quote is display/current-price data. Keep EPS and BVPS tied to
+  // the exchange ratio date so an intraday move cannot rewrite fundamentals.
+  const ratioReferencePrice = closingPrice || currentMarketPrice;
+  const eps = pe > 0 ? ratioReferencePrice / pe : 0;
+  const bvps = pb > 0 ? ratioReferencePrice / pb : 0;
   if (!eps && !bvps) throw new Error("目前沒有足夠的本益比／淨值比資料可建立估值");
   const financialHistory = await loadTaiwanFinancialHistory(ticker);
   const historicalInputs = financialInputsFromTaiwanHistory(financialHistory);
@@ -696,6 +737,14 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     assetType: "EQUITY" as const,
     sector: ratio.exchange === "TWSE" ? "台灣上市公司" : "台灣上櫃公司",
     price,
+    ...(useLiveQuote && liveQuote ? {
+      priceChange: liveQuote.change,
+      priceChangePercent: liveQuote.changePercent,
+      previousClose: liveQuote.previousClose,
+      limitUpPrice: liveQuote.limitUpPrice ?? undefined,
+      isLimitUp: liveQuote.isLimitUp,
+      priceSource: "Yahoo Finance",
+    } : {}),
     eps,
     epsHistory: historicalInputs?.epsHistory,
     bvps,
@@ -720,11 +769,11 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     dataCompleteness: hasHistoricalFinancials ? "historical" as const : "limited" as const,
     dataBasis: hasHistoricalFinancials ? "estimated" as const : "market-ratio" as const,
     financialDataDate: historicalInputs?.financialDataDate ?? formatTaiwanDate(ratio.date),
-    updatedAt: formatTaiwanDate(ratio.date),
+    updatedAt: priceDate || formatTaiwanDate(ratio.date),
     source: "自動資料" as const,
     sourceNote: hasHistoricalFinancials
-      ? `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；另以 Yahoo Finance 公開年度財務序列補充 ${financialHistory.length} 年 EPS、營收、現金流及資產負債資料。不同來源與期間可能不完全對齊，因此標示為混合期間估算並保留不確定性。`
-      : `收盤價、本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；多年財報暫時無法取得，因此僅作初步估值且不提供品質分數`,
+      ? `本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；目前價格優先採 Yahoo Finance 最新可取得日行情，並以 Yahoo Finance 公開年度財務序列補充 ${financialHistory.length} 年 EPS、營收、現金流及資產負債資料。最新行情只影響估值差距，不會改寫財務比率日的 EPS／淨值。不同來源與期間可能不完全對齊，因此標示為混合期間估算並保留不確定性。`
+      : `本益比與股價淨值比取自 ${ratio.exchange === "TWSE" ? "臺灣證券交易所" : "證券櫃檯買賣中心"} OpenAPI；目前價格優先採 Yahoo Finance 最新可取得日行情。最新行情只影響估值差距，不會改寫財務比率日的 EPS／淨值。多年財報暫時無法取得，因此僅作初步估值且不提供品質分數`,
   };
 }
 

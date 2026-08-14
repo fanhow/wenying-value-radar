@@ -74,6 +74,12 @@ export type StockInput = {
   uncertainty: number;
   assetType?: "EQUITY" | "ETF";
   updatedAt?: string;
+  priceChange?: number;
+  priceChangePercent?: number;
+  previousClose?: number;
+  limitUpPrice?: number;
+  isLimitUp?: boolean;
+  priceSource?: string;
   source?: "示範資料" | "手動輸入" | "自動資料" | "方舟截圖";
   sourceNote?: string;
   qualityAvailable?: boolean;
