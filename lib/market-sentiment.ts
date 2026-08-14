@@ -71,7 +71,7 @@ export function classifyVix(value: number, shortTermRatio: number | null = null)
   if (value >= 30 || (shortTermRatio !== null && shortTermRatio >= 1.15)) {
     return {
       level: "stressed",
-      titleZh: "風險壓力高",
+      titleZh: "市場明顯恐慌",
       titleEn: "High risk pressure",
       guidanceZh: "優先降低槓桿與單一部位集中度，保留現金，不急著一次抄底。",
       guidanceEn: "Reduce leverage and concentration first; keep cash and avoid one-shot dip buying.",
@@ -80,7 +80,7 @@ export function classifyVix(value: number, shortTermRatio: number | null = null)
   if (value >= 20 || (shortTermRatio !== null && shortTermRatio >= 1.05)) {
     return {
       level: "cautious",
-      titleZh: "避險需求升高",
+      titleZh: "市場開始緊張",
       titleEn: "Hedging demand is rising",
       guidanceZh: "新倉宜分批，檢查停損與現金比重；既有持倉以風險預算管理。",
       guidanceEn: "Scale into new positions and review stops and cash; manage holdings by risk budget.",
@@ -89,7 +89,7 @@ export function classifyVix(value: number, shortTermRatio: number | null = null)
   if (value >= 15) {
     return {
       level: "normal",
-      titleZh: "情緒中性偏穩",
+      titleZh: "市場情緒平穩",
       titleEn: "Neutral to steady",
       guidanceZh: "可維持核心持倉，但仍需配合趨勢、估值與個股風險，不單看 VIX。",
       guidanceEn: "Core holdings may be maintained, but combine VIX with trend, valuation, and stock risk.",
@@ -97,8 +97,8 @@ export function classifyVix(value: number, shortTermRatio: number | null = null)
   }
   return {
     level: "calm",
-    titleZh: "風險偏好高",
-    titleEn: "High risk appetite",
+    titleZh: "市場氣氛偏樂觀",
+    titleEn: "Market mood is optimistic",
     guidanceZh: "低波動有利持倉，但也可能代表市場過度安心；避免追價與過度加槓桿。",
     guidanceEn: "Low volatility supports holdings but can signal complacency; avoid chasing and excess leverage.",
   };

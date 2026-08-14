@@ -24,6 +24,7 @@ test("parses a Yahoo sentiment series and 20-day return", () => {
 
 test("classifies volatility without turning it into a buy or sell command", () => {
   assert.equal(classifyVix(13).level, "calm");
+  assert.equal(classifyVix(13).titleZh, "市場氣氛偏樂觀");
   assert.equal(classifyVix(18).level, "normal");
   assert.equal(classifyVix(24).level, "cautious");
   assert.equal(classifyVix(32).level, "stressed");

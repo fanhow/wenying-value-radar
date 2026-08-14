@@ -47,7 +47,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.15\.1/);
+  assert.match(html, /Rev\. 2026\.08\.15\.2/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
@@ -174,6 +174,7 @@ test("renders the market sentiment page with source-backed flow snapshots", asyn
   assert.match(html, /影片圖表的原始來源/);
   assert.match(html, /BofA THE FLOW SHOW/);
   assert.match(html, /CITADEL SECURITIES GMI/);
-  assert.match(source, /youtube\.com\/watch\?v=ebV7mgXEJ6g&t=508s/);
+  assert.doesNotMatch(source, /youtube\.com\/watch\?v=ebV7mgXEJ6g&t=508s/);
+  assert.match(source, /market-direction-mark/);
   assert.match(source, /august-after-the-reset/);
 });

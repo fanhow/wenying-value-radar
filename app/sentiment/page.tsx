@@ -21,7 +21,6 @@ const SOURCE_LINKS = {
   epfr: "https://epfr.com/",
   videoInstitutional: "https://www.youtube.com/watch?v=ebV7mgXEJ6g&t=259s",
   videoRetail: "https://www.youtube.com/watch?v=ebV7mgXEJ6g&t=266s",
-  videoVolatility: "https://www.youtube.com/watch?v=ebV7mgXEJ6g&t=508s",
 } as const;
 
 function formatValue(value: number, digits = 2) {
@@ -47,12 +46,17 @@ function MiniBars({ series }: { series: SentimentSeries }) {
   );
 }
 
-function SeriesCard({ series, title, note }: { series?: SentimentSeries; title: string; note: string }) {
+function MarketDirectionMark({ series, inverse = false }: { series: SentimentSeries; inverse?: boolean }) {
+  const pointsUp = inverse ? series.changePercent <= 0 : series.changePercent >= 0;
+  return <span className={`market-direction-mark ${pointsUp ? "market-up" : "market-down"}`} aria-label={pointsUp ? "市場可能上漲" : "市場可能下跌"}>{pointsUp ? "↗" : "↘"}</span>;
+}
+
+function SeriesCard({ series, title, note, inverse = false }: { series?: SentimentSeries; title: string; note: string; inverse?: boolean }) {
   if (!series) return <article className="sentiment-series-card muted"><span>{title}</span><strong>—</strong><small>{note}</small></article>;
   return (
     <article className="sentiment-series-card">
       <span>{title}</span>
-      <strong>{formatValue(series.current)}</strong>
+      <div className="sentiment-number"><MarketDirectionMark series={series} inverse={inverse} /><strong>{formatValue(series.current)}</strong></div>
       <b className={series.changePercent >= 0 ? "risk-up" : "risk-down"}>{formatPercent(series.changePercent)}</b>
       <MiniBars series={series} />
       <small>{note} · 20D {formatPercent(series.return20d)}</small>
@@ -96,9 +100,9 @@ export default function SentimentPage() {
           </div>
           <div className={`sentiment-reading ${signal?.level ?? "loading"}`}>
             <span>{t("即時風險溫度", "Live risk temperature")}</span>
-            <strong>{vix ? formatValue(vix.current) : "—"}</strong>
+            <div className="sentiment-reading-number">{vix && <MarketDirectionMark series={vix} inverse />}<strong>{vix ? formatValue(vix.current) : "—"}</strong></div>
             <b>{signal ? (language === "zh" ? signal.titleZh : signal.titleEn) : error ? t("暫時無法取得", "Temporarily unavailable") : t("讀取中", "Loading")}</b>
-            <small>VIX · {t("約 30 天隱含波動率", "about 30-day implied volatility")}</small>
+            <small>VIX · {t("約 30 天隱含波動率 · 紅 ↗ 市場偏上、綠 ↘ 市場偏下", "about 30-day implied volatility · red ↗ market up, green ↘ market down")}</small>
           </div>
         </header>
 
@@ -116,16 +120,15 @@ export default function SentimentPage() {
               <small>{t("提示不是買進／賣出訊號；低 VIX 也可能代表過度安心。", "This is not a buy/sell signal; a low VIX can also mean complacency.")}</small>
             </article>
             <div className="volatility-curve">
-              <SeriesCard series={bySymbol["^VIX9D"]} title="VIX9D" note={t("未來 9 天", "Next 9 days")} />
-              <SeriesCard series={vix} title="VIX" note={t("未來約 30 天", "About 30 days")} />
-              <SeriesCard series={bySymbol["^VIX3M"]} title="VIX3M" note={t("未來 3 個月", "Next 3 months")} />
+              <SeriesCard series={bySymbol["^VIX9D"]} title="VIX9D" note={t("未來 9 天", "Next 9 days")} inverse />
+              <SeriesCard series={vix} title="VIX" note={t("未來約 30 天", "About 30 days")} inverse />
+              <SeriesCard series={bySymbol["^VIX3M"]} title="VIX3M" note={t("未來 3 個月", "Next 3 months")} inverse />
               <p>{payload?.curve ? (language === "zh" ? payload.curve.zh : payload.curve.en) : t("三個期限一起看，可分辨短期事件風險是否突然升高。", "Reading all three maturities helps identify sudden near-term event risk.")}</p>
             </div>
           </div>
           <div className="sentiment-explainer">
             <strong>{t("怎麼用？", "How to use it")}</strong>
             <p>{t("隱含波動率是選擇權價格反映的未來波動預期，不是漲跌方向。若 VIX 與短期 VIX9D 同時快速上升，可視為減槓桿、提高現金與檢查集中度的提醒；下降則代表風險壓力緩和，但不代表一定上漲。", "Implied volatility is the option market's expectation of future movement, not direction. A simultaneous jump in VIX and VIX9D can prompt a review of leverage, cash, and concentration; a decline means pressure is easing, not that prices must rise.")}</p>
-            <a href={SOURCE_LINKS.videoVolatility} target="_blank" rel="noreferrer">{t("影片 08:28 提到的做法", "Video reference at 08:28")} ↗</a>
           </div>
         </section>
 
