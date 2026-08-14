@@ -92,7 +92,7 @@ export default function SentimentPage() {
         <header className="sentiment-hero">
           <div>
             <p className="eyebrow"><span className="eyebrow-line" />MARKET SENTIMENT</p>
-            <h1>{t("先看市場願意承擔多少風險，", "Read how much risk the market will carry,")}<br /><em>{t("再決定部位大小。", "then size the position.")}</em></h1>
+            <h1>{t("先看市場願意承擔多少風險", "Read how much risk the market will carry")}<br /><em>{t("再決定部位大小", "then size the position")}</em></h1>
             <p>{t(
               "整合 VIX、隱含波動率期限結構、主要指數動能與具來源的資金流研究。這裡提供風險管理參考，不取代估值與個股判斷。",
               "Combines VIX, the implied-volatility term structure, major-index momentum, and sourced flow research. This is risk-management context, not a substitute for valuation or stock research.",

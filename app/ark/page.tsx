@@ -302,7 +302,7 @@ export default function ArkPage() {
       <div className="page-content ark-page">
         <section className="ark-page-heading" aria-labelledby="ark-page-title">
           <p className="section-kicker">ARK SCREENSHOT / 02</p>
-          <h1 id="ark-page-title">{t("把方舟名單，", "Turn your ARKER list")}<br /><em>{t("直接變成公允價值清單。", "into a fair-value watchlist.")}</em></h1>
+          <h1 id="ark-page-title">{t("把方舟名單", "Turn your ARKER list")}<br /><em>{t("直接變成公允價值清單", "into a fair-value watchlist")}</em></h1>
           <p>{t("上傳方舟 App 的台股 ETF 或美股截圖，系統會辨識代碼與畫面價格、核對公開名錄，再逐檔建立估值並同步到首頁觀察清單。", "Upload Taiwan ETF or U.S. stock screenshots from the ARKER app. The tool reads tickers and prices, verifies public directories, builds valuations, and syncs them to your home watchlist.")}</p>
         </section>
 
@@ -310,7 +310,7 @@ export default function ArkPage() {
           <div className="ark-import-copy">
             <div className="ark-brand-row"><span className="ark-brand-logo" aria-hidden="true" /><div><span>ARKER {t("方舟運算", "Strategy")}</span><small>{t("獨立匯入工具", "Standalone import tool")}</small></div></div>
             <p className="section-kicker">PRIVATE OCR</p>
-            <h2 id="ark-upload-title">{t("選擇手機截圖，", "Choose screenshots,")}<br />{t("其餘交給價值雷達", "then let Value Radar take over")}</h2>
+            <h2 id="ark-upload-title">{t("選擇手機截圖", "Choose screenshots")}<br />{t("其餘交給價值雷達", "then let Value Radar take over")}</h2>
             <p>{t("原始圖片只在你的瀏覽器中辨識，不會上傳。即使 TWSE、TPEx 或 SEC 暫時拒絕連線，系統也會改用內建名錄與財務快照，不會因單一來源 403 讓整批失敗。", "Images are recognized only in your browser and are never uploaded. If TWSE, TPEx, or SEC temporarily blocks a request, built-in directories and financial snapshots keep the batch running.")}</p>
             <div className="ark-flow" aria-label={t("匯入步驟", "Import steps")}><span>{t("上傳截圖", "Upload")}</span><b>→</b><span>{t("辨識代碼", "Recognize")}</span><b>→</b><span>{t("計算公允價值", "Calculate")}</span></div>
           </div>

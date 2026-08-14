@@ -14,7 +14,7 @@ export default function AboutPage() {
       <div id="top" className="page-content about-page">
         <header className="about-page-heading">
           <p className="eyebrow"><span className="eyebrow-line" />ABOUT WENYING</p>
-          <h1>{t("認識穩盈，", "Meet WenYing,")}<br /><em>{t("理解我們如何做選擇。", "and how we make decisions.")}</em></h1>
+          <h1>{t("認識穩盈", "Meet WenYing")}<br /><em>{t("理解我們如何做選擇", "and how we make decisions")}</em></h1>
           <p>{t(
             "我們相信，能長久執行的投資方法，必須建立在資料、紀律與可承受的風險之上。",
             "We believe an investment process can last only when it is built on evidence, discipline, and risk we can afford.",
@@ -24,7 +24,7 @@ export default function AboutPage() {
         <section id="about" className="about-section about-page-section" aria-labelledby="about-title">
           <div className="about-statement">
             <p className="section-kicker">WHY WE STARTED / 01</p>
-            <h2 id="about-title">{t("我們不是賭徒。", "We are not gamblers.")}<br /><em>{t("投資，是有依據的選擇。", "Investing is an evidence-based choice.")}</em></h2>
+            <h2 id="about-title">{t("我們不是賭徒", "We are not gamblers")}<br /><em>{t("投資，是有依據的選擇", "Investing is an evidence-based choice")}</em></h2>
             <p>{t(
               "穩盈基金成立的初衷，是用有紀律、可驗證的方法管理共同資金。比起追逐短線刺激，我們更重視看得懂的機會、承受得起的風險，以及能夠長久執行的決策。",
               "WenYing Fund was created to manage shared capital with a disciplined, verifiable process. Instead of chasing short-term excitement, we focus on understandable opportunities, affordable risks, and decisions that can be sustained over time.",
@@ -40,7 +40,7 @@ export default function AboutPage() {
         </section>
 
         <section className="about-bridge">
-          <div><p className="section-kicker">FROM PRINCIPLE TO PRACTICE / 02</p><h2>{t("理念必須能落地，", "Principles must become practice,")}<br /><em>{t("資料才能形成決策。", "and data must become decisions.")}</em></h2></div>
+          <div><p className="section-kicker">FROM PRINCIPLE TO PRACTICE / 02</p><h2>{t("理念必須能落地", "Principles must become practice")}<br /><em>{t("資料才能形成決策", "and data must become decisions")}</em></h2></div>
           <div className="about-bridge-copy"><p>{t("穩盈價值雷達把這套理念轉成可以重複使用的研究流程：先驗證資料，再衡量公允價值與風險，最後才決定是否值得進一步研究。", "WenYing Value Radar turns these principles into a repeatable research process: validate the data, measure fair value and risk, and only then decide whether an idea deserves deeper research.")}</p><Link href="/#overview">{t("前往公允價值首頁", "Open the Fair Value dashboard")} <span>→</span></Link></div>
         </section>
 

@@ -268,9 +268,9 @@ a { color: inherit; text-decoration: none; }
 .range-hint { font-size: 9px; }
 .upside-value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .trend-mark { font-weight: 900; text-shadow: 0 2px 3px rgba(19,43,45,.18); }
-.trend-mark.direction-up, .card-arrow.direction-up { color: var(--red) !important; }
-.trend-mark.direction-down, .card-arrow.direction-down { color: var(--green) !important; }
-.trend-mark.direction-flat, .card-arrow.direction-flat { color: var(--ink-faint) !important; }
+.trend-mark.direction-up, .watch-direction.direction-up { color: var(--red) !important; }
+.trend-mark.direction-down, .watch-direction.direction-down { color: var(--green) !important; }
+.trend-mark.direction-flat, .watch-direction.direction-flat { color: var(--ink-faint) !important; }
 .text-positive { color: var(--green) !important; }
 .text-negative { color: var(--red) !important; }
 .text-flat { color: var(--ink-soft) !important; }
@@ -463,15 +463,18 @@ a { color: inherit; text-decoration: none; }
 .outline-button:hover { border-color: var(--green); color: var(--green-deep); }
 .outline-button span { color: var(--green); font-size: 16px; vertical-align: -1px; }
 .watchlist-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 19px; }
-.watch-card { position: relative; min-height: 89px; display: flex; justify-content: space-between; align-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); text-align: left; transition: .2s; }
+.watch-card { position: relative; min-height: 99px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); text-align: left; transition: .2s; }
 .watch-card:hover, .watch-card.active { border-color: #a9d4bf; box-shadow: 0 8px 20px rgba(42, 102, 77, .07); transform: translateY(-2px); }
-.watch-card > div:first-child { display: grid; grid-template-columns: auto auto; gap: 2px 8px; align-items: center; }
-.watch-card > div:first-child .ticker-badge { grid-row: span 2; }
+.watch-card-main { width: 100%; min-height: 99px; display: flex; justify-content: space-between; align-items: center; padding: 17px 18px 31px; border: 0; background: transparent; color: inherit; text-align: left; }
+.watch-card-main > div:first-child { display: grid; grid-template-columns: auto auto; gap: 2px 8px; align-items: center; }
+.watch-card-main > div:first-child .ticker-badge { grid-row: span 2; }
 .watch-card strong { font-size: 13px; }
 .watch-card small { display: block; color: var(--ink-faint); font-size: 9px; }
-.watch-card > div:nth-child(2) { text-align: right; }
-.watch-card > div:nth-child(2) strong { display: block; font-size: 16px; }
-.card-arrow { position: absolute; right: 9px; bottom: 7px; color: var(--ink-faint); font-size: 12px; }
+.watch-card-main > div:nth-child(2) { text-align: right; }
+.watch-card-main > div:nth-child(2) strong { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; font-size: 16px; }
+.watch-direction { font-size: 1em; line-height: 1; }
+.watch-remove { position: absolute; right: 13px; bottom: 7px; padding: 2px 4px; border: 0; background: transparent; color: var(--ink-faint); font-size: 9px; }
+.watch-remove:hover { color: var(--red); }
 .watchlist-empty { grid-column: 1 / -1; padding: 25px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--ink-faint); font-size: 12px; text-align: center; }
 
 .data-layer-banner { display: flex; align-items: center; gap: 17px; margin-bottom: 56px; padding: 20px 23px; border: 1px solid #cbded3; border-radius: 10px; background: #eaf5ee; }

@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.15.2";
+const SITE_REVISION = "Rev. 2026.08.15.3";
 
 const REVISION_ENTRIES = [
+  ["2026.08.15.3", "調整導覽順序與大標題標點，觀察清單加入同字級方向箭頭及個別移除功能。", "Reordered navigation, cleaned headline punctuation, and added equal-size direction arrows and per-item removal to the watchlist."],
   ["2026.08.15.2", "修復 Cloudflare Workers 型別檢查，市場情緒改用口語提示並加入台灣習慣的紅升綠跌方向箭頭。", "Fixed Cloudflare Workers type checking, simplified sentiment wording, and added Taiwan-style red-up and green-down direction arrows."],
   ["2026.08.15.1", "新增市場情緒頁、VIX 隱含波動率期限結構、風險提示與原始資金流研究來源。", "Added market sentiment, the VIX implied-volatility term structure, risk guidance, and original flow-research sources."],
   ["2026.08.14.1", "重排首頁研究段落，更新台股即時價格與漲停標示，加入規則式技術提示。", "Reordered research sections, refreshed Taiwan quotes and limit-up styling, and added rule-based technical signals."],

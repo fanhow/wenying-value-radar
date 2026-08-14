@@ -36,6 +36,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /穩盈 - 價值雷達/);
   assert.match(html, /關於我們/);
   assert.match(html, /市場情緒/);
+  assert.match(html, /市場情緒[\s\S]*關於我們/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
   assert.match(html, /MARKET SCAN \/ 02/);
@@ -47,7 +48,9 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.15\.2/);
+  assert.match(html, /Rev\. 2026\.08\.15\.3/);
+  assert.match(source, /className="watch-remove"/);
+  assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(stock\.upside\)/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
