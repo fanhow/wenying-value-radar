@@ -35,6 +35,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, developmentPreviewMeta);
   assert.match(html, /穩盈 - 價值雷達/);
   assert.match(html, /關於我們/);
+  assert.match(html, /市場情緒/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
   assert.match(html, /MARKET SCAN \/ 02/);
@@ -46,7 +47,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.14\.1/);
+  assert.match(html, /Rev\. 2026\.08\.15\.1/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
@@ -154,4 +155,25 @@ test("renders the fund tracker page in Chinese by default", async () => {
   assert.match(html, /Citadel Advisors/);
   assert.match(html, /TCI Fund Management/);
   assert.match(html, /SEC 13F/);
+});
+
+test("renders the market sentiment page with source-backed flow snapshots", async () => {
+  const source = await readFile(new URL("../app/sentiment/page.tsx", import.meta.url), "utf8");
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("sentiment", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/sentiment", { headers: { accept: "text/html" } }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /隱含波動率與持倉風險/);
+  assert.match(html, /影片圖表的原始來源/);
+  assert.match(html, /BofA THE FLOW SHOW/);
+  assert.match(html, /CITADEL SECURITIES GMI/);
+  assert.match(source, /youtube\.com\/watch\?v=ebV7mgXEJ6g&t=508s/);
+  assert.match(source, /august-after-the-reset/);
 });
