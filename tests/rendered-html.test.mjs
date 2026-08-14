@@ -7,6 +7,7 @@ const developmentPreviewMeta =
 
 test("renders development preview metadata", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -51,6 +52,8 @@ test("renders development preview metadata", async () => {
   assert.match(html, /Rev\. 2026\.08\.15\.3/);
   assert.match(source, /className="watch-remove"/);
   assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(stock\.upside\)/);
+  assert.match(styles, /stock-table tbody tr > td \{ width: auto !important; min-width: 0; display: block; \}/);
+  assert.match(styles, /stock-name-cell \{ display: grid; grid-template-columns: 28px auto minmax\(0, 1fr\)/);
 });
 
 test("keeps the local preview working when Cloudflare env bindings are absent", async () => {
