@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ChangeEvent, useCallback, useEffect, useState } from "react";
+import { arkResearchDate, arkResearchDateLabel } from "../../lib/ark-date";
 import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, type Market, type StockInput } from "../../lib/valuation";
 import { useLanguage } from "../language-context";
@@ -27,6 +28,7 @@ type ArkLogRow = {
   id: number;
   batchId: string;
   importedAt: string;
+  researchDate?: string | null;
   fileName: string;
   market: Market;
   ticker: string;
@@ -78,9 +80,8 @@ function confidenceLabel(confidence: ArkLogRow["confidence"], t: (zh: string, en
 function groupArkLogRowsByDay(rows: ArkLogRow[], language: "zh" | "en") {
   const grouped = new Map<string, { label: string; rows: ArkLogRow[]; batches: Set<string> }>();
   rows.forEach((row) => {
-    const date = new Date(row.importedAt);
-    const key = Number.isNaN(date.getTime()) ? row.importedAt : `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-    const label = Number.isNaN(date.getTime()) ? row.importedAt : new Intl.DateTimeFormat(language === "zh" ? "zh-TW" : "en-US", { dateStyle: "full" }).format(date);
+    const key = row.researchDate || arkResearchDate(row.importedAt) || row.importedAt;
+    const label = arkResearchDateLabel(key, language);
     const group = grouped.get(key) ?? { label, rows: [], batches: new Set<string>() };
     group.rows.push(row);
     group.batches.add(row.batchId);
@@ -120,13 +121,16 @@ function mergeIntoStorage(addedStocks: StockInput[]) {
 
 async function saveImportLog(rows: ImportCandidate[]) {
   const importedAt = new Date().toISOString();
+  const researchDate = arkResearchDate(importedAt);
   const batchId = crypto.randomUUID();
+  if (!researchDate) return 0;
   const observations = rows.flatMap((candidate) => {
     if (!candidate.stock) return [];
     const stock = calculateStock(candidate.stock);
     return [{
       batchId,
       importedAt,
+      researchDate,
       fileName: candidate.fileName,
       market: stock.market,
       ticker: stock.ticker,
@@ -364,7 +368,8 @@ export default function ArkPage() {
             <div>
               <p className="section-kicker">ARKER LONG-TERM LOG</p>
               <h2 id="ark-log-title">{t("方舟運算長期紀錄", "ARKER long-term log")}</h2>
-              <p>{t("每次匯入會保存批次、標的、檔名、匯入時間、上傳價格、市場價格、公允價值、模型差距與信心；原始圖片不保存，方便日後回看方舟名單的前瞻性與實際表現。", "Each import keeps its batch, ticker, source filename, import time, captured price, market price, fair value, model gap, and confidence. Source images are never stored, so the list can be reviewed over time.")}</p>
+              <p>{t("每次匯入會保存批次、標的、檔名、匯入時間、研究日期、上傳價格、市場價格、公允價值、模型差距與信心；原始圖片不保存，方便日後回看方舟名單的前瞻性與實際表現。", "Each import keeps its batch, ticker, source filename, import time, research date, captured price, market price, fair value, model gap, and confidence. Source images are never stored, so the list can be reviewed over time.")}</p>
+              <p className="ark-date-rule">{t("日期規則：以台灣時間 06:00 為換日點；00:00–05:59 視為前一日，所以 18:00 至隔日 06:00 的晚間上傳仍歸入前一日。週日不安排上傳。", "Date rule: Taiwan time uses 06:00 as the date boundary. Uploads from 00:00–05:59 belong to the previous date, so the overnight 18:00–06:00 window stays with the previous research date. No Sunday uploads are scheduled.")}</p>
             </div>
             <span className="ark-log-count">{isLogLoading ? t("讀取中…", "Loading…") : `${logRows.length} ${t("筆紀錄", "records")}`}</span>
           </div>

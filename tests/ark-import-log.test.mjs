@@ -10,6 +10,7 @@ test("normalizes a durable ARKER import observation", () => {
   });
   assert.equal(row?.ticker, "TSLA");
   assert.equal(row?.capturedPrice, 330);
+  assert.equal(row?.researchDate, "2026-08-12");
 });
 
 test("rejects incomplete ARKER import observations", () => {
@@ -38,8 +39,8 @@ test("persists point-in-time ARKER observations in the durable log", async () =>
   }], database);
   assert.equal(saved, 1);
   assert.equal(batches.length, 2);
-  assert.equal(batches[1][0].values[4], "1808");
-  assert.equal(batches[1][0].values[8], 59.15);
+  assert.equal(batches[1][0].values[5], "1808");
+  assert.equal(batches[1][0].values[9], 59.15);
 });
 
 test("reads recent ARKER observations for the history view", async () => {
