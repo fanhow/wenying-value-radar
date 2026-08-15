@@ -129,3 +129,23 @@ test("invalidates a previously tested support after a high-volume closing breakd
   assert.equal(result.supportBroken, true);
   assert.equal(result.technicalAlert, "support-broken");
 });
+
+test("keeps primary resistance above price and promotes a former support zone confirmed by recent daily highs", () => {
+  const candles = Array.from({ length: 140 }, (_, index) => {
+    const close = index < 80 ? 35.2 + Math.sin(index / 5) * 0.7 : 31.2 + Math.sin(index / 4) * 0.45;
+    return ohlcCandle(index, close - 0.15, close + 0.45, close - 0.45, close);
+  });
+
+  [28, 46, 64].forEach((index) => {
+    candles[index] = ohlcCandle(index, 34.2, 35, 33.55, 34.4);
+  });
+  [96, 112, 128].forEach((index) => {
+    candles[index] = ohlcCandle(index, 32.4, 33.65, 32.2, 32.8);
+  });
+  candles[139] = ohlcCandle(139, 32.2, 33.9, 32.05, 32.35, 9_500);
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.ok((result.resistanceLevel ?? 0) > result.close);
+  assert.ok((result.resistanceLevel ?? 0) >= 33.2 && (result.resistanceLevel ?? 0) <= 34);
+});

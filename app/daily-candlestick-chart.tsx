@@ -151,7 +151,8 @@ function candlestickLabel(pattern: CandlestickPattern, language: Language) {
   return labels[pattern][language === "zh" ? 0 : 1];
 }
 
-function timeframeLabel(timeframe: "weekly" | "monthly" | null, language: Language) {
+function timeframeLabel(timeframe: "daily" | "weekly" | "monthly" | null, language: Language) {
+  if (timeframe === "daily") return language === "zh" ? "日線" : "daily";
   if (timeframe === "weekly") return language === "zh" ? "週線" : "weekly";
   if (timeframe === "monthly") return language === "zh" ? "月線" : "monthly";
   return language === "zh" ? "主要" : "major";

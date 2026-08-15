@@ -39,10 +39,10 @@ export type TechnicalAnalysis = {
   volumeRatio20: number | null;
   atr14: number | null;
   supportLevel: number | null;
-  supportTimeframe: "weekly" | "monthly" | null;
+  supportTimeframe: "daily" | "weekly" | "monthly" | null;
   supportDistance: number | null;
   resistanceLevel: number | null;
-  resistanceTimeframe: "weekly" | "monthly" | null;
+  resistanceTimeframe: "daily" | "weekly" | "monthly" | null;
   resistanceDistance: number | null;
   nearSupport: boolean;
   nearResistance: boolean;
@@ -179,7 +179,7 @@ function aggregateCandles(candles: DailyCandle[], period: "week" | "month") {
 
 type PriceLevel = {
   price: number;
-  timeframe: "weekly" | "monthly";
+  timeframe: "daily" | "weekly" | "monthly";
   weight: number;
 };
 
@@ -192,7 +192,11 @@ function pivotLevels(candles: DailyCandle[], timeframe: PriceLevel["timeframe"],
     const isPivot = kind === "support"
       ? neighbors.every((neighbor) => value <= neighbor)
       : neighbors.every((neighbor) => value >= neighbor);
-    if (isPivot) result.push({ price: value, timeframe, weight: timeframe === "monthly" ? 2 : 1 });
+    if (isPivot) result.push({
+      price: value,
+      timeframe,
+      weight: timeframe === "monthly" ? 2 : timeframe === "weekly" ? 1 : 0.75,
+    });
   }
   return result;
 }
@@ -209,17 +213,23 @@ function nearestMajorLevel(
     if (cluster) {
       cluster.price = (cluster.price * cluster.score + level.price * level.weight) / (cluster.score + level.weight);
       cluster.score += level.weight;
-      if (level.timeframe === "monthly") cluster.timeframe = "monthly";
+      if (
+        level.timeframe === "monthly"
+        || (level.timeframe === "weekly" && cluster.timeframe === "daily")
+      ) cluster.timeframe = level.timeframe;
     } else {
       clusters.push({ ...level, score: level.weight });
     }
   }
 
   const eligible = clusters.filter((level) => level.score >= 2 && (
-    kind === "support" ? level.price <= close + tolerance * 2 : level.price >= close - tolerance * 2
+    kind === "support" ? level.price <= close + tolerance * 2 : level.price >= close
   ));
   if (!eligible.length) return null;
-  return eligible.reduce((best, level) => Math.abs(level.price - close) < Math.abs(best.price - close) ? level : best);
+  const primaryLevels = kind === "resistance"
+    ? eligible.filter((level) => level.score >= Math.max(2, Math.max(...eligible.map((item) => item.score)) * 0.6))
+    : eligible;
+  return primaryLevels.reduce((best, level) => Math.abs(level.price - close) < Math.abs(best.price - close) ? level : best);
 }
 
 function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly: DailyCandle[], atr14: number | null) {
@@ -227,16 +237,29 @@ function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly:
   const tolerance = Math.max(close * 0.018, (atr14 ?? 0) * 0.6);
   const completedWeekly = weekly.slice(0, -1).slice(-156);
   const completedMonthly = monthly.slice(0, -1).slice(-60);
+  const completedDaily = candles.slice(0, -1).slice(-120);
+  const dailyResistancePivots = pivotLevels(completedDaily, "daily", "resistance");
+  const formerSupportPivots = [
+    ...pivotLevels(completedDaily, "daily", "support"),
+    ...pivotLevels(completedWeekly, "weekly", "support"),
+    ...pivotLevels(completedMonthly, "monthly", "support"),
+  ].filter((level) => level.price >= close);
+  const roleReversalTolerance = Math.max(close * 0.012, (atr14 ?? 0) * 0.3);
+  const roleReversalHighs = dailyResistancePivots.filter((high) => (
+    formerSupportPivots.some((support) => Math.abs(support.price - high.price) <= roleReversalTolerance)
+  ));
   const supports = [
     ...pivotLevels(completedWeekly, "weekly", "support"),
     ...pivotLevels(completedMonthly, "monthly", "support"),
   ];
   const resistances = [
+    ...roleReversalHighs.map((level) => ({ ...level, weight: 1.1 })),
     ...pivotLevels(completedWeekly, "weekly", "resistance"),
     ...pivotLevels(completedMonthly, "monthly", "resistance"),
   ];
   const support = nearestMajorLevel(supports, close, tolerance, "support");
-  const resistance = nearestMajorLevel(resistances, close, tolerance, "resistance");
+  const resistanceClusterTolerance = Math.max(close * 0.01, (atr14 ?? 0) * 0.25);
+  const resistance = nearestMajorLevel(resistances, close, resistanceClusterTolerance, "resistance");
   const supportDistance = support ? (close - support.price) / close : null;
   const resistanceDistance = resistance ? (resistance.price - close) / close : null;
   const nearSupport = support ? Math.abs(close - support.price) <= Math.max(close * 0.025, (atr14 ?? 0) * 0.75) : false;

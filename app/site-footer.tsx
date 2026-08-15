@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.16.2";
+const SITE_REVISION = "Rev. 2026.08.16.3";
 
 const REVISION_ENTRIES = [
+  ["2026.08.16.3", "修正主要壓力定義：壓力須高於現價，並優先採用近期日線高點與前支撐轉壓力的重疊區。", "Refined primary resistance to stay above price and prioritize zones where recent daily highs overlap former support."],
   ["2026.08.16.2", "加入觀察清單背景技術掃描、D1 提醒紀錄、即時檢查與站內通知中心。", "Added background watchlist scans, durable D1 alert history, on-demand checks, and an in-site alert center."],
   ["2026.08.16.1", "加入週月支撐壓力、早晨與黃昏之星、吞噬、錘子與流星線的分級技術提醒。", "Added staged technical alerts for weekly/monthly levels, morning/evening stars, engulfing, hammers, and shooting stars."],
   ["2026.08.15.3", "調整導覽順序與大標題標點，觀察清單加入同字級方向箭頭及個別移除功能。", "Reordered navigation, cleaned headline punctuation, and added equal-size direction arrows and per-item removal to the watchlist."],
