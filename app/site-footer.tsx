@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.16.4";
+const SITE_REVISION = "Rev. 2026.08.16.5";
 
 const REVISION_ENTRIES = [
+  ["2026.08.16.5", "水平支撐壓力需跨月至少兩次測試；過度接近的狹窄盤整線位不再強制繪製。", "Horizontal levels now require tests across at least two months, and compressed congestion levels are no longer forced onto the chart."],
   ["2026.08.16.4", "支撐壓力虛線加入日線、週線或月線來源；資料不足時不強制產生線位。", "Added daily, weekly, or monthly source labels to key levels and avoids forcing levels when evidence is insufficient."],
   ["2026.08.16.3", "修正主要壓力定義：壓力須高於現價，並優先採用近期日線高點與前支撐轉壓力的重疊區。", "Refined primary resistance to stay above price and prioritize zones where recent daily highs overlap former support."],
   ["2026.08.16.2", "加入觀察清單背景技術掃描、D1 提醒紀錄、即時檢查與站內通知中心。", "Added background watchlist scans, durable D1 alert history, on-demand checks, and an in-site alert center."],

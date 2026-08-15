@@ -181,6 +181,7 @@ type PriceLevel = {
   price: number;
   timeframe: "daily" | "weekly" | "monthly";
   weight: number;
+  date: string;
 };
 
 function pivotLevels(candles: DailyCandle[], timeframe: PriceLevel["timeframe"], kind: "support" | "resistance") {
@@ -196,6 +197,7 @@ function pivotLevels(candles: DailyCandle[], timeframe: PriceLevel["timeframe"],
       price: value,
       timeframe,
       weight: timeframe === "monthly" ? 2 : timeframe === "weekly" ? 1 : 0.75,
+      date: candles[index].date,
     });
   }
   return result;
@@ -207,22 +209,23 @@ function nearestMajorLevel(
   tolerance: number,
   kind: "support" | "resistance",
 ) {
-  const clusters: Array<PriceLevel & { score: number }> = [];
+  const clusters: Array<PriceLevel & { score: number; touchMonths: Set<string> }> = [];
   for (const level of levels.sort((left, right) => left.price - right.price)) {
     const cluster = clusters.find((item) => Math.abs(item.price - level.price) <= tolerance);
     if (cluster) {
       cluster.price = (cluster.price * cluster.score + level.price * level.weight) / (cluster.score + level.weight);
       cluster.score += level.weight;
+      cluster.touchMonths.add(level.date.slice(0, 7));
       if (
         level.timeframe === "monthly"
         || (level.timeframe === "weekly" && cluster.timeframe === "daily")
       ) cluster.timeframe = level.timeframe;
     } else {
-      clusters.push({ ...level, score: level.weight });
+      clusters.push({ ...level, score: level.weight, touchMonths: new Set([level.date.slice(0, 7)]) });
     }
   }
 
-  const eligible = clusters.filter((level) => level.score >= 2 && (
+  const eligible = clusters.filter((level) => level.score >= 2 && level.touchMonths.size >= 2 && (
     kind === "support" ? level.price <= close + tolerance * 2 : level.price >= close
   ));
   if (!eligible.length) return null;
@@ -257,9 +260,18 @@ function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly:
     ...pivotLevels(completedWeekly, "weekly", "resistance"),
     ...pivotLevels(completedMonthly, "monthly", "resistance"),
   ];
-  const support = nearestMajorLevel(supports, close, tolerance, "support");
+  const rawSupport = nearestMajorLevel(supports, close, tolerance, "support");
   const resistanceClusterTolerance = Math.max(close * 0.01, (atr14 ?? 0) * 0.25);
-  const resistance = nearestMajorLevel(resistances, close, resistanceClusterTolerance, "resistance");
+  const rawResistance = nearestMajorLevel(resistances, close, resistanceClusterTolerance, "resistance");
+  const compressedRange = Boolean(
+    rawSupport
+    && rawResistance
+    && rawSupport.price <= close
+    && rawResistance.price > rawSupport.price
+    && rawResistance.price - rawSupport.price <= Math.max(close * 0.045, (atr14 ?? 0) * 1.25),
+  );
+  const support = compressedRange ? null : rawSupport;
+  const resistance = compressedRange ? null : rawResistance;
   const supportDistance = support ? (close - support.price) / close : null;
   const resistanceDistance = resistance ? (resistance.price - close) / close : null;
   const nearSupport = support ? Math.abs(close - support.price) <= Math.max(close * 0.025, (atr14 ?? 0) * 0.75) : false;

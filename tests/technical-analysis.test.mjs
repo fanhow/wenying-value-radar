@@ -165,3 +165,16 @@ test("does not fabricate a daily resistance from only a few breakout candles", (
   assert.equal(result.resistanceLevel, null);
   assert.notEqual(result.supportTimeframe, "daily");
 });
+
+test("does not present a compressed congestion band as a separate support and resistance pair", () => {
+  const candles = Array.from({ length: 180 }, (_, index) => {
+    const close = 38 + Math.sin(index / 5) * 0.35;
+    const recurring = index > 15 && index % 25 === 12;
+    return ohlcCandle(index, close - 0.15, recurring ? 38.8 : close + 0.4, recurring ? 37.5 : close - 0.4, close);
+  });
+  candles[179] = ohlcCandle(179, 38.5, 40.8, 37.8, 38.15, 8_000);
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.supportLevel !== null && result.resistanceLevel !== null, false);
+});
