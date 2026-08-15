@@ -15,7 +15,7 @@ const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   triggers: {
-    crons: ["15 1 * * *", "30 3 15 1,4,7,10 *"],
+    crons: ["15 1 * * *", "30 3 15 1,4,7,10 *", "30 22 * * 1-5"],
   },
   d1_databases: d1
     ? [

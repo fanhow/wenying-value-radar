@@ -2,6 +2,8 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { runSnapshotJob, snapshotKindForCron, type SnapshotValuation } from "../lib/snapshot-scheduler";
+import { loadPublicTechnicalData } from "../lib/public-technical-data";
+import { runTechnicalAlertJob, TECHNICAL_ALERT_CRON } from "../lib/technical-alert-scheduler";
 import { setRuntimeDatabase } from "../lib/runtime-env";
 
 interface Env {
@@ -57,6 +59,13 @@ const worker = {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     setRuntimeDatabase(env.DB);
+    if (controller.cron === TECHNICAL_ALERT_CRON) {
+      ctx.waitUntil(runTechnicalAlertJob({
+        database: env.DB,
+        loadAnalysis: async (target) => (await loadPublicTechnicalData(target.ticker, target.market))?.technicalAnalysis ?? null,
+      }));
+      return;
+    }
     const kind = snapshotKindForCron(controller.cron);
     ctx.waitUntil(runSnapshotJob(kind, {
       database: env.DB,

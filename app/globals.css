@@ -470,6 +470,33 @@ a { color: inherit; text-decoration: none; }
 .detail-note p { margin: 0; color: var(--ink-faint); font-size: 9px; line-height: 1.6; }
 
 .watchlist-section { padding: 69px 0 0; }
+.technical-alert-center { margin-top: 19px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: linear-gradient(135deg, rgba(239,248,244,.9), rgba(247,248,246,.94)); }
+.technical-alert-center-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.technical-alert-center-heading > div:first-child > span, .technical-alert-center-heading small { display: block; color: var(--ink-faint); font-size: 9px; }
+.technical-alert-center-heading > div:first-child > span { color: var(--green); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.technical-alert-center-heading > div:first-child > span b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 7px; padding: 0 5px; border-radius: 999px; background: var(--red); color: white; font-size: 9px; letter-spacing: 0; }
+.technical-alert-center-heading strong { display: block; margin: 5px 0 4px; color: var(--ink); font-size: 16px; }
+.technical-alert-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.technical-alert-actions button { padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: white; color: var(--ink-soft); font-size: 9px; cursor: pointer; }
+.technical-alert-actions button.primary { border-color: var(--green); background: var(--green); color: white; }
+.technical-alert-actions button:disabled { cursor: not-allowed; opacity: .48; }
+.technical-alert-event-list { display: grid; gap: 7px; margin-top: 13px; }
+.technical-alert-event { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1fr) minmax(180px, .7fr); gap: 12px; align-items: center; width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: 7px; background: rgba(255,255,255,.88); text-align: left; cursor: pointer; }
+.technical-alert-event.positive { border-left-color: var(--red); }
+.technical-alert-event.caution { border-left-color: var(--green); }
+.technical-alert-event.watch { border-left-color: #c29132; }
+.technical-alert-event > span { min-width: 0; }
+.technical-alert-event > span:first-child { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 7px; }
+.technical-alert-event i { font-style: normal; }
+.technical-alert-event strong, .technical-alert-event small { display: block; }
+.technical-alert-event strong { color: var(--ink-soft); font-size: 10px; }
+.technical-alert-event.positive > span:nth-child(2) strong { color: var(--red); }
+.technical-alert-event.caution > span:nth-child(2) strong { color: var(--green); }
+.technical-alert-event.watch > span:nth-child(2) strong { color: #956f2b; }
+.technical-alert-event small { margin-top: 3px; overflow: hidden; color: var(--ink-faint); font-size: 8px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.technical-alert-empty { padding: 17px; border: 1px dashed var(--line-strong); border-radius: 7px; color: var(--ink-faint); font-size: 10px; text-align: center; }
+.technical-alert-error { margin: 10px 0 0; color: var(--red); font-size: 9px; }
+.technical-alert-disclaimer { margin: 10px 0 0; color: var(--ink-faint); font-size: 8px; }
 .section-heading-row { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
 .outline-button, .primary-button, .cancel-button { border-radius: 6px; font-size: 11px; }
 .outline-button { padding: 10px 13px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); }
@@ -837,6 +864,11 @@ a { color: inherit; text-decoration: none; }
   .excluded-model-row { display: block; }
   .excluded-model-row p { margin-top: 6px; }
   .watchlist-section { padding-top: 55px; }
+  .technical-alert-center { padding: 12px; }
+  .technical-alert-center-heading { display: block; }
+  .technical-alert-actions { justify-content: flex-start; margin-top: 11px; }
+  .technical-alert-event { grid-template-columns: 1fr; gap: 8px; }
+  .technical-alert-event small { white-space: normal; }
   .section-heading-row { display: block; }
   .outline-button { margin-top: 17px; }
   .watchlist-cards { grid-template-columns: 1fr; }

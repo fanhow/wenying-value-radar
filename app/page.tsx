@@ -36,6 +36,29 @@ type ValuationCandidate = {
   refresh?: boolean;
 };
 
+type TechnicalAlertEvent = {
+  id: number;
+  market: Market;
+  ticker: string;
+  name: string;
+  asOf: string;
+  alertType: "bullish-confirmed" | "bullish-candidate" | "bearish-confirmed" | "bearish-candidate" | "near-support" | "near-resistance" | "support-broken" | "neutral";
+  pattern: string;
+  stage: "candidate" | "confirmed" | "none";
+  close: number;
+  supportLevel: number | null;
+  resistanceLevel: number | null;
+  createdAt: string;
+};
+
+type TechnicalScanRun = {
+  status: "succeeded" | "partial" | "failed";
+  finishedAt: string;
+  targetCount: number;
+  alertCount: number;
+  errorCount: number;
+};
+
 const seedInputs: StockInput[] = [];
 
 const numberFormatter = new Intl.NumberFormat("zh-TW", {
@@ -64,6 +87,29 @@ function stockDescriptor(stock: Pick<StockInput, "name" | "market" | "sector" | 
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
+}
+
+function technicalAlertCopy(alert: TechnicalAlertEvent, language: Language) {
+  const labels = language === "zh" ? {
+    "bullish-confirmed": ["↗ 多頭反轉確認", "紅色", "可進一步檢查小時線與量能"],
+    "bullish-candidate": ["早晨型態候選", "觀察", "等待下一根紅 K 確認"],
+    "bearish-confirmed": ["↘ 空頭反轉確認", "綠色", "避免追價並檢查風險"],
+    "bearish-candidate": ["高檔轉弱候選", "觀察", "等待下一根綠 K 確認"],
+    "near-support": ["接近主要支撐", "觀察", "留意十字星、錘子線或吞噬"],
+    "near-resistance": ["接近主要壓力", "觀察", "避免在壓力區追價"],
+    "support-broken": ["↘ 主要支撐失效", "綠色", "先停止抄底假設"],
+    neutral: ["尚無明確訊號", "中性", "繼續觀察"],
+  } : {
+    "bullish-confirmed": ["↗ Bullish reversal confirmed", "Bullish", "Review the hourly chart and volume"],
+    "bullish-candidate": ["Bullish reversal candidate", "Watch", "Wait for the next bullish candle"],
+    "bearish-confirmed": ["↘ Bearish reversal confirmed", "Bearish", "Avoid chasing and review risk"],
+    "bearish-candidate": ["Bearish reversal candidate", "Watch", "Wait for the next bearish candle"],
+    "near-support": ["Near major support", "Watch", "Look for a doji, hammer, or engulfing pattern"],
+    "near-resistance": ["Near major resistance", "Watch", "Avoid chasing into resistance"],
+    "support-broken": ["↘ Major support invalidated", "Bearish", "Pause the bottom-fishing thesis"],
+    neutral: ["No clear signal", "Neutral", "Keep watching"],
+  };
+  return labels[alert.alertType] ?? labels.neutral;
 }
 
 function formatMultiple(value: number | null | undefined) {
@@ -294,6 +340,13 @@ export default function Home() {
   const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
+  const [technicalClientId, setTechnicalClientId] = useState("");
+  const [technicalAlerts, setTechnicalAlerts] = useState<TechnicalAlertEvent[]>([]);
+  const [technicalLatestScan, setTechnicalLatestScan] = useState<TechnicalScanRun | null>(null);
+  const [technicalLastSeen, setTechnicalLastSeen] = useState("");
+  const [isTechnicalScanLoading, setIsTechnicalScanLoading] = useState(false);
+  const [technicalAlertError, setTechnicalAlertError] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
   const initialTickerHandled = useRef(false);
   const lookupRequest = useRef<AbortController | null>(null);
   const [form, setForm] = useState({
@@ -317,6 +370,9 @@ export default function Home() {
   useEffect(() => {
     let savedStocks: StockInput[] = [];
     let savedWatchlist: string[] = [];
+    let savedClientId = "";
+    let savedTechnicalLastSeen = "";
+    let savedNotificationPermission: NotificationPermission = "default";
     try {
       savedStocks = JSON.parse(
         localStorage.getItem("wenying-value-radar-stocks-v1")
@@ -328,6 +384,13 @@ export default function Home() {
           || localStorage.getItem("stable-value-watchlist-v1")
           || "[]",
       ) as string[];
+      savedClientId = localStorage.getItem("wenying-value-radar-client-v1") ?? "";
+      if (!/^[a-zA-Z0-9-]{16,64}$/.test(savedClientId)) {
+        savedClientId = crypto.randomUUID();
+        localStorage.setItem("wenying-value-radar-client-v1", savedClientId);
+      }
+      savedTechnicalLastSeen = localStorage.getItem("wenying-value-radar-technical-seen-v1") ?? "";
+      if (typeof Notification !== "undefined") savedNotificationPermission = Notification.permission;
     } catch {
       localStorage.removeItem("wenying-value-radar-stocks-v1");
       localStorage.removeItem("wenying-value-radar-watchlist-v1");
@@ -335,6 +398,9 @@ export default function Home() {
     const timer = window.setTimeout(() => {
       if (Array.isArray(savedStocks)) setStockInputs(savedStocks);
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist);
+      setTechnicalClientId(savedClientId);
+      setTechnicalLastSeen(savedTechnicalLastSeen);
+      setNotificationPermission(savedNotificationPermission);
       setHasLoadedStorage(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -482,6 +548,54 @@ export default function Home() {
   }, [filter, overvaluedRankingStocks, query, rankingStocks, sortKey, stocks]);
 
   const watchlistStocks = stocks.filter((stock) => watchlist.includes(stock.ticker));
+  const technicalSubscriptions = useMemo(() => watchlist.map((ticker) => {
+    const stock = stocks.find((candidate) => candidate.ticker === ticker);
+    return {
+      ticker,
+      market: stock?.market ?? (/^\d/.test(ticker) ? "TW" as const : "US" as const),
+      name: stock?.name ?? ticker,
+    };
+  }), [stocks, watchlist]);
+  const newTechnicalAlertCount = technicalAlerts.filter((alert) => !technicalLastSeen || alert.createdAt > technicalLastSeen).length;
+
+  const applyTechnicalAlertPayload = useCallback((payload: { rows?: TechnicalAlertEvent[]; latestScan?: TechnicalScanRun | null }) => {
+    setTechnicalAlerts(Array.isArray(payload.rows) ? payload.rows : []);
+    setTechnicalLatestScan(payload.latestScan ?? null);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStorage || !technicalClientId) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/technical-alerts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "sync", clientId: technicalClientId, subscriptions: technicalSubscriptions }),
+          signal: controller.signal,
+        });
+        const payload = await response.json() as { rows?: TechnicalAlertEvent[]; latestScan?: TechnicalScanRun | null };
+        if (response.ok) applyTechnicalAlertPayload(payload);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setTechnicalAlertError(t("技術提醒暫時無法同步", "Technical alerts could not sync"));
+      }
+    }, 400);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [applyTechnicalAlertPayload, hasLoadedStorage, t, technicalClientId, technicalSubscriptions]);
+
+  useEffect(() => {
+    const latest = technicalAlerts[0];
+    if (!latest || notificationPermission !== "granted" || (technicalLastSeen && latest.createdAt <= technicalLastSeen)) return;
+    const notificationKey = `technical-alert-${latest.id}`;
+    if (localStorage.getItem("wenying-value-radar-last-notification-v1") === notificationKey) return;
+    const [title, , detail] = technicalAlertCopy(latest, language);
+    const notification = new Notification(`${latest.ticker} · ${title}`, { body: detail });
+    localStorage.setItem("wenying-value-radar-last-notification-v1", notificationKey);
+    return () => notification.close();
+  }, [language, notificationPermission, technicalAlerts, technicalLastSeen]);
   const undervaluedCount = rankingStocks.length;
   const overvaluedCount = overvaluedRankingStocks.length;
   const displayedUniverseCount = filter === "undervalued"
@@ -548,6 +662,38 @@ export default function Home() {
 
   function toggleWatchlist(ticker: string) {
     setWatchlist((current) => (current.includes(ticker) ? current.filter((item) => item !== ticker) : [...current, ticker]));
+  }
+
+  async function scanTechnicalAlerts() {
+    if (!technicalClientId || isTechnicalScanLoading) return;
+    setIsTechnicalScanLoading(true);
+    setTechnicalAlertError("");
+    try {
+      const response = await fetch("/api/technical-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "scan", clientId: technicalClientId }),
+      });
+      const payload = await response.json() as { rows?: TechnicalAlertEvent[]; latestScan?: TechnicalScanRun | null; error?: string };
+      if (!response.ok) throw new Error(payload.error || "scan failed");
+      applyTechnicalAlertPayload(payload);
+    } catch {
+      setTechnicalAlertError(t("本次技術掃描未完成，請稍後重試", "The technical scan did not complete; try again later"));
+    } finally {
+      setIsTechnicalScanLoading(false);
+    }
+  }
+
+  function markTechnicalAlertsSeen() {
+    const seenAt = new Date().toISOString();
+    localStorage.setItem("wenying-value-radar-technical-seen-v1", seenAt);
+    setTechnicalLastSeen(seenAt);
+  }
+
+  async function enableTechnicalNotifications() {
+    if (typeof Notification === "undefined") return;
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
   }
 
   async function requestValuation(candidate: ValuationCandidate, signal?: AbortSignal) {
@@ -871,6 +1017,32 @@ export default function Home() {
 
         <section id="watchlist" className="watchlist-section">
           <div className="section-heading-row"><div><p className="section-kicker">MY WATCHLIST / 03</p><h2>{t("我的觀察清單", "My Watchlist")}</h2><p>{t("把你正在研究的股票集中在這裡，搜尋代碼即可回到估值明細", "Keep the stocks you are researching together and return to their valuation details in one click")}</p></div><button type="button" className="outline-button" onClick={() => setShowAddForm(true)}><span>＋</span> {t("新增自訂標的", "Add custom stock")}</button></div>
+          <div className="technical-alert-center" aria-live="polite">
+            <div className="technical-alert-center-heading">
+              <div><span>{t("背景技術掃描", "Background technical scan")}{newTechnicalAlertCount > 0 && <b>{newTechnicalAlertCount}</b>}</span><strong>{t("觀察清單技術提醒", "Watchlist technical alerts")}</strong><small>{technicalLatestScan
+                ? t(`最近掃描 ${new Date(technicalLatestScan.finishedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false })} · ${technicalLatestScan.targetCount} 檔`, `Last scan ${new Date(technicalLatestScan.finishedAt).toLocaleString("en-US", { timeZone: "Asia/Taipei" })} · ${technicalLatestScan.targetCount} stocks`)
+                : t("每日台灣時間 06:30 自動檢查，也可立即手動檢查", "Runs daily at 06:30 Taiwan time, with manual scans available")}</small></div>
+              <div className="technical-alert-actions">
+                {notificationPermission === "default" && <button type="button" onClick={() => void enableTechnicalNotifications()}>{t("開啟網站通知", "Enable site notifications")}</button>}
+                {newTechnicalAlertCount > 0 && <button type="button" onClick={markTechnicalAlertsSeen}>{t("標為已讀", "Mark read")}</button>}
+                <button type="button" className="primary" disabled={isTechnicalScanLoading || technicalSubscriptions.length === 0} onClick={() => void scanTechnicalAlerts()}>{isTechnicalScanLoading ? t("掃描中…", "Scanning…") : t("立即檢查", "Scan now")}</button>
+              </div>
+            </div>
+            {technicalAlertError && <p className="technical-alert-error">{technicalAlertError}</p>}
+            <div className="technical-alert-event-list">
+              {technicalAlerts.slice(0, 8).map((alert) => {
+                const [title, , detail] = technicalAlertCopy(alert, language);
+                const tone = alert.alertType.startsWith("bullish") ? "positive" : alert.alertType.startsWith("bearish") || alert.alertType === "support-broken" ? "caution" : "watch";
+                return <button type="button" key={alert.id} className={`technical-alert-event ${tone}`} onClick={() => openWatchlistStock(alert.ticker)}>
+                  <span><i className={`ticker-badge market-${alert.market.toLowerCase()}`}>{alert.market}</i><strong>{alert.ticker}</strong><small>{alert.name}</small></span>
+                  <span><strong>{title}</strong><small>{detail}</small></span>
+                  <span><strong>{formatPrice(alert.close, alert.market)}</strong><small>{alert.asOf}{alert.supportLevel !== null ? ` · ${t("支撐", "Support")} ${formatPrice(alert.supportLevel, alert.market)}` : alert.resistanceLevel !== null ? ` · ${t("壓力", "Resistance")} ${formatPrice(alert.resistanceLevel, alert.market)}` : ""}</small></span>
+                </button>;
+              })}
+              {technicalAlerts.length === 0 && <div className="technical-alert-empty">{technicalSubscriptions.length === 0 ? t("先把股票加入觀察清單，背景掃描才會追蹤。", "Add stocks to the watchlist before background scanning starts.") : t("目前尚無需要提醒的候選、確認或支撐失效訊號。", "No candidate, confirmed, or support-break alerts yet.")}</div>}
+            </div>
+            <p className="technical-alert-disclaimer">{t("桌面通知只會在網站開啟時顯示；技術型態是研究提示，不是自動買賣指令。", "Desktop notices appear while the site is open. Technical patterns are research prompts, not automatic trading instructions.")}</p>
+          </div>
           <div className="watchlist-cards">
             {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => {
               const direction = valuationDirection(stock.upside);

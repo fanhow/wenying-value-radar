@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const marketPriceSnapshots = sqliteTable("market_price_snapshots", {
   market: text("market").notNull(),
@@ -76,3 +76,43 @@ export const taiwanFinancialHistory = sqliteTable("taiwan_financial_history", {
   pretaxIncome: real("pretax_income"),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [primaryKey({ columns: [table.ticker, table.fiscalYear] })]);
+
+export const technicalWatchSubscriptions = sqliteTable("technical_watch_subscriptions", {
+  clientId: text("client_id").notNull(),
+  market: text("market").notNull(),
+  ticker: text("ticker").notNull(),
+  name: text("name").notNull().default(""),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.clientId, table.market, table.ticker] }),
+  index("idx_technical_watch_market_ticker").on(table.market, table.ticker),
+]);
+
+export const technicalAlertEvents = sqliteTable("technical_alert_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  market: text("market").notNull(),
+  ticker: text("ticker").notNull(),
+  asOf: text("as_of").notNull(),
+  alertType: text("alert_type").notNull(),
+  pattern: text("pattern").notNull(),
+  stage: text("stage").notNull(),
+  close: real("close").notNull(),
+  supportLevel: real("support_level"),
+  resistanceLevel: real("resistance_level"),
+  payload: text("payload").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_technical_alert_unique_event").on(table.market, table.ticker, table.asOf, table.alertType),
+  index("idx_technical_alert_ticker_time").on(table.market, table.ticker, table.createdAt),
+  index("idx_technical_alert_created_at").on(table.createdAt),
+]);
+
+export const technicalScanRuns = sqliteTable("technical_scan_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  status: text("status").notNull(),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at").notNull(),
+  targetCount: integer("target_count").notNull().default(0),
+  alertCount: integer("alert_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+}, (table) => [index("idx_technical_scan_started_at").on(table.startedAt)]);

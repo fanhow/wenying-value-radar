@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.16.1";
+const SITE_REVISION = "Rev. 2026.08.16.2";
 
 const REVISION_ENTRIES = [
+  ["2026.08.16.2", "加入觀察清單背景技術掃描、D1 提醒紀錄、即時檢查與站內通知中心。", "Added background watchlist scans, durable D1 alert history, on-demand checks, and an in-site alert center."],
   ["2026.08.16.1", "加入週月支撐壓力、早晨與黃昏之星、吞噬、錘子與流星線的分級技術提醒。", "Added staged technical alerts for weekly/monthly levels, morning/evening stars, engulfing, hammers, and shooting stars."],
   ["2026.08.15.3", "調整導覽順序與大標題標點，觀察清單加入同字級方向箭頭及個別移除功能。", "Reordered navigation, cleaned headline punctuation, and added equal-size direction arrows and per-item removal to the watchlist."],
   ["2026.08.15.2", "修復 Cloudflare Workers 型別檢查，市場情緒改用口語提示並加入台灣習慣的紅升綠跌方向箭頭。", "Fixed Cloudflare Workers type checking, simplified sentiment wording, and added Taiwan-style red-up and green-down direction arrows."],
