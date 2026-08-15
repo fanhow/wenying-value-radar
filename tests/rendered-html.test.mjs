@@ -49,7 +49,8 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.16\.3/);
+  assert.match(html, /Rev\. 2026\.08\.16\.4/);
+  assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /timeframeLabel\(analysis\.supportTimeframe/);
   assert.match(source, /className="watch-remove"/);
   assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(stock\.upside\)/);
   assert.match(styles, /stock-table tbody tr > td \{ width: auto !important; min-width: 0; display: block; \}/);

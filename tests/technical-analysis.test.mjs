@@ -149,3 +149,19 @@ test("keeps primary resistance above price and promotes a former support zone co
   assert.ok((result.resistanceLevel ?? 0) > result.close);
   assert.ok((result.resistanceLevel ?? 0) >= 33.2 && (result.resistanceLevel ?? 0) <= 34);
 });
+
+test("does not fabricate a daily resistance from only a few breakout candles", () => {
+  const candles = Array.from({ length: 140 }, (_, index) => {
+    const close = 30 + Math.sin(index / 6) * 0.45;
+    return ohlcCandle(index, close - 0.1, close + 0.35, close - 0.35, close);
+  });
+  [32, 34, 36, 39, 38.15].forEach((close, offset) => {
+    const index = candles.length - 5 + offset;
+    candles[index] = ohlcCandle(index, close - 0.4, close + 0.8, close - 0.8, close, 5_000 + offset * 1_000);
+  });
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.resistanceLevel, null);
+  assert.notEqual(result.supportTimeframe, "daily");
+});

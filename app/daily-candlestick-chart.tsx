@@ -50,10 +50,10 @@ function YahooCandlestickChart({ candles, ticker, language, analysis }: { candle
   const labelIndexes = Array.from(new Set([0, 24, 48, 72, 96, candles.length - 1].filter((index) => index >= 0 && index < candles.length)));
   const keyLevels = [
     analysis?.supportLevel && analysis.supportLevel >= low && analysis.supportLevel <= high
-      ? { key: "support", value: analysis.supportLevel, color: "#b98224", label: language === "zh" ? "支撐" : "Support" }
+      ? { key: "support", value: analysis.supportLevel, color: "#b98224", label: language === "zh" ? `${timeframeLabel(analysis.supportTimeframe, language)}支撐` : `${timeframeLabel(analysis.supportTimeframe, language)} support` }
       : null,
     analysis?.resistanceLevel && analysis.resistanceLevel >= low && analysis.resistanceLevel <= high
-      ? { key: "resistance", value: analysis.resistanceLevel, color: "#667a80", label: language === "zh" ? "壓力" : "Resistance" }
+      ? { key: "resistance", value: analysis.resistanceLevel, color: "#667a80", label: language === "zh" ? `${timeframeLabel(analysis.resistanceTimeframe, language)}壓力` : `${timeframeLabel(analysis.resistanceTimeframe, language)} resistance` }
       : null,
   ].filter((level): level is { key: string; value: number; color: string; label: string } => level !== null);
 
@@ -63,7 +63,7 @@ function YahooCandlestickChart({ candles, ticker, language, analysis }: { candle
       <svg className="yahoo-candlestick-svg" viewBox="0 0 1000 880" preserveAspectRatio="none" role="img" aria-label={language === "zh" ? `${ticker} 近 120 個交易日 K 線` : `${ticker} 120-session candlestick chart`}>
         <rect x="0" y="0" width="1000" height="880" fill="#fbfcfb" />
         {gridValues.map((value) => <g key={value}><line x1={left} x2={right} y1={y(value)} y2={y(value)} stroke="#dfe7e2" strokeWidth="1" /><text x="945" y={y(value) + 4} fill="#72858a" fontSize="12">{value.toFixed(value >= 100 ? 0 : 1)}</text></g>)}
-        {keyLevels.map((level) => <g key={level.key}><line x1={left} x2={right} y1={y(level.value)} y2={y(level.value)} stroke={level.color} strokeWidth="1.5" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" /><rect x={left + 5} y={y(level.value) - 17} width="112" height="16" rx="3" fill="#fbfcfb" opacity=".9" /><text x={left + 10} y={y(level.value) - 5} fill={level.color} fontSize="11" fontWeight="700">{level.label} {formatIndicator(level.value)}</text></g>)}
+        {keyLevels.map((level) => <g key={level.key}><line x1={left} x2={right} y1={y(level.value)} y2={y(level.value)} stroke={level.color} strokeWidth="1.5" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" /><rect x={left + 5} y={y(level.value) - 17} width="160" height="16" rx="3" fill="#fbfcfb" opacity=".9" /><text x={left + 10} y={y(level.value) - 5} fill={level.color} fontSize="11" fontWeight="700">{level.label} {formatIndicator(level.value)}</text></g>)}
         {candles.map((candle, index) => {
           const rising = candle.close >= candle.open;
           const color = rising ? "#d94b45" : "#15986c";
