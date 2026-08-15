@@ -49,7 +49,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.15\.3/);
+  assert.match(html, /Rev\. 2026\.08\.16\.1/);
   assert.match(source, /className="watch-remove"/);
   assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(stock\.upside\)/);
   assert.match(styles, /stock-table tbody tr > td \{ width: auto !important; min-width: 0; display: block; \}/);

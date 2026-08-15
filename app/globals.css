@@ -428,15 +428,27 @@ a { color: inherit; text-decoration: none; }
 .technical-analysis-heading strong { display: block; color: var(--ink); font-size: 10px; }
 .technical-analysis-heading span, .technical-analysis-heading small { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 8px; }
 .technical-analysis-heading small { margin-top: 0; text-align: right; }
+.technical-alert-banner { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; align-items: center; margin-top: 9px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,.82); }
+.technical-alert-banner span { color: var(--ink-faint); font-size: 8px; font-weight: 700; }
+.technical-alert-banner strong { color: var(--ink-soft); font-size: 12px; }
+.technical-alert-banner small { grid-column: 1 / -1; color: var(--ink-faint); font-size: 8px; line-height: 1.55; }
+.technical-alert-banner.positive { border-color: rgba(217,75,69,.28); background: rgba(217,75,69,.06); }
+.technical-alert-banner.positive strong { color: var(--red); }
+.technical-alert-banner.watch { border-color: rgba(188,140,50,.3); background: rgba(255,247,225,.78); }
+.technical-alert-banner.watch strong { color: #956f2b; }
+.technical-alert-banner.caution { border-color: rgba(21,152,108,.3); background: rgba(21,152,108,.06); }
+.technical-alert-banner.caution strong { color: var(--green); }
 .technical-analysis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 9px; }
 .technical-signal { min-width: 0; padding: 9px 10px; border-left: 3px solid var(--line-strong); border-radius: 5px; background: rgba(255,255,255,.82); }
 .technical-signal.positive { border-left-color: var(--red); }
 .technical-signal.caution { border-left-color: var(--green); }
+.technical-signal.watch { border-left-color: #c29132; }
 .technical-signal.muted { opacity: .78; }
 .technical-signal span, .technical-signal small { display: block; color: var(--ink-faint); font-size: 8px; line-height: 1.5; }
 .technical-signal strong { display: block; margin: 4px 0; color: var(--ink-soft); font-size: 11px; }
 .technical-signal.positive strong { color: var(--red); }
 .technical-signal.caution strong { color: var(--green); }
+.technical-signal.watch strong { color: #956f2b; }
 .public-chart-widget { width: 100%; height: 720px; min-height: 720px; margin-top: 10px; overflow: hidden; border-radius: 6px; }
 .public-chart-widget iframe { height: 100% !important; min-height: 720px !important; }
 .yahoo-chart-widget { position: relative; border: 1px solid #e2e9e5; background: #fbfcfb; }
