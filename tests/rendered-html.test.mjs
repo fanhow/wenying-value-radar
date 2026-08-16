@@ -49,10 +49,14 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.16\.8/);
+  assert.match(html, /Rev\. 2026\.08\.16\.9/);
   assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /timeframeLabel\(analysis\.supportTimeframe/);
-  assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /chart-timeframe-switch/);
-  assert.match(await readFile(new URL("../app/echarts-candlestick-chart.tsx", import.meta.url), "utf8"), /candlestick/);
+  const candlestickSource = await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8");
+  const echartsSource = await readFile(new URL("../app/echarts-candlestick-chart.tsx", import.meta.url), "utf8");
+  assert.match(candlestickSource, /state === "ready" && <div className="chart-timeframe-switch"/);
+  assert.doesNotMatch(candlestickSource, /TradingViewChart|s3\.tradingview\.com/);
+  assert.match(echartsSource, /type: "candlestick"/);
+  assert.match(echartsSource, /formatter: "\{b\}"/);
   assert.match(await readFile(new URL("../lib/trend-structure.ts", import.meta.url), "utf8"), /detectTrendStructure/);
   assert.match(await readFile(new URL("../lib/public-technical-data.ts", import.meta.url), "utf8"), /weeklyCandles:[\s\S]*monthlyCandles:/);
   assert.match(source, /className="watch-remove"/);

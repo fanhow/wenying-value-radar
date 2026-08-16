@@ -42,7 +42,7 @@ function boundarySeries(name: string, boundary: TrendBoundary, candles: DailyCan
 }
 
 function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: { candles: DailyCandle[]; ticker: string; language: Language; analysis: TechnicalAnalysis | null; timeframe: ChartTimeframe }) {
-  const trend = detectTrendStructure(candles);
+  const trend = detectTrendStructure(candles, timeframe);
   const timeframeName = timeframeLabel(timeframe, language);
   const keyLevels = (analysis?.keyLevels ?? []).map((level) => ({
     name: language === "zh"
@@ -51,10 +51,20 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
     yAxis: level.price,
     lineStyle: {
       color: level.kind === "support" ? "#a8731d" : "#566f78",
-      type: level.timeframe === "daily" ? "dashed" : level.timeframe === "weekly" ? "dotted" : "solid",
-      width: level.timeframe === "monthly" ? 2 : 1,
+      type: level.timeframe === "daily" ? [4, 4] : level.timeframe === "weekly" ? [8, 5] : [2, 3, 10, 3],
+      width: level.timeframe === "monthly" ? 2 : 1.5,
     },
-    label: { show: true, position: "insideStartTop", color: level.kind === "support" ? "#8f6817" : "#566f78" },
+    label: {
+      show: true,
+      formatter: "{b}",
+      position: "insideStartTop",
+      color: level.kind === "support" ? "#8f6817" : "#566f78",
+      backgroundColor: "rgba(251,252,251,.92)",
+      padding: [2, 4],
+      borderRadius: 3,
+      fontSize: 10,
+      fontWeight: 700,
+    },
   }));
   const trendSeries = trend.channel
     ? [

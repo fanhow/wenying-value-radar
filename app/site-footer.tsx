@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.16.8";
+const SITE_REVISION = "Rev. 2026.08.16.9";
 
 const REVISION_ENTRIES = [
+  ["2026.08.16.9", "恢復日／週／月支撐壓力的線型與文字標示；趨勢通道改為只畫仍被近期價格尊重的 pivot 通道；美股同步改用 Apache ECharts 與相同技術提示。", "Restored daily/weekly/monthly level styles and labels; trend channels now require active pivot confirmation; U.S. charts now use Apache ECharts with the same technical signals."],
   ["2026.08.16.8", "台股站內 K 線改用 Apache ECharts，保留日／週／月切換，加入自動趨勢線與上升／下降通道；美股維持 TradingView。", "Taiwan in-site candles now use Apache ECharts with daily/weekly/monthly switching, automatic trendlines, and ascending/descending channels; US charts remain on TradingView."],
   ["2026.08.16.7", "修正外部市場資料暫時回傳無效內容時，公允價值排行榜會消失的問題。", "Fixed the fair-value ranking disappearing when an optional market source temporarily returns invalid content."],
   ["2026.08.16.6", "台股 K 線可切換日線、週線與月線，並分別標示可信的多週期支撐壓力；星形候選加入趨勢、均線乖離、十字 K 與跳空條件。", "Taiwan charts now switch between daily, weekly, and monthly candles with credible multi-timeframe levels; star candidates now include trend, MA deviation, doji, and gap evidence."],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CorporateAction, DailyCandle } from "../lib/price-history";
 import type { CandlestickPattern, TechnicalAnalysis } from "../lib/technical-analysis";
 import { EChartsCandlestickChart } from "./echarts-candlestick-chart";
@@ -11,7 +11,6 @@ type ChartTimeframe = "daily" | "weekly" | "monthly";
 type ChartResult = {
   requestUrl: string;
   yahooSymbol: string;
-  tradingViewSymbol: string;
   candles: DailyCandle[];
   weeklyCandles: DailyCandle[];
   monthlyCandles: DailyCandle[];
@@ -19,51 +18,6 @@ type ChartResult = {
   technicalAnalysis: TechnicalAnalysis | null;
   state: "ready" | "empty";
 };
-
-function TradingViewChart({ symbol, language }: { symbol: string; language: Language }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.replaceChildren();
-
-    const widget = document.createElement("div");
-    widget.className = "tradingview-widget-container__widget";
-    widget.style.height = "100%";
-    widget.style.width = "100%";
-
-    const script = document.createElement("script");
-    script.type = "text/javascript";
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.async = true;
-    script.textContent = JSON.stringify({
-      autosize: true,
-      symbol,
-      interval: "D",
-      timezone: "Asia/Taipei",
-      theme: "light",
-      backgroundColor: "#fbfcfb",
-      gridColor: "rgba(19, 43, 45, 0.06)",
-      style: "1",
-      locale: language === "zh" ? "zh_TW" : "en",
-      hide_side_toolbar: true,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      hide_volume: false,
-      withdateranges: true,
-      allow_symbol_change: false,
-      save_image: false,
-      calendar: false,
-      support_host: "https://www.tradingview.com",
-    });
-
-    container.append(widget, script);
-    return () => container.replaceChildren();
-  }, [language, symbol]);
-
-  return <div ref={containerRef} className="tradingview-widget-container public-chart-widget" />;
-}
 
 function formatIndicator(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "—";
@@ -214,35 +168,29 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
     const controller = new AbortController();
     void fetch(requestUrl, { signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { symbol?: string; tradingViewSymbol?: string; candles?: DailyCandle[]; weeklyCandles?: DailyCandle[]; monthlyCandles?: DailyCandle[]; corporateActions?: CorporateAction[]; technicalAnalysis?: TechnicalAnalysis | null };
+        const payload = await response.json() as { symbol?: string; candles?: DailyCandle[]; weeklyCandles?: DailyCandle[]; monthlyCandles?: DailyCandle[]; corporateActions?: CorporateAction[]; technicalAnalysis?: TechnicalAnalysis | null };
         const yahooSymbol = String(payload.symbol ?? "").trim();
-        const tradingViewSymbol = String(payload.tradingViewSymbol ?? "").trim();
         const candles = Array.isArray(payload.candles) ? payload.candles : [];
         setResult({
           requestUrl,
           yahooSymbol,
-          tradingViewSymbol,
           candles,
           weeklyCandles: Array.isArray(payload.weeklyCandles) ? payload.weeklyCandles : [],
           monthlyCandles: Array.isArray(payload.monthlyCandles) ? payload.monthlyCandles : [],
           corporateActions: Array.isArray(payload.corporateActions) ? payload.corporateActions : [],
           technicalAnalysis: payload.technicalAnalysis ?? null,
-          state: response.ok && yahooSymbol && (market === "TW" ? candles.length >= 20 : Boolean(tradingViewSymbol)) ? "ready" : "empty",
+          state: response.ok && yahooSymbol && candles.length >= 20 ? "ready" : "empty",
         });
       })
       .catch((error) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setResult({ requestUrl, yahooSymbol: "", tradingViewSymbol: "", candles: [], weeklyCandles: [], monthlyCandles: [], corporateActions: [], technicalAnalysis: null, state: "empty" });
+          setResult({ requestUrl, yahooSymbol: "", candles: [], weeklyCandles: [], monthlyCandles: [], corporateActions: [], technicalAnalysis: null, state: "empty" });
         }
       });
     return () => controller.abort();
   }, [market, requestUrl]);
 
-  const chartSymbol = currentResult?.tradingViewSymbol ?? "";
   const yahooSymbol = currentResult?.yahooSymbol ?? (market === "TW" ? `${ticker}.TW` : ticker);
-  const tradingViewHref = chartSymbol
-    ? `https://www.tradingview.com/symbols/${chartSymbol.replace(":", "-")}/`
-    : "https://www.tradingview.com/";
   const yahooHref = `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol)}/chart/`;
   const corporateActions = currentResult?.corporateActions ?? [];
   const candles = timeframe === "weekly"
@@ -257,7 +205,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       <div className="detail-section-title chart-title-row">
         <div>
           <h3>{language === "zh" ? "公開技術 K 線" : "Public Technical Chart"}</h3>
-          <span>{market === "TW" ? (language === "zh" ? "Yahoo Finance 公開資料 · Apache ECharts 日／週／月 K 線、趨勢線與通道" : "Yahoo Finance public data · Apache ECharts daily, weekly, monthly candles, trendlines, and channels") : (language === "zh" ? "TradingView · 可切換日／週／月與技術指標" : "TradingView · switch daily, weekly, monthly, and technical indicators")}</span>
+          <span>{language === "zh" ? "Yahoo Finance 公開資料 · Apache ECharts 日／週／月 K 線、可信線位與有效趨勢通道" : "Yahoo Finance public data · Apache ECharts daily, weekly, monthly candles, credible levels, and active trend channels"}</span>
         </div>
         <a href={yahooHref} target="_blank" rel="noopener noreferrer">{language === "zh" ? "Yahoo Finance ↗" : "Yahoo Finance ↗"}</a>
       </div>
@@ -272,13 +220,13 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       {technicalAnalysis && <TechnicalAnalysisPanel analysis={technicalAnalysis} language={language} />}
       {state === "loading" && <div className="chart-state">{language === "zh" ? "正在載入公開 K 線…" : "Loading public chart…"}</div>}
       {state === "empty" && <div className="chart-state">{language === "zh" ? "目前無法載入公開 K 線，估值資料不受影響" : "The public chart is unavailable; valuation is unaffected"}</div>}
-      {state === "ready" && market === "TW" && <div className="chart-timeframe-switch" role="group" aria-label={language === "zh" ? "K 線週期" : "Chart timeframe"}>
+      {state === "ready" && <div className="chart-timeframe-switch" role="group" aria-label={language === "zh" ? "K 線週期" : "Chart timeframe"}>
         {(["daily", "weekly", "monthly"] as const).map((option) => <button key={option} type="button" className={timeframe === option ? "active" : ""} aria-pressed={timeframe === option} onClick={() => setTimeframe(option)}>{timeframeLabel(option, language)}</button>)}
       </div>}
-      {state === "ready" && (market === "TW" ? <EChartsCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} timeframe={timeframe} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}
+      {state === "ready" && <EChartsCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} timeframe={timeframe} />}
       <p className="chart-footnote">
-        {language === "zh" ? "外部圖表僅供技術型態判讀，不納入公允價值計算。" : "The external chart is for technical review only and is not included in fair-value calculations."}{" "}
-        {market === "TW" ? <a href={yahooHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "行情資料由 Yahoo Finance 提供" : "market data by Yahoo Finance"}</a> : <a href={tradingViewHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "圖表由 TradingView 提供" : "chart by TradingView"}</a>}
+        {language === "zh" ? "公開行情圖表僅供技術型態判讀，不納入公允價值計算。" : "The public market chart is for technical review only and is not included in fair-value calculations."}{" "}
+        <a href={yahooHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "行情資料由 Yahoo Finance 提供" : "market data by Yahoo Finance"}</a>
       </p>
     </section>
   );
