@@ -4,11 +4,12 @@ import handler from "vinext/server/app-router-entry";
 import { runSnapshotJob, snapshotKindForCron, type SnapshotValuation } from "../lib/snapshot-scheduler";
 import { loadPublicTechnicalData } from "../lib/public-technical-data";
 import { runTechnicalAlertJob, TECHNICAL_ALERT_CRON } from "../lib/technical-alert-scheduler";
-import { setRuntimeDatabase } from "../lib/runtime-env";
+import { setRuntimeDatabase, setRuntimeMarketScanMode } from "../lib/runtime-env";
 
 interface Env {
   ASSETS: Fetcher;
   DB?: D1Database;
+  MARKET_SCAN_MODE?: "live" | "snapshot";
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -38,6 +39,7 @@ const worker = {
   async fetch(request: Request, env: Env | undefined, ctx: ExecutionContext): Promise<Response> {
     const runtimeEnv = (env ?? {}) as Env;
     setRuntimeDatabase(runtimeEnv.DB);
+    setRuntimeMarketScanMode(runtimeEnv.MARKET_SCAN_MODE);
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {

@@ -22,6 +22,7 @@ declare global {
   }
 
   var __WENYING_DB: D1Database | undefined;
+  var __WENYING_MARKET_SCAN_MODE: "live" | "snapshot" | undefined;
 }
 
 export function setRuntimeDatabase(database: D1Database | undefined) {
@@ -30,4 +31,12 @@ export function setRuntimeDatabase(database: D1Database | undefined) {
 
 export function getRuntimeDatabase() {
   return globalThis.__WENYING_DB;
+}
+
+export function setRuntimeMarketScanMode(mode: "live" | "snapshot" | undefined) {
+  globalThis.__WENYING_MARKET_SCAN_MODE = mode;
+}
+
+export function getRuntimeMarketScanMode() {
+  return globalThis.__WENYING_MARKET_SCAN_MODE;
 }

@@ -1,24 +1,26 @@
-import { NextResponse } from "next/server";
-import { buildComparableMap } from "../../../lib/market-comparables";
-import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan";
-import type { StockInput } from "../../../lib/valuation";
-import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry";
-import { optionalPublicRows } from "../../../lib/optional-public-rows";
-import tpexSnapshot from "../../../lib/tpex-snapshot.json";
-import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
+import { NextResponse } from "next/server.js";
+import { buildComparableMap } from "../../../lib/market-comparables.ts";
+import { selectMarketCandidates, type MarketScanRow } from "../../../lib/market-scan.ts";
+import type { StockInput } from "../../../lib/valuation.ts";
+import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry.ts";
+import { optionalPublicRows } from "../../../lib/optional-public-rows.ts";
+import { getRuntimeMarketScanMode } from "../../../lib/runtime-env.ts";
+import marketScanSnapshot from "../../../lib/market-scan-snapshot.json" with { type: "json" };
+import tpexSnapshot from "../../../lib/tpex-snapshot.json" with { type: "json" };
+import usMarketSnapshot from "../../../lib/us-market-snapshot.json" with { type: "json" };
 import {
   readFinancialSnapshots,
   readLatestSnapshotRun,
   readMarketPriceSnapshots,
   type FinancialSnapshot,
   type MarketPriceSnapshot,
-} from "../../../lib/snapshot-store";
+} from "../../../lib/snapshot-store.ts";
 
 type TwseRatioRow = { Date?: string; Code?: string; Name?: string; PEratio?: string; PBratio?: string };
 type TwseDailyRow = { Date?: string; Code?: string; Name?: string; ClosingPrice?: string; TradeVolume?: string };
 type TaiwanCompanyRow = Record<string, unknown>;
 
-export async function GET() {
+export async function buildLiveMarketScan() {
   const [twseRatios, twseDaily, twseCompanyData, tpexCompanyData] = await Promise.all([
     optionalPublicRows<TwseRatioRow>("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL"),
     optionalPublicRows<TwseDailyRow>("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"),
@@ -115,11 +117,22 @@ export async function GET() {
     ...selectMarketCandidates(refreshedUsUniverse, "overvalued", 20, usComparableMap),
   ];
 
-  return NextResponse.json({
+  const payload = {
     scannedCount: taiwanUniverse.length + usUniverse.length,
     scannedByMarket: { TW: taiwanUniverse.length, US: usUniverse.length },
     candidates,
     overvaluedCandidates,
     snapshotRun: latestSnapshotRun,
-  });
+  };
+
+  return { payload, taiwanUniverse: refreshedTaiwanUniverse };
+}
+
+export async function GET() {
+  if (getRuntimeMarketScanMode() === "snapshot") {
+    return NextResponse.json(marketScanSnapshot);
+  }
+
+  const { payload } = await buildLiveMarketScan();
+  return NextResponse.json(payload);
 }

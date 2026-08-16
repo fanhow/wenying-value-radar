@@ -21,6 +21,9 @@ import { normalizeSector } from "../../../lib/sector-normalization";
 import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry";
 import { financialInputsFromTaiwanHistory, loadTaiwanFinancialHistory } from "../../../lib/taiwan-financials";
 import { readValuationQueryCache, saveValuationQueryCache } from "../../../lib/valuation-cache";
+import { marketStockFromRatio, type MarketScanRow } from "../../../lib/market-scan";
+import { getRuntimeMarketScanMode } from "../../../lib/runtime-env";
+import marketScanSnapshot from "../../../lib/market-scan-snapshot.json" with { type: "json" };
 import {
   latestMarketQuoteFromCandles,
   parseYahooDailyCandles,
@@ -271,6 +274,7 @@ function valueUsSnapshot(
   ticker: string,
   snapshot: ArkUsSnapshotRow,
   fallbackReason: SnapshotFallbackReason = "unavailable",
+  lightweight = false,
 ) {
   const price = preferCapturedPrice(body.capturedPrice, numeric(snapshot.price));
   const eps = Math.max(numeric(snapshot.eps), 0);
@@ -304,7 +308,16 @@ function valueUsSnapshot(
     fcfPerShare,
     dividendPerShare: Math.max(numeric(snapshot.dividendPerShare), 0),
     ...targets,
-    ...comparableInputForTicker(ticker),
+    ...(lightweight ? {
+      targetPb: snapshot.targetPb ?? targets.targetPb,
+      targetPe: snapshot.targetPe ?? targets.targetPe,
+      targetPsMultiple: snapshot.targetPsMultiple ?? undefined,
+      targetEvRevenueMultiple: snapshot.targetEvRevenueMultiple ?? undefined,
+      targetEvEbitdaMultiple: snapshot.targetEvEbitdaMultiple ?? undefined,
+      ffoPerShare: snapshot.ffoPerShare ?? undefined,
+      affoPerShare: snapshot.affoPerShare ?? undefined,
+      targetFfoMultiple: snapshot.targetFfoMultiple ?? undefined,
+    } : comparableInputForTicker(ticker)),
     revenueGrowth,
     roe,
     debtRatio,
@@ -821,7 +834,27 @@ export async function POST(request: NextRequest) {
       const cached = await readValuationQueryCache(market, ticker);
       if (cached) return NextResponse.json({ stock: cached, cache: "d1" });
     }
-    const stock = market === "TW" ? await valueTwStock(body, ticker) : await valueUsStock(body, ticker);
+    let stock: StockInput;
+    if (getRuntimeMarketScanMode() === "snapshot") {
+      if (market === "US") {
+        const snapshot = findArkUsSnapshot(ticker);
+        if (!snapshot) throw new Error("此代碼尚無部署時公開財務快照");
+        stock = valueUsSnapshot(body, ticker, snapshot, "unavailable", true);
+      } else {
+        const snapshotRow = marketScanSnapshot.taiwanUniverse.find((row) => row.ticker === ticker);
+        if (!snapshotRow) throw new Error("此代碼尚無部署時台股公開資料快照");
+        const snapshotPrice = preferCapturedPrice(body.capturedPrice, numeric(snapshotRow.price));
+        const snapshotStock = marketStockFromRatio({
+          ...(snapshotRow as MarketScanRow),
+          price: snapshotPrice,
+          name: body.capturedName?.trim() || snapshotRow.name,
+        });
+        if (!snapshotStock) throw new Error("部署時公開資料不足，暫時無法建立可靠估值");
+        stock = snapshotStock;
+      }
+    } else {
+      stock = market === "TW" ? await valueTwStock(body, ticker) : await valueUsStock(body, ticker);
+    }
     const institutionalSignal = institutionalSignalForTicker(fundHoldingsSnapshot, ticker);
     const fundPortfolioPe = fundPortfolioPeSummary(fundHoldingsSnapshot, fundPeReferences);
     const fundSectorPe = market === "US"

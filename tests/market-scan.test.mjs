@@ -11,7 +11,15 @@ import { buildComparableMap } from "../lib/market-comparables.ts";
 import { buildTaiwanIndustryMap } from "../lib/taiwan-industry.ts";
 import fundHoldingsSnapshot from "../lib/fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "../lib/us-market-snapshot.json" with { type: "json" };
+import marketScanSnapshot from "../lib/market-scan-snapshot.json" with { type: "json" };
 import { optionalPublicRows } from "../lib/optional-public-rows.ts";
+
+test("keeps a precomputed 40 plus 40 ranking for the Cloudflare Free deployment", () => {
+  assert.equal(marketScanSnapshot.candidates.length, 40);
+  assert.equal(marketScanSnapshot.overvaluedCandidates.length, 40);
+  assert.ok(marketScanSnapshot.scannedCount > 0);
+  assert.ok(Date.parse(marketScanSnapshot.generatedAt) > 0);
+});
 
 test("keeps the ranking available when an optional market source returns invalid JSON", async () => {
   const rows = await optionalPublicRows("https://example.invalid/source", async () => ({

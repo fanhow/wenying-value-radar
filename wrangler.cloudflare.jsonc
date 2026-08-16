@@ -7,6 +7,9 @@
   "workers_dev": true,
   "preview_urls": false,
   "no_bundle": true,
+  "vars": {
+    "MARKET_SCAN_MODE": "snapshot"
+  },
   "rules": [
     {
       "type": "ESModule",

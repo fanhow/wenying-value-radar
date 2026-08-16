@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.17.7";
+const SITE_REVISION = "Rev. 2026.08.17.8";
 
 const REVISION_ENTRIES = [
+  ["2026.08.17.8", "修復 Cloudflare Free 私人站的公允價值排行榜與未快取個股查詢，改用部署時公開資料快照以避免 Worker CPU 超限；估值引擎不變。", "Fixed the Cloudflare Free private site's fair-value ranking and uncached ticker lookup by using deployment-time public-data snapshots to avoid Worker CPU limits; the valuation engine is unchanged."],
   ["2026.08.17.7", "日、週、月技術 K 線均線更新為 EMA15（黑色，預設勾選）、SMA50（紅色，預設勾選）及 SMA20（藍色，預設不勾選）。", "Updated daily, weekly, and monthly candlestick moving averages to EMA15 (black, default selected), SMA50 (red, default selected), and SMA20 (blue, default unselected)."],
   ["2026.08.17.6", "放大估值方向箭頭旁的差距百分比，使數值與箭頭同字級並提升閱讀性。", "Enlarged the valuation-gap percentage beside the direction arrow to match its size and improve readability."],
   ["2026.08.17.5", "公允價值排行榜 80 檔候選（低估 40 ＋ 高估 40）全面套用非經常性收益濾網與資產錨定標準化；根除吉祥全 (2491) 等業外暴衝扭曲並精確逼近 InvestingPro ($23.32，下行 -32.2%)；全站統一對數高斯共識校準與紅漲綠跌規則。", "Uniformly applied one-off non-operating earnings filters and book-value anchors across all 80 ranking candidates (40 undervalued + 40 overvalued); completely resolved 2491 anomaly to match InvestingPro ($23.32, -32.2% downside); unified site-wide log-Gaussian calibration and color rules."],
