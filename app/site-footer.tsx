@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.17.6";
+const SITE_REVISION = "Rev. 2026.08.17.7";
 
 const REVISION_ENTRIES = [
+  ["2026.08.17.7", "日、週、月技術 K 線均線更新為 EMA15（黑色，預設勾選）、SMA50（紅色，預設勾選）及 SMA20（藍色，預設不勾選）。", "Updated daily, weekly, and monthly candlestick moving averages to EMA15 (black, default selected), SMA50 (red, default selected), and SMA20 (blue, default unselected)."],
   ["2026.08.17.6", "放大估值方向箭頭旁的差距百分比，使數值與箭頭同字級並提升閱讀性。", "Enlarged the valuation-gap percentage beside the direction arrow to match its size and improve readability."],
   ["2026.08.17.5", "公允價值排行榜 80 檔候選（低估 40 ＋ 高估 40）全面套用非經常性收益濾網與資產錨定標準化；根除吉祥全 (2491) 等業外暴衝扭曲並精確逼近 InvestingPro ($23.32，下行 -32.2%)；全站統一對數高斯共識校準與紅漲綠跌規則。", "Uniformly applied one-off non-operating earnings filters and book-value anchors across all 80 ranking candidates (40 undervalued + 40 overvalued); completely resolved 2491 anomaly to match InvestingPro ($23.32, -32.2% downside); unified site-wide log-Gaussian calibration and color rules."],
   ["2026.08.17.4", "Broadcom (AVGO) 解決併購攤銷失真並精確對齊 InvestingPro (+13% 看漲，$443.00)；全面重構 37 檔基金持股多模型參數；嚴格落實紅漲 ↗ 綠跌 ↘ 顏色規範（數值與箭頭一律同色）。", "Broadcom (AVGO) non-cash M&A amortization resolved to match InvestingPro (+13% upside, $443.00); comprehensively tuned all 37 fund holdings; strictly enforced red-up ↗ / green-down ↘ color rules everywhere."],

@@ -8,12 +8,32 @@ import type { Language } from "./language-context";
 
 type ChartTimeframe = "daily" | "weekly" | "monthly";
 
-function movingAverage(candles: DailyCandle[], period: number) {
+function simpleMovingAverage(candles: DailyCandle[], period: number) {
   return candles.map((_, index) => {
     if (index + 1 < period) return null;
     const window = candles.slice(index + 1 - period, index + 1);
     return window.reduce((sum, candle) => sum + candle.close, 0) / period;
   });
+}
+
+function exponentialMovingAverage(candles: DailyCandle[], period: number) {
+  if (candles.length === 0) return [];
+  const multiplier = 2 / (period + 1);
+  const result: (number | null)[] = new Array(candles.length).fill(null);
+  if (candles.length < period) return result;
+
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += candles[i].close;
+  }
+  let prevEma = sum / period;
+  result[period - 1] = prevEma;
+
+  for (let i = period; i < candles.length; i++) {
+    prevEma = (candles[i].close - prevEma) * multiplier + prevEma;
+    result[i] = prevEma;
+  }
+  return result;
 }
 
 function formatIndicator(value: number | null) {
@@ -74,13 +94,24 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
     : trend.trendline
       ? [boundarySeries(language === "zh" ? `${trend.direction === "ascending" ? "上升" : "下降"}趨勢線` : `${trend.direction} trendline`, trend.trendline, candles, "#b45b86")]
       : [];
-  const maSeries = (period: number, name: string, color: string) => ({
+  const emaSeries = (period: number, name: string, color: string) => ({
     name,
     type: "line",
     showSymbol: false,
     symbol: "none",
     connectNulls: false,
-    data: movingAverage(candles, period).map((value, index) => value === null ? null : [candles[index].date, value]),
+    data: exponentialMovingAverage(candles, period).map((value, index) => value === null ? null : [candles[index].date, value]),
+    lineStyle: { color, width: 1.5 },
+    emphasis: { disabled: true },
+    z: 2,
+  });
+  const smaSeries = (period: number, name: string, color: string) => ({
+    name,
+    type: "line",
+    showSymbol: false,
+    symbol: "none",
+    connectNulls: false,
+    data: simpleMovingAverage(candles, period).map((value, index) => value === null ? null : [candles[index].date, value]),
     lineStyle: { color, width: 1.5 },
     emphasis: { disabled: true },
     z: 2,
@@ -96,7 +127,12 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
       right: 14,
       type: "scroll",
       textStyle: { color: "#566f78", fontSize: 11 },
-      data: ["MA5", "MA20", "MA60", ...trendSeries.map((series) => series.name)],
+      data: ["EMA15", "SMA50", "SMA20", ...trendSeries.map((series) => series.name)],
+      selected: {
+        EMA15: true,
+        SMA50: true,
+        SMA20: false,
+      },
     },
     tooltip: { trigger: "axis", axisPointer: { type: "cross" }, confine: true },
     grid: [
@@ -124,9 +160,9 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
         markLine: { silent: true, symbol: "none", data: keyLevels },
         z: 4,
       },
-      maSeries(5, "MA5", "#4ca6e8"),
-      maSeries(20, "MA20", "#d9732d"),
-      maSeries(60, "MA60", "#6d55c5"),
+      emaSeries(15, "EMA15", "#111827"),
+      smaSeries(50, "SMA50", "#dc2626"),
+      smaSeries(20, "SMA20", "#2563eb"),
       {
         name: language === "zh" ? "成交量" : "Volume",
         type: "bar",
