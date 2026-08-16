@@ -1,4 +1,5 @@
 import { calculateStock, valuationTargets, type Market, type StockInput } from "./valuation.ts";
+import { calibrateFairValue } from "./valuation-calibration.ts";
 import {
   fundPortfolioPeProfiles,
   fundPortfolioBusinessPeProfiles,
@@ -58,6 +59,9 @@ export type MarketScanRow = {
   financialLeverage?: string | number | null;
   epsHistory?: StockInput["epsHistory"];
   dataBasis?: StockInput["dataBasis"];
+  ffoPerShare?: string | number | null;
+  affoPerShare?: string | number | null;
+  targetFfoMultiple?: string | number | null;
   targetPe?: string | number | null;
   targetPb?: string | number | null;
   targetPsMultiple?: string | number | null;
@@ -108,7 +112,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
   const eps = numeric(row.eps ?? 0) || (price > 0 && pe > 0 ? price / pe : 0);
   const bvps = numeric(row.bvps ?? 0) || (price > 0 && pb > 0 ? price / pb : 0);
   if (!price || (!eps && !bvps)) return null;
-  if (market === "US" && (price < 3 || numeric(row.marketCap ?? 0) < 500_000_000 || numeric(row.volume ?? 0) < 100_000)) return null;
+  if (market === "US" && price < 1) return null;
   // U.S. asset-light companies can report a zero/negative book value after
   // buybacks or acquisitions. Keep them in the scan when earnings are usable;
   // the valuation engine will exclude P/B while retaining P/E, P/S, EV and DCF
@@ -164,6 +168,9 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     netMargin: hasNetMargin ? numeric(row.netMargin) : undefined,
     assetTurnover: hasAssetTurnover ? numeric(row.assetTurnover) : undefined,
     financialLeverage: hasFinancialLeverage ? numeric(row.financialLeverage) : undefined,
+    ffoPerShare: hasFiniteValue(row.ffoPerShare) ? numeric(row.ffoPerShare) : undefined,
+    affoPerShare: hasFiniteValue(row.affoPerShare) ? numeric(row.affoPerShare) : undefined,
+    targetFfoMultiple: hasFiniteValue(row.targetFfoMultiple) ? numeric(row.targetFfoMultiple) : (hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : undefined),
     targetPe: hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : targets.targetPe,
     targetPb: hasFiniteValue(row.targetPb) ? numeric(row.targetPb) : targets.targetPb,
     targetPsMultiple: hasFiniteValue(row.targetPsMultiple) ? numeric(row.targetPsMultiple) : comparableMultiples?.psMedian ?? undefined,
@@ -194,7 +201,9 @@ export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null 
   const input = marketStockFromRatio(row, row.comparableMultiples);
   if (!input) return null;
   const valuation = validValuation(input);
-  return valuation && valuation.upside >= 0.1 && valuation.upside <= 1 ? input : null;
+  if (!valuation) return null;
+  const cal = calibrateFairValue(valuation);
+  return cal.calibratedUpside >= 0.05 ? input : null;
 }
 
 function validValuation(stock: StockInput) {
@@ -220,12 +229,16 @@ export function selectMarketCandidates(
     .filter(hasCandidateLiquidity)
     .map((row) => marketStockFromRatio(row, profiles.get(String(row.ticker).trim().toUpperCase())))
     .filter((stock): stock is StockInput => stock !== null)
-    .map((stock) => ({ stock, valuation: validValuation(stock) }))
-    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock> } => row.valuation !== null)
-    .map(({ stock, valuation }) => ({ stock, upside: valuation.upside }))
+    .map((stock) => {
+      const valuation = validValuation(stock);
+      if (!valuation) return null;
+      const cal = calibrateFairValue(valuation);
+      return { stock, valuation, cal, upside: cal.calibratedUpside };
+    })
+    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock>; cal: ReturnType<typeof calibrateFairValue>; upside: number } => row !== null)
     .filter(({ upside }) => direction === "undervalued"
-      ? upside >= 0.1 && upside <= 1
-      : upside <= -0.1)
+      ? upside >= 0.05
+      : upside <= -0.05)
     .sort((left, right) => direction === "undervalued"
       ? right.upside - left.upside
       : left.upside - right.upside)

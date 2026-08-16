@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.17.2";
+const SITE_REVISION = "Rev. 2026.08.17.3";
 
 const REVISION_ENTRIES = [
+  ["2026.08.17.3", "全盤審查 37 檔六大基金持股與公允價值排行榜前 40 檔候選（低估 40 + 高估 40），統一套用對數高斯核密度共識校準與 InvestingPro 估值準則。", "Comprehensive audit of all 37 top-6 fund holdings and top 40 ranking candidates (40 undervalued + 40 overvalued), uniformly applying log-Gaussian mode calibration and InvestingPro benchmark standards."],
   ["2026.08.17.2", "校準 Tesla 等高成長龍頭估值逼近 InvestingPro ($245.62)；全站統一台灣紅漲綠跌（上行紅 ↗、下行綠 ↘）；大戶追蹤持股變化採用階層式紅綠漸層強度。", "Calibrated Tesla & growth leaders to match InvestingPro ($245.62); unified red-up ↗ / green-down ↘ across watchlist & tables; tiered red/green intensity for fund holding changes."],
   ["2026.08.17.1", "整合 InvestingPro Fair Value 量化校準層（Huber 穩健共識 ＋ 產業動態平滑），支援雙軌估值呈現、校準差距與 OOD 異常診斷。", "Integrated InvestingPro Fair Value calibration layer (Huber robust consensus + sector smoothing) with dual valuation display, calibration gap, and OOD diagnostics."],
   ["2026.08.16.9", "恢復日／週／月支撐壓力的線型與文字標示；趨勢通道改為只畫仍被近期價格尊重的 pivot 通道；美股同步改用 Apache ECharts 與相同技術提示。", "Restored daily/weekly/monthly level styles and labels; trend channels now require active pivot confirmation; U.S. charts now use Apache ECharts with the same technical signals."],

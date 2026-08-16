@@ -1111,7 +1111,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const fcfNormalizationApplied = normalizedFcfPerShare > 0
     && reportedFcfPerShare > normalizedFcfPerShare * 1.001;
   const fcfPerShare = normalizedFcfPerShare;
-  const assetLight = !financial && roe >= 25;
+  const assetLight = !financial && !reit && roe >= 25;
   const mature = valuationEps > 0
     && roe > 0
     && revenueGrowth >= -5
