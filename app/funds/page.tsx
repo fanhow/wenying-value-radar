@@ -229,9 +229,10 @@ function businessGroupLabel(group: ReturnType<typeof businessGroupForTicker>, la
 
 function valuationClass(stock: Stock | null) {
   if (!stock) return "unavailable";
+  const upside = stock.calibratedUpside ?? stock.upside;
   if (stock.valuationConfidence === "low") return "uncertain";
-  if (stock.upside >= 0.1) return "undervalued";
-  if (stock.upside <= -0.1) return "overvalued";
+  if (upside >= 0.05) return "undervalued";
+  if (upside <= -0.05) return "overvalued";
   return "fair";
 }
 
@@ -483,13 +484,16 @@ export default function FundsPage() {
                   <tbody>
                     {fund.holdings.map((holding) => {
                       const state = valuationClass(holding.stock);
+                      const fairValue = holding.stock?.calibratedFairValue ?? holding.stock?.fairValue;
+                      const upside = holding.stock?.calibratedUpside ?? holding.stock?.upside;
+                      const direction = upside !== undefined ? (upside >= 0.05 ? "up" : upside <= -0.05 ? "down" : "flat") : "flat";
                       return (
                         <tr key={`${fund.slug}-${holding.cusip}`}>
                           <td data-label={t("持倉", "Holding")}><Link className="fund-stock-link" href={stockDetailHref(holding.ticker)} aria-label={t(`查看 ${holding.ticker} 完整估值`, `View full valuation for ${holding.ticker}`)}><div className="fund-stock-name"><span className="ticker-badge market-us">US</span><span><strong>{holding.ticker}</strong><small>{holding.stock?.name || holding.issuer}{holding.taiwanExposure ? <em>{t("台灣相關", "Taiwan-linked")}</em> : null}</small></span></div></Link></td>
                           <td data-label={t("組合比重", "Portfolio weight")}><strong>{holding.portfolioWeight.toFixed(2)}%</strong><small>{compactUsd.format(holding.valueUsd)}</small></td>
                           <td data-label={t("持股變化", "Share change")}><span className={`fund-change ${fundChangeTierClass(holding)} ${holding.significantChange ? "significant" : ""}`}>{changeLabel(holding)}</span><small>{t("較上季持股數", "vs. prior-quarter shares")}</small></td>
                           <td data-label={t("目前價格", "Price")}><strong>{holding.stock ? formatPrice(holding.stock.price) : "—"}</strong><small>{holding.stock?.updatedAt || "—"}</small></td>
-                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? holding.stock.valuationConfidence === "low" ? t("歷史資料 · 低信心", "Historical data · low confidence") : `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
+                          <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock && fairValue ? formatPrice(fairValue) : "—"}</strong><small>{holding.stock && upside !== undefined ? <span className={direction === "up" ? "text-positive" : direction === "down" ? "text-negative" : "text-flat"}>{direction === "up" ? "↗ " : direction === "down" ? "↘ " : "= "}{formatPercent(upside * 100)}</span> : t("不適用", "N/A")}</small></td>
                           <td data-label={t("成長市場參考", "Growth-market reference")}><strong>{holding.stock?.marketPricing?.enabled && holding.stock.marketPricing.fairValue !== null ? formatPrice(holding.stock.marketPricing.fairValue) : "—"}</strong><small>{holding.stock?.marketPricing?.enabled && holding.stock.marketPricing.selectedPe !== null ? `${t("市場本益比", "Market P/E")} ${formatMultiple(holding.stock.marketPricing.selectedPe)}` : t("未達兩項獨立訊號", "Fewer than two independent signals")}</small></td>
                           <td data-label={t("估值狀態", "Valuation")}><span className={`fund-valuation status-${state}`}>{valuationLabel(holding.stock)}</span></td>
                         </tr>

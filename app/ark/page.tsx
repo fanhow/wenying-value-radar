@@ -349,8 +349,21 @@ export default function ArkPage() {
                   <>
                     <div className="ark-result-top"><span className={`ticker-badge market-${candidate.market.toLowerCase()}`}>{candidate.market}</span><span className={`import-state state-${candidate.status === "已加入" ? "done" : candidate.status === "需要確認" ? "warn" : "working"}`}>{language === "zh" ? candidate.status : translateStatus(candidate.status)}</span></div>
                     <strong>{candidate.ticker}</strong>
-                    <p>{candidate.capturedName || candidate.fileName}</p>
-                    {stock ? <><div className="ark-result-values"><span>{t("目前價格", "Price")}<b>{formatPrice(stock.price, stock.market)}</b></span><span>{stock.valuationConfidence === "low" ? t("歷史初估", "Historical estimate") : t("公允價值", "Fair value")}<b>{formatPrice(stock.fairValue, stock.market)}</b></span><span>{stock.valuationConfidence === "low" ? t("判讀狀態", "Interpretation") : t("模型差距", "Model gap")}<b className={stock.valuationConfidence === "low" ? "text-uncertain" : stock.upside >= 0 ? "text-positive" : "text-negative"}>{stock.valuationConfidence === "low" ? t("資料限制", "Data limits") : `${stock.upside >= 0 ? "+" : ""}${(stock.upside * 100).toFixed(1)}%`}</b></span></div><small className={`ark-confidence confidence-${stock.valuationConfidence}`}>{stock.valuationConfidence === "low" ? t("低信心 · 點擊查看模型與原因 →", "Low confidence · view models and reason →") : t("點擊查看完整估值 →", "View full valuation →")}</small></> : <small title={candidate.message}>{candidate.message || t("正在計算…", "Calculating…")}</small>}
+                    {stock ? (() => {
+                      const fairVal = stock.calibratedFairValue ?? stock.fairValue;
+                      const upside = stock.calibratedUpside ?? stock.upside;
+                      const direction = upside >= 0.05 ? "up" : upside <= -0.05 ? "down" : "flat";
+                      return (
+                        <>
+                          <div className="ark-result-values">
+                            <span>{t("目前價格", "Price")}<b>{formatPrice(stock.price, stock.market)}</b></span>
+                            <span>{stock.valuationConfidence === "low" ? t("歷史初估", "Historical estimate") : t("公允價值", "Fair value")}<b>{formatPrice(fairVal, stock.market)}</b></span>
+                            <span>{t("模型差距", "Model gap")}<b className={direction === "up" ? "text-positive" : direction === "down" ? "text-negative" : "text-flat"}>{direction === "up" ? "↗ +" : direction === "down" ? "↘ " : "= "}{(upside * 100).toFixed(1)}%</b></span>
+                          </div>
+                          <small className={`ark-confidence confidence-${stock.calibrationConfidence ?? stock.valuationConfidence}`}>{stock.valuationConfidence === "low" ? t("低信心 · 點擊查看模型與原因 →", "Low confidence · view models and reason →") : t("點擊查看完整估值 →", "View full valuation →")}</small>
+                        </>
+                      );
+                    })() : <small title={candidate.message}>{candidate.message || t("正在計算…", "Calculating…")}</small>}
                   </>
                 );
                 return stock ? (

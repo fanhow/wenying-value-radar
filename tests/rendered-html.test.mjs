@@ -49,7 +49,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.17\.3/);
+  assert.match(html, /Rev\. 2026\.08\.17\.4/);
   assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /timeframeLabel\(analysis\.supportTimeframe/);
   const candlestickSource = await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8");
   const echartsSource = await readFile(new URL("../app/echarts-candlestick-chart.tsx", import.meta.url), "utf8");
@@ -60,7 +60,7 @@ test("renders development preview metadata", async () => {
   assert.match(await readFile(new URL("../lib/trend-structure.ts", import.meta.url), "utf8"), /detectTrendStructure/);
   assert.match(await readFile(new URL("../lib/public-technical-data.ts", import.meta.url), "utf8"), /weeklyCandles:[\s\S]*monthlyCandles:/);
   assert.match(source, /className="watch-remove"/);
-  assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(stock\.upside\)/);
+  assert.match(source, /valuationDirectionSymbol\(direction\)[\s\S]*formatSignedPercent\(upside\)/);
   assert.match(styles, /stock-table tbody tr > td \{ width: auto !important; min-width: 0; display: block; \}/);
   assert.match(styles, /stock-name-cell \{ display: grid; grid-template-columns: 28px auto minmax\(0, 1fr\)/);
 });

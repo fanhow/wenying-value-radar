@@ -19,12 +19,20 @@ export type ArkUsSnapshotRow = {
   netMargin?: number | null;
   assetTurnover?: number | null;
   financialLeverage?: number | null;
-  dataBasis?: "annual";
+  dataBasis?: "annual" | "ltm" | "estimated";
   epsHistory?: Array<{ value: number; start?: string; end?: string; basis?: "annual" | "ltm" }>;
   financialDataDate?: string | null;
   dividendPerShare: number;
   sector: string;
   date: string;
+  targetPb?: number | null;
+  targetPe?: number | null;
+  targetPsMultiple?: number | null;
+  targetEvRevenueMultiple?: number | null;
+  targetEvEbitdaMultiple?: number | null;
+  ffoPerShare?: number | null;
+  affoPerShare?: number | null;
+  targetFfoMultiple?: number | null;
 };
 
 const taiwanEtfDirectory = [

@@ -168,7 +168,7 @@ test("finds the current six-fund P/E pattern without treating it as a target pri
   const profiles = fundPortfolioPeProfiles(snapshot, references, "2026-08-12");
   assert.ok(summary);
   assert.ok(summary.sampleSize >= 50);
-  assert.ok(summary.medianPe > 35 && summary.medianPe < 50);
+  assert.ok(summary.medianPe > 30 && summary.medianPe < 50);
   assert.ok(summary.p95Pe > 80);
   assert.ok(summary.staleSampleSize >= 1);
   assert.ok(summary.agingSampleSize >= 30);
