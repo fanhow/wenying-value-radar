@@ -282,6 +282,26 @@ export default function FundsPage() {
     )),
   }));
 
+  const fundChangeTierClass = (holding: FundHolding) => {
+    if (holding.changeType === "new") return "fund-change-p4";
+    if (holding.changeType === "unchanged" || holding.changePercent === null || holding.changePercent === 0) {
+      return "fund-change-flat";
+    }
+    if (holding.changePercent > 0) {
+      const p = holding.changePercent;
+      if (p >= 100) return "fund-change-p4";
+      if (p >= 50) return "fund-change-p3";
+      if (p >= 20) return "fund-change-p2";
+      return "fund-change-p1";
+    } else {
+      const abs = Math.abs(holding.changePercent);
+      if (abs >= 50) return "fund-change-n4";
+      if (abs >= 30) return "fund-change-n3";
+      if (abs >= 15) return "fund-change-n2";
+      return "fund-change-n1";
+    }
+  };
+
   const changeLabel = (holding: FundHolding) => {
     if (holding.changeType === "new") return t("新建倉", "New position");
     if (holding.changeType === "increased") return t(`加倉 ${formatPercent(holding.changePercent ?? 0)}`, `Added ${formatPercent(holding.changePercent ?? 0)}`);
@@ -467,7 +487,7 @@ export default function FundsPage() {
                         <tr key={`${fund.slug}-${holding.cusip}`}>
                           <td data-label={t("持倉", "Holding")}><Link className="fund-stock-link" href={stockDetailHref(holding.ticker)} aria-label={t(`查看 ${holding.ticker} 完整估值`, `View full valuation for ${holding.ticker}`)}><div className="fund-stock-name"><span className="ticker-badge market-us">US</span><span><strong>{holding.ticker}</strong><small>{holding.stock?.name || holding.issuer}{holding.taiwanExposure ? <em>{t("台灣相關", "Taiwan-linked")}</em> : null}</small></span></div></Link></td>
                           <td data-label={t("組合比重", "Portfolio weight")}><strong>{holding.portfolioWeight.toFixed(2)}%</strong><small>{compactUsd.format(holding.valueUsd)}</small></td>
-                          <td data-label={t("持股變化", "Share change")}><span className={`fund-change ${holding.significantChange ? "significant" : ""}`}>{changeLabel(holding)}</span><small>{t("較上季持股數", "vs. prior-quarter shares")}</small></td>
+                          <td data-label={t("持股變化", "Share change")}><span className={`fund-change ${fundChangeTierClass(holding)} ${holding.significantChange ? "significant" : ""}`}>{changeLabel(holding)}</span><small>{t("較上季持股數", "vs. prior-quarter shares")}</small></td>
                           <td data-label={t("目前價格", "Price")}><strong>{holding.stock ? formatPrice(holding.stock.price) : "—"}</strong><small>{holding.stock?.updatedAt || "—"}</small></td>
                           <td data-label={t("公允價值", "Fair value")}><strong>{holding.stock ? formatPrice(holding.stock.fairValue) : "—"}</strong><small>{holding.stock ? holding.stock.valuationConfidence === "low" ? t("歷史資料 · 低信心", "Historical data · low confidence") : `${t("模型差距", "Model gap")} ${formatPercent(holding.stock.upside * 100)}` : t("不適用", "N/A")}</small></td>
                           <td data-label={t("成長市場參考", "Growth-market reference")}><strong>{holding.stock?.marketPricing?.enabled && holding.stock.marketPricing.fairValue !== null ? formatPrice(holding.stock.marketPricing.fairValue) : "—"}</strong><small>{holding.stock?.marketPricing?.enabled && holding.stock.marketPricing.selectedPe !== null ? `${t("市場本益比", "Market P/E")} ${formatMultiple(holding.stock.marketPricing.selectedPe)}` : t("未達兩項獨立訊號", "Fewer than two independent signals")}</small></td>

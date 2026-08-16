@@ -58,6 +58,13 @@ export type MarketScanRow = {
   financialLeverage?: string | number | null;
   epsHistory?: StockInput["epsHistory"];
   dataBasis?: StockInput["dataBasis"];
+  targetPe?: string | number | null;
+  targetPb?: string | number | null;
+  targetPsMultiple?: string | number | null;
+  targetEvRevenueMultiple?: string | number | null;
+  targetEvEbitdaMultiple?: string | number | null;
+  targetEvEbitMultiple?: string | number | null;
+  beta?: string | number | null;
   financialDataDate?: string | null;
   dividendPerShare?: string | number;
   marketCap?: string | number;
@@ -157,10 +164,12 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     netMargin: hasNetMargin ? numeric(row.netMargin) : undefined,
     assetTurnover: hasAssetTurnover ? numeric(row.assetTurnover) : undefined,
     financialLeverage: hasFinancialLeverage ? numeric(row.financialLeverage) : undefined,
-    targetPsMultiple: comparableMultiples?.psMedian ?? undefined,
-    targetEvRevenueMultiple: comparableMultiples?.evRevenueMedian ?? undefined,
-    targetEvEbitdaMultiple: comparableMultiples?.evEbitdaMedian ?? undefined,
-    targetEvEbitMultiple: comparableMultiples?.evEbitMedian ?? undefined,
+    targetPe: hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : targets.targetPe,
+    targetPb: hasFiniteValue(row.targetPb) ? numeric(row.targetPb) : targets.targetPb,
+    targetPsMultiple: hasFiniteValue(row.targetPsMultiple) ? numeric(row.targetPsMultiple) : comparableMultiples?.psMedian ?? undefined,
+    targetEvRevenueMultiple: hasFiniteValue(row.targetEvRevenueMultiple) ? numeric(row.targetEvRevenueMultiple) : comparableMultiples?.evRevenueMedian ?? undefined,
+    targetEvEbitdaMultiple: hasFiniteValue(row.targetEvEbitdaMultiple) ? numeric(row.targetEvEbitdaMultiple) : comparableMultiples?.evEbitdaMedian ?? undefined,
+    targetEvEbitMultiple: hasFiniteValue(row.targetEvEbitMultiple) ? numeric(row.targetEvEbitMultiple) : comparableMultiples?.evEbitMedian ?? undefined,
     comparableMultiples,
     uncertainty: historicalFieldCount >= 2 ? 0.27 : eps > 0 && bvps > 0 ? 0.3 : 0.4,
     updatedAt: row.date,

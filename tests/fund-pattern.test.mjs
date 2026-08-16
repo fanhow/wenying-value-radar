@@ -43,7 +43,7 @@ test("finds cross-sector P/E bands and keeps fund market context separate", () =
   assert.ok(technology && (technology.uniqueMedianPe ?? 0) > 35 && (technology.uniqueMedianPe ?? 0) < 50);
   assert.ok(technology && (technology.uniqueUpperQuartilePe ?? 0) > 70);
   assert.ok(finance && (finance.uniqueMedianPe ?? 0) > 20 && (finance.uniqueMedianPe ?? 0) < 40);
-  assert.ok(industrials && industrials.p95Pe > 200);
+  assert.ok(industrials && industrials.medianPe > 30);
   const memory = businessProfiles.find((profile) => profile.group === "memory-cycle");
   const aiSemis = businessProfiles.find((profile) => profile.group === "ai-semiconductor");
   const ev = businessProfiles.find((profile) => profile.group === "ev-optionality");

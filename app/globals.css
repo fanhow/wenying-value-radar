@@ -272,8 +272,8 @@ a { color: inherit; text-decoration: none; }
 .trend-mark.direction-up, .watch-direction.direction-up { color: var(--red) !important; }
 .trend-mark.direction-down, .watch-direction.direction-down { color: var(--green) !important; }
 .trend-mark.direction-flat, .watch-direction.direction-flat { color: var(--ink-faint) !important; }
-.text-positive { color: var(--green) !important; }
-.text-negative { color: var(--red) !important; }
+.text-positive { color: var(--red) !important; }
+.text-negative { color: var(--green) !important; }
 .text-flat { color: var(--ink-soft) !important; }
 .text-uncertain { color: #956f2b !important; }
 .quality-score { display: flex; align-items: center; gap: 8px; }

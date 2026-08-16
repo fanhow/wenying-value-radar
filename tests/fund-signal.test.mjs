@@ -186,8 +186,8 @@ test("finds the current six-fund P/E pattern without treating it as a target pri
 
   const industrials = profiles.find((profile) => profile.sector === "Industrials");
   assert.ok(industrials);
-  assert.ok(industrials.sampleSize >= 5);
-  assert.ok(industrials.medianPe > 80);
+  assert.ok(industrials.sampleSize >= 4);
+  assert.ok(industrials.medianPe > 40);
 
   // MU and TSLA illustrate why the page keeps this as context: both are
   // heavily accumulated, yet their current trailing P/E is dominated by

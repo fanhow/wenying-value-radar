@@ -138,7 +138,7 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
     };
   }
 
-  // 1. Calculate robust Huber-loss central consensus from valid models
+  // 1. Calculate robust Huber-loss central consensus and Kernel Mode consensus
   const modelValues = validModels.map((m) => m.value);
   const medVal = median(modelValues);
   const delta = medVal * 0.35; // Huber delta threshold
@@ -154,12 +154,49 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
 
   const huberCenter = weightTotal > 0 ? weightedSum / weightTotal : medVal;
 
+  // 1b. Gaussian Kernel Density Mode in log space to resolve multi-cluster growth valuations
+  const logValues = modelValues.map((v) => Math.log(v));
+  const sigma = 0.20;
+  let bestCandidate = medVal;
+  let maxDensity = -1;
+
+  for (const candidate of modelValues) {
+    const logCand = Math.log(candidate);
+    let density = 0;
+    for (const lv of logValues) {
+      const diff = (logCand - lv) / sigma;
+      density += Math.exp(-0.5 * diff * diff);
+    }
+    if (density > maxDensity) {
+      maxDensity = density;
+      bestCandidate = candidate;
+    }
+  }
+
+  let modeWeightedSum = 0;
+  let modeWeightTotal = 0;
+  for (const val of modelValues) {
+    const diff = (Math.log(val) - Math.log(bestCandidate)) / (sigma * 2.2);
+    const w = Math.exp(-0.5 * diff * diff);
+    modeWeightedSum += val * w;
+    modeWeightTotal += w;
+  }
+  const modeConsensus = modeWeightTotal > 0 ? modeWeightedSum / modeWeightTotal : bestCandidate;
+
+  // Combine Huber median center and mode cluster consensus
+  const isInstitutionalAccumulated = ((stock.institutionalSignal?.increasedByCount ?? 0) + (stock.institutionalSignal?.newByCount ?? 0)) > (stock.institutionalSignal?.reducedByCount ?? 0);
+  const clusterStrength = validModels.length >= 4 ? clamp(maxDensity / validModels.length, 0.3, 0.85) : 0.4;
+  const growthModeRatio = isInstitutionalAccumulated && Number(stock.revenueGrowth) >= 12
+    ? 0.90
+    : clusterStrength;
+  const robustConsensus = modeConsensus * growthModeRatio + huberCenter * (1 - growthModeRatio);
+
   // 2. Sector and Business Model Adaptation
   const sector = (stock.sector || "").toLowerCase();
   const isFinance = sector.includes("finance") || sector.includes("bank") || sector.includes("insurance") || sector.includes("金融");
   const isReit = sector.includes("reit") || sector.includes("real estate") || sector.includes("不動產");
 
-  let blendWeight = options.blendWeight ?? 0.70; // 70% Huber consensus, 30% Native family-balanced
+  let blendWeight = options.blendWeight ?? 0.70; // 70% Robust consensus, 30% Native family-balanced
   if (isFinance || isReit) {
     blendWeight = 0.85; // Higher alignment on specialized financial/REIT rules
   }
@@ -169,13 +206,15 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
     blendWeight = 0.35;
   }
 
-  let calibrated = huberCenter * blendWeight + nativeValue * (1 - blendWeight);
+  let calibrated = robustConsensus * blendWeight + nativeValue * (1 - blendWeight);
 
   // 3. Quality & Moat Elasticity Fine-Tuning
   const roe = Number(stock.roe) || 0;
   const growth = Number(stock.revenueGrowth) || 0;
   if (roe >= 25 && growth >= 8 && !isFinance && !isReit) {
     calibrated *= 1.02; // Minor 2% quality moat premium
+  } else if (isInstitutionalAccumulated && growth >= 12 && !isFinance && !isReit) {
+    calibrated *= 1.03; // Institutional high-conviction growth elasticity
   }
 
   // Guard against numerical instability: ensure positive, finite, bounded

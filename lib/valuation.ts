@@ -1794,7 +1794,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     );
   }
 
-  if (valuationEps > 0 && bvps > 0 && !reit && !assetLight && roe <= 25 && debtRatio <= 70) {
+  const isHighGrowthOrHighMultiple = targetPe > 25 || revenueGrowth > 15 || roe > 25;
+  if (valuationEps > 0 && bvps > 0 && !reit && !assetLight && !isHighGrowthOrHighMultiple && debtRatio <= 70) {
     const value = Math.sqrt(22.5 * valuationEps * bvps);
     addCandidate(
       createModel(
@@ -1818,7 +1819,9 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       "Graham 防禦估值",
       assetLight
         ? "高 ROE 輕資產公司容易被帳面價值公式系統性低估。"
-        : reit
+        : isHighGrowthOrHighMultiple
+          ? "高成長或高倍數企業不適用傳統低倍數防禦型 Graham 公式。"
+          : reit
           ? "REIT 優先使用 P/FFO，不使用 Graham EPS／帳面價值公式。"
         : debtRatio > 70
           ? "總負債率超出防禦型估值條件。"

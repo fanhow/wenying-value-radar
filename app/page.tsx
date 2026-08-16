@@ -947,7 +947,7 @@ export default function Home() {
               </table>
               {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{isMarketScanLoading ? t("正在掃描市場…", "Scanning the market…") : stocks.length ? t("目前名單沒有符合條件的標的", "No stocks in the current list match") : t("市場資料暫時無法載入", "Market data is temporarily unavailable")}</strong><p>{isMarketScanLoading ? t("正在整理上市與上櫃估值候選", "Reviewing listed and OTC valuation candidates") : stocks.length ? t("可切換篩選條件，或搜尋其他股票代碼", "Change the filter or search another ticker") : t("仍可在上方搜尋單一股票代碼", "You can still search for an individual ticker above")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{t("搜尋股票代碼", "Search tickers")}</button></div>}
             </div>
-            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t("檔高估候選；台股前 20＋美股前 20", "overvalued candidates; Taiwan top 20 + U.S. top 20") : filter === "undervalued" ? t("檔低估候選；台股前 20＋美股前 20", "undervalued candidates; Taiwan top 20 + U.S. top 20") : t("檔", "stocks")}</span><span><span className="legend-dot green-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot red-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
+            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t("檔高估候選；台股前 20＋美股前 20", "overvalued candidates; Taiwan top 20 + U.S. top 20") : filter === "undervalued" ? t("檔低估候選；台股前 20＋美股前 20", "undervalued candidates; Taiwan top 20 + U.S. top 20") : t("檔", "stocks")}</span><span><span className="legend-dot red-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot green-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
           </div>
 
           {selected && (
@@ -1010,12 +1010,12 @@ export default function Home() {
             <p>{t(`台股 ${scannedByMarket.TW}＋美股 ${scannedByMarket.US}`, `Taiwan ${scannedByMarket.TW} + U.S. ${scannedByMarket.US}`)}</p>
           </article>
           <article className="metric-card">
-            <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon green">↗</span></div>
+            <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon red">↗</span></div>
             <strong>{undervaluedCount}<small> {t("檔", "stocks")}</small></strong>
             <p>{t(`台股 ${marketCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${marketCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${marketCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${marketCandidates.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card">
-            <div className="metric-card-top"><span>{t("高估候選", "Overvalued")}</span><span className="metric-icon red">↘</span></div>
+            <div className="metric-card-top"><span>{t("高估候選", "Overvalued")}</span><span className="metric-icon green">↘</span></div>
             <strong>{overvaluedCount}<small> {t("檔", "stocks")}</small></strong>
             <p>{t(`台股 ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
