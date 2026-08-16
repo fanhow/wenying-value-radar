@@ -22,8 +22,8 @@ export function sanitizeMarketScanRatios(input: {
   cashPerShare?: number | null;
   debtPerShare?: number | null;
 }) {
-  const { market, price } = input;
-  let { pe, pb, eps, bvps } = input;
+  const { market, price, pe } = input;
+  let { eps, bvps } = input;
   let revenuePerShare = input.revenuePerShare;
   let fcfPerShare = input.fcfPerShare;
   let ebitdaPerShare = input.ebitdaPerShare;
