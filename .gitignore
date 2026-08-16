@@ -44,4 +44,6 @@ next-env.d.ts
 /.wrangler/
 /.sites-runtime/
 /outputs/
+/output/
+/tmp/
 /work/

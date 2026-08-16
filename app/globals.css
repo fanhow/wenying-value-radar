@@ -356,8 +356,14 @@ a { color: inherit; text-decoration: none; }
 .growth-premium-tags span { padding: 5px 8px; border-radius: 999px; background: #f8edcf; color: #956f2b; font-size: 8px; font-weight: 700; }
 .growth-premium-panel p { margin: 10px 0 0; color: var(--ink-soft); font-size: 9px; line-height: 1.65; }
 .fair-value-focus { margin-top: 10px; padding: 17px 15px; border: 1px solid #d2e4d9; border-radius: 9px; background: linear-gradient(135deg, #f6fcf8, #eef8f2); }
-.fair-value-focus > div:first-child { display: flex; align-items: baseline; justify-content: space-between; }
-.fair-value-focus > div:first-child strong { color: var(--green-deep); font-size: 36px; letter-spacing: -.06em; }
+.dual-fair-value-header { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.dual-fair-value-header strong { color: var(--green-deep); font-size: 36px; letter-spacing: -.06em; }
+.native-fair-value-card { padding: 6px 10px; border: 1px solid #d0e2d7; border-radius: 7px; background: rgba(255,255,255,.76); text-align: right; }
+.native-fair-value-price { display: block; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+.native-fair-value-card small { display: block; font-size: 8px; color: var(--ink-faint); margin-top: 2px; }
+.ood-warning-banner { margin-top: 10px; padding: 8px 10px; border: 1px solid #fed7aa; border-radius: 6px; background: #fff7ed; color: #9a3412; font-size: 9px; line-height: 1.5; }
+.ood-warning-banner span { font-weight: 700; display: block; }
+.calibration-gap-sub { display: block; font-size: 8px; color: var(--ink-faint); margin-top: 2px; }
 .market-fair-value-banner { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid #e6c98b; border-radius: 7px; background: rgba(255,250,240,.84); }
 .market-fair-value-banner span, .market-fair-value-banner small { color: #956f2b; font-size: 9px; }
 .market-fair-value-banner strong { color: #956f2b; font-size: 23px; letter-spacing: -.04em; }

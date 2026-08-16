@@ -2,6 +2,7 @@ import { matchStructuralThemes, type StructuralTheme } from "./market-themes.ts"
 import type { FundBusinessPeProfile, FundPortfolioPeSummary, FundSectorPeProfile, InstitutionalSignal } from "./fund-signal.ts";
 import type { ComparableMultiples } from "./market-comparables.ts";
 import { classifyFinancialFreshness, financialAgeDays, type FinancialFreshness } from "./data-freshness.ts";
+import { calibrateFairValue, type CalibrationMetadata } from "./valuation-calibration.ts";
 
 export type Market = "TW" | "US";
 export type TaiwanListingBoard = "TWSE" | "TPEx";
@@ -231,6 +232,16 @@ export type Stock = StockInput & {
   epsNormalizationApplied: boolean;
   epsNormalizationMethod: EarningsNormalizationMethod;
   epsHistoryCount: number;
+
+  calibratedFairValue?: number;
+  calibratedRangeLow?: number;
+  calibratedRangeHigh?: number;
+  calibratedUpside?: number;
+  calibrationConfidence?: ValuationConfidence;
+  calibrationGap?: number;
+  isOutOfDistribution?: boolean;
+  oodReasons?: string[];
+  calibrationMetadata?: CalibrationMetadata;
 };
 
 type ModelCandidate = Omit<ValuationModel, "status" | "weight" | "family">;
@@ -1042,6 +1053,14 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       epsNormalizationApplied: epsNormalization.applied,
       epsNormalizationMethod: epsNormalization.method,
       epsHistoryCount: epsNormalization.historyCount,
+      calibratedFairValue: fairValue,
+      calibratedRangeLow: range.low,
+      calibratedRangeHigh: range.high,
+      calibratedUpside: price > 0 ? (fairValue - price) / price : 0,
+      calibrationConfidence: "medium",
+      calibrationGap: 0,
+      isOutOfDistribution: false,
+      oodReasons: [],
     };
   }
 
@@ -1989,7 +2008,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       ? "high"
       : "medium";
 
-  return {
+  const baseStock: Stock = {
     ...input,
     price,
     eps,
@@ -2026,5 +2045,20 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     epsNormalizationApplied: epsNormalization.applied,
     epsNormalizationMethod: epsNormalization.method,
     epsHistoryCount: epsNormalization.historyCount,
+  };
+
+  const calibrated = calibrateFairValue(baseStock);
+
+  return {
+    ...baseStock,
+    calibratedFairValue: calibrated.calibratedFairValue,
+    calibratedRangeLow: calibrated.calibratedRangeLow,
+    calibratedRangeHigh: calibrated.calibratedRangeHigh,
+    calibratedUpside: calibrated.calibratedUpside,
+    calibrationConfidence: calibrated.calibrationConfidence,
+    calibrationGap: calibrated.calibrationGap,
+    isOutOfDistribution: calibrated.isOutOfDistribution,
+    oodReasons: calibrated.oodReasons,
+    calibrationMetadata: calibrated.calibrationMetadata,
   };
 }
