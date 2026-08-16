@@ -324,6 +324,7 @@ a { color: inherit; text-decoration: none; }
 .price-hero small.quote-down { color: var(--green); font-weight: 800; }
 .price-hero .hero-upside > strong { display: flex; align-items: baseline; gap: 8px; }
 .price-hero .hero-upside > strong .trend-mark { display: inline; margin: 0; color: inherit; font-size: 1em; line-height: 1; letter-spacing: 0; vertical-align: baseline; }
+.price-hero .hero-upside > strong > span:not(.trend-mark) { display: inline; color: inherit; font-size: 1em; line-height: 1; }
 .price-hero small { display: block; margin-top: 7px; color: var(--ink-faint); font-size: 9px; }
 .positive-box { background: var(--red-pale) !important; }
 .positive-box strong { color: var(--red) !important; }
