@@ -49,7 +49,7 @@ test("renders development preview metadata", async () => {
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
   assert.doesNotMatch(html, /HOW IT WORKS/);
-  assert.match(html, /Rev\. 2026\.08\.16\.6/);
+  assert.match(html, /Rev\. 2026\.08\.16\.7/);
   assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /timeframeLabel\(analysis\.supportTimeframe/);
   assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /chart-timeframe-switch/);
   assert.match(await readFile(new URL("../lib/public-technical-data.ts", import.meta.url), "utf8"), /weeklyCandles:[\s\S]*monthlyCandles:/);

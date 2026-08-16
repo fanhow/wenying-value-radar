@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.16.6";
+const SITE_REVISION = "Rev. 2026.08.16.7";
 
 const REVISION_ENTRIES = [
+  ["2026.08.16.7", "修正外部市場資料暫時回傳無效內容時，公允價值排行榜會消失的問題。", "Fixed the fair-value ranking disappearing when an optional market source temporarily returns invalid content."],
   ["2026.08.16.6", "台股 K 線可切換日線、週線與月線，並分別標示可信的多週期支撐壓力；星形候選加入趨勢、均線乖離、十字 K 與跳空條件。", "Taiwan charts now switch between daily, weekly, and monthly candles with credible multi-timeframe levels; star candidates now include trend, MA deviation, doji, and gap evidence."],
   ["2026.08.16.5", "水平支撐壓力需跨月至少兩次測試；過度接近的狹窄盤整線位不再強制繪製。", "Horizontal levels now require tests across at least two months, and compressed congestion levels are no longer forced onto the chart."],
   ["2026.08.16.4", "支撐壓力虛線加入日線、週線或月線來源；資料不足時不強制產生線位。", "Added daily, weekly, or monthly source labels to key levels and avoids forcing levels when evidence is insufficient."],
