@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CorporateAction, DailyCandle } from "../lib/price-history";
 import type { CandlestickPattern, TechnicalAnalysis } from "../lib/technical-analysis";
+import { EChartsCandlestickChart } from "./echarts-candlestick-chart";
 import type { Language } from "./language-context";
 
 type Props = { ticker: string; market: "TW" | "US"; language: Language };
@@ -18,81 +19,6 @@ type ChartResult = {
   technicalAnalysis: TechnicalAnalysis | null;
   state: "ready" | "empty";
 };
-
-function movingAverage(candles: DailyCandle[], period: number) {
-  return candles.map((_, index) => {
-    if (index + 1 < period) return null;
-    const window = candles.slice(index + 1 - period, index + 1);
-    return window.reduce((sum, candle) => sum + candle.close, 0) / period;
-  });
-}
-
-function YahooCandlestickChart({ candles, ticker, language, analysis, timeframe }: { candles: DailyCandle[]; ticker: string; language: Language; analysis: TechnicalAnalysis | null; timeframe: ChartTimeframe }) {
-  const left = 42;
-  const right = 932;
-  const priceTop = 30;
-  const priceBottom = 670;
-  const volumeTop = 710;
-  const volumeBottom = 850;
-  const ma5 = movingAverage(candles, 5);
-  const ma20 = movingAverage(candles, 20);
-  const ma60 = movingAverage(candles, 60);
-  const prices = candles.flatMap((candle) => [candle.low, candle.high]);
-  const rawLow = Math.min(...prices);
-  const rawHigh = Math.max(...prices);
-  const padding = Math.max((rawHigh - rawLow) * 0.06, rawHigh * 0.01);
-  const low = rawLow - padding;
-  const high = rawHigh + padding;
-  const priceRange = Math.max(high - low, 1);
-  const maxVolume = Math.max(...candles.map((candle) => candle.volume), 1);
-  const x = (index: number) => left + index * (right - left) / Math.max(candles.length - 1, 1);
-  const y = (value: number) => priceTop + (high - value) / priceRange * (priceBottom - priceTop);
-  const bodyWidth = Math.max(2, Math.min(9, (right - left) / candles.length * 0.58));
-  const linePoints = (values: Array<number | null>) => values.flatMap((value, index) => value === null ? [] : [`${x(index)},${y(value)}`]).join(" ");
-  const gridValues = Array.from({ length: 6 }, (_, index) => high - index * priceRange / 5);
-  const labelIndexes = Array.from(new Set(Array.from({ length: 6 }, (_, index) => Math.round(index * (candles.length - 1) / 5))));
-  const keyLevels = (analysis?.keyLevels ?? [])
-    .filter((level) => level.price >= low && level.price <= high)
-    .map((level) => ({
-      ...level,
-      key: `${level.timeframe}-${level.kind}`,
-      value: level.price,
-      color: level.kind === "support" ? "#a8731d" : "#566f78",
-      dash: level.timeframe === "daily" ? "4 4" : level.timeframe === "weekly" ? "8 5" : "2 3 10 3",
-      labelX: level.timeframe === "daily" ? left + 10 : level.timeframe === "weekly" ? left + 165 : left + 320,
-      label: language === "zh"
-        ? `${timeframeLabel(level.timeframe, language)}${level.kind === "support" ? "支撐" : "壓力"}`
-        : `${timeframeLabel(level.timeframe, language)} ${level.kind}`,
-    }));
-  const timeframeName = timeframeLabel(timeframe, language);
-
-  return (
-    <div className="public-chart-widget yahoo-chart-widget">
-      <div className="yahoo-chart-legend" aria-hidden="true"><span className="ma5">MA5</span><span className="ma20">MA20</span><span className="ma60">MA60</span></div>
-      <svg className="yahoo-candlestick-svg" viewBox="0 0 1000 880" preserveAspectRatio="none" role="img" aria-label={language === "zh" ? `${ticker} ${timeframeName} K 線` : `${ticker} ${timeframeName} candlestick chart`}>
-        <rect x="0" y="0" width="1000" height="880" fill="#fbfcfb" />
-        {gridValues.map((value) => <g key={value}><line x1={left} x2={right} y1={y(value)} y2={y(value)} stroke="#dfe7e2" strokeWidth="1" /><text x="945" y={y(value) + 4} fill="#72858a" fontSize="12">{value.toFixed(value >= 100 ? 0 : 1)}</text></g>)}
-        {keyLevels.map((level) => <g key={level.key}><line x1={left} x2={right} y1={y(level.value)} y2={y(level.value)} stroke={level.color} strokeWidth={level.timeframe === "monthly" ? "2" : "1.5"} strokeDasharray={level.dash} vectorEffect="non-scaling-stroke" /><rect x={level.labelX - 5} y={y(level.value) - 17} width="150" height="16" rx="3" fill="#fbfcfb" opacity=".9" /><text x={level.labelX} y={y(level.value) - 5} fill={level.color} fontSize="11" fontWeight="700">{level.label} {formatIndicator(level.value)}</text></g>)}
-        {candles.map((candle, index) => {
-          const rising = candle.close >= candle.open;
-          const color = rising ? "#d94b45" : "#15986c";
-          const openY = y(candle.open);
-          const closeY = y(candle.close);
-          return <g key={candle.date}><title>{`${candle.date} O ${candle.open} H ${candle.high} L ${candle.low} C ${candle.close}`}</title><line x1={x(index)} x2={x(index)} y1={y(candle.high)} y2={y(candle.low)} stroke={color} strokeWidth="1.25" /><rect x={x(index) - bodyWidth / 2} y={Math.min(openY, closeY)} width={bodyWidth} height={Math.max(Math.abs(closeY - openY), 1.4)} fill={color} /></g>;
-        })}
-        <polyline points={linePoints(ma5)} fill="none" stroke="#4ca6e8" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <polyline points={linePoints(ma20)} fill="none" stroke="#f18b46" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <polyline points={linePoints(ma60)} fill="none" stroke="#7a64d1" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <line x1={left} x2={right} y1={volumeTop} y2={volumeTop} stroke="#dfe7e2" strokeWidth="1" />
-        {candles.map((candle, index) => {
-          const height = candle.volume / maxVolume * (volumeBottom - volumeTop);
-          return <rect key={`volume-${candle.date}`} x={x(index) - bodyWidth / 2} y={volumeBottom - height} width={bodyWidth} height={Math.max(height, 1)} fill={candle.close >= candle.open ? "#e58b86" : "#68bea1"} opacity=".72" />;
-        })}
-        {labelIndexes.map((index) => <text key={`date-${candles[index].date}`} x={x(index)} y="872" fill="#72858a" fontSize="12" textAnchor={index === 0 ? "start" : index === candles.length - 1 ? "end" : "middle"}>{candles[index].date.slice(5)}</text>)}
-      </svg>
-    </div>
-  );
-}
 
 function TradingViewChart({ symbol, language }: { symbol: string; language: Language }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -331,7 +257,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       <div className="detail-section-title chart-title-row">
         <div>
           <h3>{language === "zh" ? "公開技術 K 線" : "Public Technical Chart"}</h3>
-          <span>{market === "TW" ? (language === "zh" ? "Yahoo Finance 公開資料 · 站內日／週／月 K 線" : "Yahoo Finance public data · in-site daily, weekly, and monthly charts") : (language === "zh" ? "TradingView · 可切換日／週／月與技術指標" : "TradingView · switch daily, weekly, monthly, and technical indicators")}</span>
+          <span>{market === "TW" ? (language === "zh" ? "Yahoo Finance 公開資料 · Apache ECharts 日／週／月 K 線、趨勢線與通道" : "Yahoo Finance public data · Apache ECharts daily, weekly, monthly candles, trendlines, and channels") : (language === "zh" ? "TradingView · 可切換日／週／月與技術指標" : "TradingView · switch daily, weekly, monthly, and technical indicators")}</span>
         </div>
         <a href={yahooHref} target="_blank" rel="noopener noreferrer">{language === "zh" ? "Yahoo Finance ↗" : "Yahoo Finance ↗"}</a>
       </div>
@@ -349,7 +275,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       {state === "ready" && market === "TW" && <div className="chart-timeframe-switch" role="group" aria-label={language === "zh" ? "K 線週期" : "Chart timeframe"}>
         {(["daily", "weekly", "monthly"] as const).map((option) => <button key={option} type="button" className={timeframe === option ? "active" : ""} aria-pressed={timeframe === option} onClick={() => setTimeframe(option)}>{timeframeLabel(option, language)}</button>)}
       </div>}
-      {state === "ready" && (market === "TW" ? <YahooCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} timeframe={timeframe} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}
+      {state === "ready" && (market === "TW" ? <EChartsCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} timeframe={timeframe} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}
       <p className="chart-footnote">
         {language === "zh" ? "外部圖表僅供技術型態判讀，不納入公允價值計算。" : "The external chart is for technical review only and is not included in fair-value calculations."}{" "}
         {market === "TW" ? <a href={yahooHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "行情資料由 Yahoo Finance 提供" : "market data by Yahoo Finance"}</a> : <a href={tradingViewHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "圖表由 TradingView 提供" : "chart by TradingView"}</a>}
