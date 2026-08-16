@@ -22,6 +22,14 @@ export type TechnicalAlert =
   | "support-broken"
   | "neutral";
 
+export type TechnicalTimeframe = "daily" | "weekly" | "monthly";
+
+export type TechnicalLevel = {
+  kind: "support" | "resistance";
+  timeframe: TechnicalTimeframe;
+  price: number;
+};
+
 export type TechnicalAnalysis = {
   asOf: string;
   close: number;
@@ -44,6 +52,7 @@ export type TechnicalAnalysis = {
   resistanceLevel: number | null;
   resistanceTimeframe: "daily" | "weekly" | "monthly" | null;
   resistanceDistance: number | null;
+  keyLevels: TechnicalLevel[];
   nearSupport: boolean;
   nearResistance: boolean;
   patternAtSupport: boolean;
@@ -53,6 +62,10 @@ export type TechnicalAnalysis = {
   patternDirection: "bullish" | "bearish" | "neutral";
   patternStage: "candidate" | "confirmed" | "none";
   consecutiveLargeBearish: number;
+  consecutiveLargeBullish: number;
+  consecutiveTrendCandles: number;
+  ma20Deviation: number | null;
+  gapDirection: "up" | "down" | null;
   technicalAlert: TechnicalAlert;
 };
 
@@ -160,7 +173,7 @@ function periodKey(date: string, period: "week" | "month") {
   return value.toISOString().slice(0, 10);
 }
 
-function aggregateCandles(candles: DailyCandle[], period: "week" | "month") {
+export function aggregateCandles(candles: DailyCandle[], period: "week" | "month") {
   const result: DailyCandle[] = [];
   for (const candle of candles) {
     const key = periodKey(candle.date, period);
@@ -179,7 +192,7 @@ function aggregateCandles(candles: DailyCandle[], period: "week" | "month") {
 
 type PriceLevel = {
   price: number;
-  timeframe: "daily" | "weekly" | "monthly";
+  timeframe: TechnicalTimeframe;
   weight: number;
   date: string;
 };
@@ -200,6 +213,46 @@ function pivotLevels(candles: DailyCandle[], timeframe: PriceLevel["timeframe"],
       date: candles[index].date,
     });
   }
+  return result;
+}
+
+function credibleTimeframeLevels(
+  candles: DailyCandle[],
+  weekly: DailyCandle[],
+  monthly: DailyCandle[],
+  atr14: number | null,
+) {
+  const close = candles[candles.length - 1].close;
+  const sources: Array<{ timeframe: TechnicalTimeframe; candles: DailyCandle[]; tolerance: number }> = [
+    { timeframe: "daily", candles: candles.slice(0, -1).slice(-260), tolerance: Math.max(close * 0.009, (atr14 ?? 0) * 0.3) },
+    { timeframe: "weekly", candles: weekly.slice(0, -1).slice(-156), tolerance: Math.max(close * 0.014, (atr14 ?? 0) * 0.45) },
+    { timeframe: "monthly", candles: monthly.slice(0, -1).slice(-60), tolerance: Math.max(close * 0.02, (atr14 ?? 0) * 0.65) },
+  ];
+  const result: TechnicalLevel[] = [];
+
+  for (const source of sources) {
+    const support = nearestMajorLevel(
+      pivotLevels(source.candles, source.timeframe, "support"),
+      close,
+      source.tolerance,
+      "support",
+    );
+    const resistance = nearestMajorLevel(
+      pivotLevels(source.candles, source.timeframe, "resistance"),
+      close,
+      source.tolerance,
+      "resistance",
+    );
+    const compressedRange = Boolean(
+      support
+      && resistance
+      && resistance.price - support.price <= Math.max(close * 0.045, (atr14 ?? 0) * 1.25),
+    );
+    if (compressedRange) continue;
+    if (support) result.push({ kind: "support", timeframe: source.timeframe, price: support.price });
+    if (resistance) result.push({ kind: "resistance", timeframe: source.timeframe, price: resistance.price });
+  }
+
   return result;
 }
 
@@ -278,8 +331,12 @@ function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly:
   const nearResistance = resistance ? Math.abs(resistance.price - close) <= Math.max(close * 0.025, (atr14 ?? 0) * 0.75) : false;
   const patternLow = Math.min(...candles.slice(-3).map((candle) => candle.low));
   const patternHigh = Math.max(...candles.slice(-3).map((candle) => candle.high));
-  const patternAtSupport = support ? Math.abs(patternLow - support.price) <= Math.max(close * 0.025, (atr14 ?? 0) * 0.75) : false;
-  const patternAtResistance = resistance ? Math.abs(patternHigh - resistance.price) <= Math.max(close * 0.025, (atr14 ?? 0) * 0.75) : false;
+  const keyLevels = credibleTimeframeLevels(candles, weekly, monthly, atr14);
+  const patternTolerance = Math.max(close * 0.025, (atr14 ?? 0) * 0.75);
+  const patternAtSupport = [support?.price, ...keyLevels.filter((level) => level.kind === "support").map((level) => level.price)]
+    .some((price) => price !== undefined && Math.abs(patternLow - price) <= patternTolerance);
+  const patternAtResistance = [resistance?.price, ...keyLevels.filter((level) => level.kind === "resistance").map((level) => level.price)]
+    .some((price) => price !== undefined && Math.abs(patternHigh - price) <= patternTolerance);
   const previous = candles[candles.length - 2];
   const averageVolume20 = mean(candles.slice(-21, -1).map((candle) => candle.volume).filter((value) => value > 0));
   const volumeRatio20 = averageVolume20 && candles[candles.length - 1].volume > 0
@@ -293,10 +350,30 @@ function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly:
     && close < support.price - atr14 * 0.35
     && (volumeRatio20 === null || volumeRatio20 >= 1.2),
   );
-  return { support, resistance, supportDistance, resistanceDistance, nearSupport, nearResistance, patternAtSupport, patternAtResistance, supportBroken };
+  return {
+    support,
+    resistance,
+    keyLevels,
+    supportDistance,
+    resistanceDistance,
+    nearSupport,
+    nearResistance,
+    patternAtSupport,
+    patternAtResistance,
+    supportBroken,
+  };
 }
 
-function detectCandlestickPattern(candles: DailyCandle[]) {
+function consecutiveCandles(candles: DailyCandle[], endIndex: number, direction: "down" | "up") {
+  let count = 0;
+  for (let index = endIndex; index >= Math.max(0, endIndex - 5); index -= 1) {
+    if (direction === "down" ? isBearish(candles[index]) : isBullish(candles[index])) count += 1;
+    else break;
+  }
+  return count;
+}
+
+function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) {
   const latest = candles[candles.length - 1];
   const prior = candles[candles.length - 2];
   const first = candles[candles.length - 3];
@@ -304,47 +381,63 @@ function detectCandlestickPattern(candles: DailyCandle[]) {
   const declining = priorTrend(candles, candles.length - 3, "down");
   const rising = priorTrend(candles, candles.length - 3, "up");
   let consecutiveLargeBearish = 0;
+  let consecutiveLargeBullish = 0;
   for (let index = candles.length - 2; index >= Math.max(0, candles.length - 5); index -= 1) {
     if (isBearish(candles[index]) && isLargeBody(candles[index], baseline)) consecutiveLargeBearish += 1;
     else break;
   }
+  for (let index = candles.length - 2; index >= Math.max(0, candles.length - 5); index -= 1) {
+    if (isBullish(candles[index]) && isLargeBody(candles[index], baseline)) consecutiveLargeBullish += 1;
+    else break;
+  }
+  const consecutiveBearish = consecutiveCandles(candles, candles.length - 2, "down");
+  const consecutiveBullish = consecutiveCandles(candles, candles.length - 2, "up");
+  const ma20 = movingAverageAt(candles, 20);
+  const ma20Deviation = ma20 && latest ? latest.close / ma20 - 1 : null;
+  const farThreshold = latest ? Math.max(0.05, ((atr14 ?? 0) / latest.close) * 1.5) : 0.05;
+  const farBelowMa20 = ma20Deviation !== null && ma20Deviation <= -farThreshold;
+  const farAboveMa20 = ma20Deviation !== null && ma20Deviation >= farThreshold;
+  const gapDirection = prior && latest
+    ? latest.open < prior.low ? "down" as const : latest.open > prior.high ? "up" as const : null
+    : null;
+  const details = { consecutiveLargeBearish, consecutiveLargeBullish, ma20Deviation, gapDirection };
 
   if (first && prior && latest && declining && isBearish(first) && isLargeBody(first, baseline)
     && isSmallBody(prior, baseline) && isBullish(latest) && realBody(latest) >= baseline * 0.8
     && latest.close >= (first.open + first.close) / 2) {
-    return { pattern: "morning-star" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveLargeBearish };
+    return { pattern: "morning-star" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
   if (first && prior && latest && rising && isBullish(first) && isLargeBody(first, baseline)
     && isSmallBody(prior, baseline) && isBearish(latest) && realBody(latest) >= baseline * 0.8
     && latest.close <= (first.open + first.close) / 2) {
-    return { pattern: "evening-star" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveLargeBearish };
+    return { pattern: "evening-star" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
   if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior) && isBullish(latest)
     && latest.open <= prior.close && latest.close >= prior.open) {
-    return { pattern: "bullish-engulfing" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveLargeBearish };
+    return { pattern: "bullish-engulfing" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
   if (prior && latest && priorTrend(candles, candles.length - 2, "up") && isBullish(prior) && isBearish(latest)
     && latest.open >= prior.close && latest.close <= prior.open) {
-    return { pattern: "bearish-engulfing" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveLargeBearish };
+    return { pattern: "bearish-engulfing" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
-  if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior)
-    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline)) {
-    return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveLargeBearish };
+  if (prior && latest && priorTrend(candles, candles.length - 2, "down") && consecutiveBearish >= 2 && isBearish(prior)
+    && isLargeBody(prior, baseline) && isDoji(latest) && farBelowMa20) {
+    return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
-  if (prior && latest && priorTrend(candles, candles.length - 2, "up") && isBullish(prior)
-    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline)) {
-    return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveLargeBearish };
+  if (prior && latest && priorTrend(candles, candles.length - 2, "up") && consecutiveBullish >= 2 && isBullish(prior)
+    && isLargeBody(prior, baseline) && isDoji(latest) && farAboveMa20) {
+    return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
   if (latest && priorTrend(candles, candles.length - 1, "down") && isHammer(latest)) {
-    return { pattern: "hammer" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveLargeBearish };
+    return { pattern: "hammer" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
   if (latest && priorTrend(candles, candles.length - 1, "up") && isShootingStar(latest)) {
-    return { pattern: "shooting-star" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveLargeBearish };
+    return { pattern: "shooting-star" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
   if (latest && isDoji(latest)) {
-    return { pattern: "doji" as const, direction: "neutral" as const, stage: "candidate" as const, consecutiveLargeBearish };
+    return { pattern: "doji" as const, direction: "neutral" as const, stage: "candidate" as const, consecutiveTrendCandles: Math.max(consecutiveBearish, consecutiveBullish), ...details };
   }
-  return { pattern: "none" as const, direction: "neutral" as const, stage: "none" as const, consecutiveLargeBearish };
+  return { pattern: "none" as const, direction: "neutral" as const, stage: "none" as const, consecutiveTrendCandles: Math.max(consecutiveBearish, consecutiveBullish), ...details };
 }
 
 function detectWBottom(candles: DailyCandle[]) {
@@ -427,7 +520,7 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   const volumeRatio20 = averageVolume20 && latest.volume > 0 ? latest.volume / averageVolume20 : null;
   const atr14 = averageTrueRange(valid);
   const levels = detectKeyLevels(valid, aggregateCandles(valid, "week"), aggregateCandles(valid, "month"), atr14);
-  const candlestick = detectCandlestickPattern(valid);
+  const candlestick = detectCandlestickPattern(valid, atr14);
   const technicalAlert: TechnicalAlert = levels.supportBroken
     ? "support-broken"
     : candlestick.direction === "bullish" && candlestick.stage === "confirmed" && levels.patternAtSupport
@@ -466,6 +559,7 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
     resistanceLevel: levels.resistance?.price ?? null,
     resistanceTimeframe: levels.resistance?.timeframe ?? null,
     resistanceDistance: levels.resistanceDistance,
+    keyLevels: levels.keyLevels,
     nearSupport: levels.nearSupport,
     nearResistance: levels.nearResistance,
     patternAtSupport: levels.patternAtSupport,
@@ -475,6 +569,10 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
     patternDirection: candlestick.direction,
     patternStage: candlestick.stage,
     consecutiveLargeBearish: candlestick.consecutiveLargeBearish,
+    consecutiveLargeBullish: candlestick.consecutiveLargeBullish,
+    consecutiveTrendCandles: candlestick.consecutiveTrendCandles,
+    ma20Deviation: candlestick.ma20Deviation,
+    gapDirection: candlestick.gapDirection,
     technicalAlert,
   };
 }

@@ -6,11 +6,14 @@ import type { CandlestickPattern, TechnicalAnalysis } from "../lib/technical-ana
 import type { Language } from "./language-context";
 
 type Props = { ticker: string; market: "TW" | "US"; language: Language };
+type ChartTimeframe = "daily" | "weekly" | "monthly";
 type ChartResult = {
   requestUrl: string;
   yahooSymbol: string;
   tradingViewSymbol: string;
   candles: DailyCandle[];
+  weeklyCandles: DailyCandle[];
+  monthlyCandles: DailyCandle[];
   corporateActions: CorporateAction[];
   technicalAnalysis: TechnicalAnalysis | null;
   state: "ready" | "empty";
@@ -24,7 +27,7 @@ function movingAverage(candles: DailyCandle[], period: number) {
   });
 }
 
-function YahooCandlestickChart({ candles, ticker, language, analysis }: { candles: DailyCandle[]; ticker: string; language: Language; analysis: TechnicalAnalysis | null }) {
+function YahooCandlestickChart({ candles, ticker, language, analysis, timeframe }: { candles: DailyCandle[]; ticker: string; language: Language; analysis: TechnicalAnalysis | null; timeframe: ChartTimeframe }) {
   const left = 42;
   const right = 932;
   const priceTop = 30;
@@ -44,26 +47,32 @@ function YahooCandlestickChart({ candles, ticker, language, analysis }: { candle
   const maxVolume = Math.max(...candles.map((candle) => candle.volume), 1);
   const x = (index: number) => left + index * (right - left) / Math.max(candles.length - 1, 1);
   const y = (value: number) => priceTop + (high - value) / priceRange * (priceBottom - priceTop);
-  const bodyWidth = Math.max(2, Math.min(5, (right - left) / candles.length * 0.58));
+  const bodyWidth = Math.max(2, Math.min(9, (right - left) / candles.length * 0.58));
   const linePoints = (values: Array<number | null>) => values.flatMap((value, index) => value === null ? [] : [`${x(index)},${y(value)}`]).join(" ");
   const gridValues = Array.from({ length: 6 }, (_, index) => high - index * priceRange / 5);
-  const labelIndexes = Array.from(new Set([0, 24, 48, 72, 96, candles.length - 1].filter((index) => index >= 0 && index < candles.length)));
-  const keyLevels = [
-    analysis?.supportLevel && analysis.supportLevel >= low && analysis.supportLevel <= high
-      ? { key: "support", value: analysis.supportLevel, color: "#b98224", label: language === "zh" ? `${timeframeLabel(analysis.supportTimeframe, language)}支撐` : `${timeframeLabel(analysis.supportTimeframe, language)} support` }
-      : null,
-    analysis?.resistanceLevel && analysis.resistanceLevel >= low && analysis.resistanceLevel <= high
-      ? { key: "resistance", value: analysis.resistanceLevel, color: "#667a80", label: language === "zh" ? `${timeframeLabel(analysis.resistanceTimeframe, language)}壓力` : `${timeframeLabel(analysis.resistanceTimeframe, language)} resistance` }
-      : null,
-  ].filter((level): level is { key: string; value: number; color: string; label: string } => level !== null);
+  const labelIndexes = Array.from(new Set(Array.from({ length: 6 }, (_, index) => Math.round(index * (candles.length - 1) / 5))));
+  const keyLevels = (analysis?.keyLevels ?? [])
+    .filter((level) => level.price >= low && level.price <= high)
+    .map((level) => ({
+      ...level,
+      key: `${level.timeframe}-${level.kind}`,
+      value: level.price,
+      color: level.kind === "support" ? "#a8731d" : "#566f78",
+      dash: level.timeframe === "daily" ? "4 4" : level.timeframe === "weekly" ? "8 5" : "2 3 10 3",
+      labelX: level.timeframe === "daily" ? left + 10 : level.timeframe === "weekly" ? left + 165 : left + 320,
+      label: language === "zh"
+        ? `${timeframeLabel(level.timeframe, language)}${level.kind === "support" ? "支撐" : "壓力"}`
+        : `${timeframeLabel(level.timeframe, language)} ${level.kind}`,
+    }));
+  const timeframeName = timeframeLabel(timeframe, language);
 
   return (
     <div className="public-chart-widget yahoo-chart-widget">
       <div className="yahoo-chart-legend" aria-hidden="true"><span className="ma5">MA5</span><span className="ma20">MA20</span><span className="ma60">MA60</span></div>
-      <svg className="yahoo-candlestick-svg" viewBox="0 0 1000 880" preserveAspectRatio="none" role="img" aria-label={language === "zh" ? `${ticker} 近 120 個交易日 K 線` : `${ticker} 120-session candlestick chart`}>
+      <svg className="yahoo-candlestick-svg" viewBox="0 0 1000 880" preserveAspectRatio="none" role="img" aria-label={language === "zh" ? `${ticker} ${timeframeName} K 線` : `${ticker} ${timeframeName} candlestick chart`}>
         <rect x="0" y="0" width="1000" height="880" fill="#fbfcfb" />
         {gridValues.map((value) => <g key={value}><line x1={left} x2={right} y1={y(value)} y2={y(value)} stroke="#dfe7e2" strokeWidth="1" /><text x="945" y={y(value) + 4} fill="#72858a" fontSize="12">{value.toFixed(value >= 100 ? 0 : 1)}</text></g>)}
-        {keyLevels.map((level) => <g key={level.key}><line x1={left} x2={right} y1={y(level.value)} y2={y(level.value)} stroke={level.color} strokeWidth="1.5" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" /><rect x={left + 5} y={y(level.value) - 17} width="160" height="16" rx="3" fill="#fbfcfb" opacity=".9" /><text x={left + 10} y={y(level.value) - 5} fill={level.color} fontSize="11" fontWeight="700">{level.label} {formatIndicator(level.value)}</text></g>)}
+        {keyLevels.map((level) => <g key={level.key}><line x1={left} x2={right} y1={y(level.value)} y2={y(level.value)} stroke={level.color} strokeWidth={level.timeframe === "monthly" ? "2" : "1.5"} strokeDasharray={level.dash} vectorEffect="non-scaling-stroke" /><rect x={level.labelX - 5} y={y(level.value) - 17} width="150" height="16" rx="3" fill="#fbfcfb" opacity=".9" /><text x={level.labelX} y={y(level.value) - 5} fill={level.color} fontSize="11" fontWeight="700">{level.label} {formatIndicator(level.value)}</text></g>)}
         {candles.map((candle, index) => {
           const rising = candle.close >= candle.open;
           const color = rising ? "#d94b45" : "#15986c";
@@ -185,7 +194,7 @@ function TechnicalAnalysisPanel({ analysis, language }: { analysis: TechnicalAna
     : analysis.technicalAlert === "bullish-candidate" || analysis.technicalAlert === "near-support" ? "watch"
       : analysis.technicalAlert === "bearish-confirmed" || analysis.technicalAlert === "bearish-candidate" || analysis.technicalAlert === "support-broken" ? "caution"
         : "neutral";
-  const alertTitle = language === "zh"
+  const genericAlertTitle = language === "zh"
     ? ({
       "bullish-confirmed": "↗ 反轉型態確認",
       "bullish-candidate": "反轉候選，下一根 K 線待確認",
@@ -206,17 +215,28 @@ function TechnicalAnalysisPanel({ analysis, language }: { analysis: TechnicalAna
       "support-broken": "↘ Major support invalidated",
       neutral: "No high-priority technical alert",
     } as const)[analysis.technicalAlert];
+  const alertTitle = analysis.technicalAlert === "bullish-candidate" && analysis.candlestickPattern === "morning-star-candidate"
+    ? (language === "zh" ? "早晨之星可能形成，等待第三根紅 K 確認" : "Morning star may be forming; await the third bullish candle")
+    : analysis.technicalAlert === "bearish-candidate" && analysis.candlestickPattern === "evening-star-candidate"
+      ? (language === "zh" ? "黃昏之星可能形成，等待第三根綠 K 確認" : "Evening star may be forming; await the third bearish candle")
+      : genericAlertTitle;
   const supportText = analysis.supportLevel === null
     ? (language === "zh" ? "支撐資料不足" : "Support unavailable")
     : `${timeframeLabel(analysis.supportTimeframe, language)}${language === "zh" ? "支撐" : " support"} ${formatIndicator(analysis.supportLevel)}${analysis.supportDistance === null ? "" : ` · ${Math.abs(analysis.supportDistance * 100).toFixed(1)}%`}`;
   const resistanceText = analysis.resistanceLevel === null
     ? (language === "zh" ? "壓力資料不足" : "Resistance unavailable")
     : `${timeframeLabel(analysis.resistanceTimeframe, language)}${language === "zh" ? "壓力" : " resistance"} ${formatIndicator(analysis.resistanceLevel)}${analysis.resistanceDistance === null ? "" : ` · ${Math.abs(analysis.resistanceDistance * 100).toFixed(1)}%`}`;
+  const ma20Deviation = analysis.ma20Deviation === null ? null : `${analysis.ma20Deviation >= 0 ? "+" : ""}${(analysis.ma20Deviation * 100).toFixed(1)}%`;
+  const gapText = analysis.gapDirection === null
+    ? (language === "zh" ? "未出現明顯跳空" : "no clear gap")
+    : language === "zh"
+      ? `伴隨向${analysis.gapDirection === "down" ? "下" : "上"}跳空`
+      : `${analysis.gapDirection === "down" ? "down" : "up"} gap present`;
   const patternDetail = language === "zh"
     ? analysis.candlestickPattern === "morning-star-candidate"
-      ? `${analysis.consecutiveLargeBearish || 1} 根大陰線後出現小實體／十字星；下一交易日觀察紅 K 是否收復首根陰線中點`
+      ? `連跌 ${analysis.consecutiveTrendCandles} 根、${analysis.consecutiveLargeBearish || 1} 根大陰線後出現十字 K，距 MA20 ${ma20Deviation ?? "—"}，${analysis.patternAtSupport ? "位於主要支撐" : "尚未貼近主要支撐"}，${gapText}；等待紅 K 收復首根陰線中點`
       : analysis.candlestickPattern === "evening-star-candidate"
-        ? "上漲後出現小實體／十字星；下一交易日觀察是否形成黃昏之星"
+        ? `連漲 ${analysis.consecutiveTrendCandles} 根、${analysis.consecutiveLargeBullish || 1} 根大陽線後出現十字 K，距 MA20 ${ma20Deviation ?? "—"}，${analysis.patternAtResistance ? "位於主要壓力" : "尚未貼近主要壓力"}，${gapText}；等待綠 K 跌破確認`
         : analysis.candlestickPattern === "hammer"
           ? "長下影顯示低檔承接，仍需下一根紅 K 突破錘子線高點"
           : analysis.candlestickPattern === "shooting-star"
@@ -227,9 +247,9 @@ function TechnicalAnalysisPanel({ analysis, language }: { analysis: TechnicalAna
                 ? `已完成 ${candlestickLabel(analysis.candlestickPattern, language)}；仍需搭配位置與量能判讀`
                 : "規則尚未找到早晨／黃昏之星、吞噬、錘子或流星線"
     : analysis.candlestickPattern === "morning-star-candidate"
-      ? `Small body/doji after ${analysis.consecutiveLargeBearish || 1} large bearish candle(s); watch for a bullish close through the first candle midpoint`
+      ? `${analysis.consecutiveTrendCandles} declining candles and ${analysis.consecutiveLargeBearish || 1} large bearish candle(s), followed by a doji ${ma20Deviation ? `${ma20Deviation} from MA20` : "far from MA20"}; ${analysis.patternAtSupport ? "at major support" : "not yet at major support"}, ${gapText}; await a bullish close through the first candle midpoint`
       : analysis.candlestickPattern === "evening-star-candidate"
-        ? "Small body/doji after an advance; watch for an evening-star confirmation"
+        ? `${analysis.consecutiveTrendCandles} advancing candles and ${analysis.consecutiveLargeBullish || 1} large bullish candle(s), followed by a doji ${ma20Deviation ? `${ma20Deviation} from MA20` : "far from MA20"}; ${analysis.patternAtResistance ? "at major resistance" : "not yet at major resistance"}, ${gapText}; await a bearish confirmation`
         : analysis.candlestickPattern === "hammer"
           ? "Long lower shadow shows demand; confirmation above the hammer high is still required"
           : analysis.candlestickPattern === "shooting-star"
@@ -260,6 +280,7 @@ function TechnicalAnalysisPanel({ analysis, language }: { analysis: TechnicalAna
 export function DailyCandlestickChart({ ticker, market, language }: Props) {
   const requestUrl = `/api/price-history?ticker=${encodeURIComponent(ticker)}&market=${market}`;
   const [result, setResult] = useState<ChartResult | null>(null);
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>("daily");
   const currentResult = result?.requestUrl === requestUrl ? result : null;
   const state = currentResult?.state ?? "loading";
 
@@ -267,7 +288,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
     const controller = new AbortController();
     void fetch(requestUrl, { signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { symbol?: string; tradingViewSymbol?: string; candles?: DailyCandle[]; corporateActions?: CorporateAction[]; technicalAnalysis?: TechnicalAnalysis | null };
+        const payload = await response.json() as { symbol?: string; tradingViewSymbol?: string; candles?: DailyCandle[]; weeklyCandles?: DailyCandle[]; monthlyCandles?: DailyCandle[]; corporateActions?: CorporateAction[]; technicalAnalysis?: TechnicalAnalysis | null };
         const yahooSymbol = String(payload.symbol ?? "").trim();
         const tradingViewSymbol = String(payload.tradingViewSymbol ?? "").trim();
         const candles = Array.isArray(payload.candles) ? payload.candles : [];
@@ -276,6 +297,8 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
           yahooSymbol,
           tradingViewSymbol,
           candles,
+          weeklyCandles: Array.isArray(payload.weeklyCandles) ? payload.weeklyCandles : [],
+          monthlyCandles: Array.isArray(payload.monthlyCandles) ? payload.monthlyCandles : [],
           corporateActions: Array.isArray(payload.corporateActions) ? payload.corporateActions : [],
           technicalAnalysis: payload.technicalAnalysis ?? null,
           state: response.ok && yahooSymbol && (market === "TW" ? candles.length >= 20 : Boolean(tradingViewSymbol)) ? "ready" : "empty",
@@ -283,7 +306,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       })
       .catch((error) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setResult({ requestUrl, yahooSymbol: "", tradingViewSymbol: "", candles: [], corporateActions: [], technicalAnalysis: null, state: "empty" });
+          setResult({ requestUrl, yahooSymbol: "", tradingViewSymbol: "", candles: [], weeklyCandles: [], monthlyCandles: [], corporateActions: [], technicalAnalysis: null, state: "empty" });
         }
       });
     return () => controller.abort();
@@ -296,7 +319,11 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
     : "https://www.tradingview.com/";
   const yahooHref = `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol)}/chart/`;
   const corporateActions = currentResult?.corporateActions ?? [];
-  const candles = currentResult?.candles ?? [];
+  const candles = timeframe === "weekly"
+    ? currentResult?.weeklyCandles ?? []
+    : timeframe === "monthly"
+      ? currentResult?.monthlyCandles ?? []
+      : currentResult?.candles ?? [];
   const technicalAnalysis = currentResult?.technicalAnalysis ?? null;
 
   return (
@@ -304,7 +331,7 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       <div className="detail-section-title chart-title-row">
         <div>
           <h3>{language === "zh" ? "公開技術 K 線" : "Public Technical Chart"}</h3>
-          <span>{market === "TW" ? (language === "zh" ? "Yahoo Finance 公開日線 · 近 120 個交易日" : "Yahoo Finance public daily data · 120 sessions") : (language === "zh" ? "TradingView · 可切換日／週／月與技術指標" : "TradingView · switch daily, weekly, monthly, and technical indicators")}</span>
+          <span>{market === "TW" ? (language === "zh" ? "Yahoo Finance 公開資料 · 站內日／週／月 K 線" : "Yahoo Finance public data · in-site daily, weekly, and monthly charts") : (language === "zh" ? "TradingView · 可切換日／週／月與技術指標" : "TradingView · switch daily, weekly, monthly, and technical indicators")}</span>
         </div>
         <a href={yahooHref} target="_blank" rel="noopener noreferrer">{language === "zh" ? "Yahoo Finance ↗" : "Yahoo Finance ↗"}</a>
       </div>
@@ -319,7 +346,10 @@ export function DailyCandlestickChart({ ticker, market, language }: Props) {
       {technicalAnalysis && <TechnicalAnalysisPanel analysis={technicalAnalysis} language={language} />}
       {state === "loading" && <div className="chart-state">{language === "zh" ? "正在載入公開 K 線…" : "Loading public chart…"}</div>}
       {state === "empty" && <div className="chart-state">{language === "zh" ? "目前無法載入公開 K 線，估值資料不受影響" : "The public chart is unavailable; valuation is unaffected"}</div>}
-      {state === "ready" && (market === "TW" ? <YahooCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}
+      {state === "ready" && market === "TW" && <div className="chart-timeframe-switch" role="group" aria-label={language === "zh" ? "K 線週期" : "Chart timeframe"}>
+        {(["daily", "weekly", "monthly"] as const).map((option) => <button key={option} type="button" className={timeframe === option ? "active" : ""} aria-pressed={timeframe === option} onClick={() => setTimeframe(option)}>{timeframeLabel(option, language)}</button>)}
+      </div>}
+      {state === "ready" && (market === "TW" ? <YahooCandlestickChart candles={candles} ticker={ticker} language={language} analysis={technicalAnalysis} timeframe={timeframe} /> : <TradingViewChart symbol={chartSymbol} language={language} />)}
       <p className="chart-footnote">
         {language === "zh" ? "外部圖表僅供技術型態判讀，不納入公允價值計算。" : "The external chart is for technical review only and is not included in fair-value calculations."}{" "}
         {market === "TW" ? <a href={yahooHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "行情資料由 Yahoo Finance 提供" : "market data by Yahoo Finance"}</a> : <a href={tradingViewHref} target="_blank" rel="noopener nofollow noreferrer">{ticker} {language === "zh" ? "圖表由 TradingView 提供" : "chart by TradingView"}</a>}

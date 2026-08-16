@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeTechnicalSetup } from "../lib/technical-analysis.ts";
+import { aggregateCandles, analyzeTechnicalSetup } from "../lib/technical-analysis.ts";
 
 function candle(index, close, volume = 1_000) {
   const date = new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10);
@@ -55,8 +55,59 @@ test("pre-alerts a possible morning star after large bearish candles reach major
   assert.ok(result);
   assert.equal(result.candlestickPattern, "morning-star-candidate");
   assert.equal(result.consecutiveLargeBearish, 2);
+  assert.ok(result.consecutiveTrendCandles >= 2);
+  assert.ok((result.ma20Deviation ?? 0) <= -0.05);
   assert.equal(result.patternAtSupport, true);
   assert.equal(result.technicalAlert, "bullish-candidate");
+  assert.ok(result.keyLevels.some((level) => level.kind === "support" && level.timeframe === "daily"));
+  assert.ok(result.keyLevels.some((level) => level.kind === "support" && level.timeframe === "weekly"));
+});
+
+test("records a downward gap as optional morning-star candidate evidence", () => {
+  const candles = repeatedLevelHistory("support");
+  candles.push(
+    ohlcCandle(117, 103, 103.5, 96.5, 97),
+    ohlcCandle(118, 97, 97.4, 90.5, 91),
+    ohlcCandle(119, 89.3, 90, 88.7, 89.32),
+  );
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.candlestickPattern, "morning-star-candidate");
+  assert.equal(result.gapDirection, "down");
+  assert.equal(result.technicalAlert, "bullish-candidate");
+});
+
+test("pre-alerts an evening star after an extended rise reaches resistance", () => {
+  const candles = repeatedLevelHistory("resistance");
+  candles.push(
+    ohlcCandle(117, 99, 104.5, 98.5, 104),
+    ohlcCandle(118, 104, 108.5, 103.5, 108),
+    ohlcCandle(119, 109, 111.5, 108.7, 109.05),
+  );
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.candlestickPattern, "evening-star-candidate");
+  assert.ok(result.consecutiveTrendCandles >= 2);
+  assert.ok((result.ma20Deviation ?? 0) >= 0.05);
+  assert.equal(result.gapDirection, "up");
+  assert.equal(result.patternAtResistance, true);
+  assert.equal(result.technicalAlert, "bearish-candidate");
+});
+
+test("aggregates daily candles into selectable weekly and monthly OHLCV bars", () => {
+  const candles = [
+    { date: "2026-01-29", open: 10, high: 12, low: 9, close: 11, volume: 100 },
+    { date: "2026-01-30", open: 11, high: 13, low: 10, close: 12, volume: 200 },
+    { date: "2026-02-02", open: 12, high: 14, low: 11, close: 13, volume: 300 },
+  ];
+  assert.deepEqual(aggregateCandles(candles, "week"), [
+    { date: "2026-01-26", open: 10, high: 13, low: 9, close: 12, volume: 300 },
+    { date: "2026-02-02", open: 12, high: 14, low: 11, close: 13, volume: 300 },
+  ]);
+  assert.deepEqual(aggregateCandles(candles, "month"), [
+    { date: "2026-01", open: 10, high: 13, low: 9, close: 12, volume: 300 },
+    { date: "2026-02", open: 12, high: 14, low: 11, close: 13, volume: 300 },
+  ]);
 });
 
 test("confirms a morning star only after the third candle recovers the first body midpoint", () => {

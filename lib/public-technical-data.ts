@@ -5,7 +5,7 @@ import {
   yahooHistorySymbols,
   type YahooChartPayload,
 } from "./price-history.ts";
-import { analyzeTechnicalSetup } from "./technical-analysis.ts";
+import { aggregateCandles, analyzeTechnicalSetup } from "./technical-analysis.ts";
 
 export async function loadPublicTechnicalData(ticker: string, market: "TW" | "US", fetcher: typeof fetch = fetch) {
   for (const symbol of yahooHistorySymbols(ticker, market)) {
@@ -28,6 +28,8 @@ export async function loadPublicTechnicalData(ticker: string, market: "TW" | "US
         symbol,
         tradingViewSymbol,
         candles: allCandles.slice(-120),
+        weeklyCandles: aggregateCandles(allCandles, "week").slice(-104),
+        monthlyCandles: aggregateCandles(allCandles, "month").slice(-60),
         corporateActions: parseYahooCorporateActions(payload),
         technicalAnalysis: analyzeTechnicalSetup(allCandles),
       };
