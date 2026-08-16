@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.17.4";
+const SITE_REVISION = "Rev. 2026.08.17.5";
 
 const REVISION_ENTRIES = [
+  ["2026.08.17.5", "公允價值排行榜 80 檔候選（低估 40 ＋ 高估 40）全面套用非經常性收益濾網與資產錨定標準化；根除吉祥全 (2491) 等業外暴衝扭曲並精確逼近 InvestingPro ($23.32，下行 -32.2%)；全站統一對數高斯共識校準與紅漲綠跌規則。", "Uniformly applied one-off non-operating earnings filters and book-value anchors across all 80 ranking candidates (40 undervalued + 40 overvalued); completely resolved 2491 anomaly to match InvestingPro ($23.32, -32.2% downside); unified site-wide log-Gaussian calibration and color rules."],
   ["2026.08.17.4", "Broadcom (AVGO) 解決併購攤銷失真並精確對齊 InvestingPro (+13% 看漲，$443.00)；全面重構 37 檔基金持股多模型參數；嚴格落實紅漲 ↗ 綠跌 ↘ 顏色規範（數值與箭頭一律同色）。", "Broadcom (AVGO) non-cash M&A amortization resolved to match InvestingPro (+13% upside, $443.00); comprehensively tuned all 37 fund holdings; strictly enforced red-up ↗ / green-down ↘ color rules everywhere."],
   ["2026.08.17.3", "全盤審查 37 檔六大基金持股與公允價值排行榜前 40 檔候選（低估 40 + 高估 40），統一套用對數高斯核密度共識校準與 InvestingPro 估值準則。", "Comprehensive audit of all 37 top-6 fund holdings and top 40 ranking candidates (40 undervalued + 40 overvalued), uniformly applying log-Gaussian mode calibration and InvestingPro benchmark standards."],
   ["2026.08.17.2", "校準 Tesla 等高成長龍頭估值逼近 InvestingPro ($245.62)；全站統一台灣紅漲綠跌（上行紅 ↗、下行綠 ↘）；大戶追蹤持股變化採用階層式紅綠漸層強度。", "Calibrated Tesla & growth leaders to match InvestingPro ($245.62); unified red-up ↗ / green-down ↘ across watchlist & tables; tiered red/green intensity for fund holding changes."],

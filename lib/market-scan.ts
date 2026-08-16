@@ -1,5 +1,6 @@
 import { calculateStock, valuationTargets, type Market, type StockInput } from "./valuation.ts";
 import { calibrateFairValue } from "./valuation-calibration.ts";
+import { sanitizeMarketScanRatios } from "./market-scan-sanitizer.ts";
 import {
   fundPortfolioPeProfiles,
   fundPortfolioBusinessPeProfiles,
@@ -111,7 +112,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
   const pb = numeric(row.pb);
   const eps = numeric(row.eps ?? 0) || (price > 0 && pe > 0 ? price / pe : 0);
   const bvps = numeric(row.bvps ?? 0) || (price > 0 && pb > 0 ? price / pb : 0);
-  if (!price || (!eps && !bvps)) return null;
+  if (!price || price > 1_000_000 || (!eps && !bvps)) return null;
   if (market === "US" && price < 1) return null;
   // U.S. asset-light companies can report a zero/negative book value after
   // buybacks or acquisitions. Keep them in the scan when earnings are usable;
@@ -134,8 +135,39 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
   const fcfPerShare = hasFcf ? numeric(row.fcfPerShare) : 0;
   const debtRatio = hasDebtRatio ? numeric(row.debtRatio) : 0;
   const historicalFieldCount = [hasRevenueGrowth, hasFcf, hasDebtRatio].filter(Boolean).length;
-  const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
+
+  const sanitized = sanitizeMarketScanRatios({
+    ticker: row.ticker,
+    name: row.name,
+    market,
+    price,
+    pe,
+    pb,
+    eps,
+    bvps,
+    revenueGrowth: hasRevenueGrowth ? revenueGrowth : undefined,
+    debtRatio: hasDebtRatio ? debtRatio : undefined,
+    fcfPerShare: hasFcf ? fcfPerShare : undefined,
+    revenuePerShare: hasRevenuePerShare ? numeric(row.revenuePerShare) : undefined,
+    ebitdaPerShare: hasEbitdaPerShare ? numeric(row.ebitdaPerShare) : undefined,
+    ebitPerShare: hasEbitPerShare ? numeric(row.ebitPerShare) : undefined,
+    cashPerShare: hasCashPerShare ? numeric(row.cashPerShare) : undefined,
+    debtPerShare: hasDebtPerShare ? numeric(row.debtPerShare) : undefined,
+  });
+  const effectiveEps = sanitized.eps;
+  const effectiveBvps = sanitized.bvps;
+  const effectiveRevenuePerShare = sanitized.revenuePerShare;
+  const effectiveFcfPerShare = sanitized.fcfPerShare ?? 0;
+  const effectiveEbitdaPerShare = sanitized.ebitdaPerShare;
+  const effectiveEbitPerShare = sanitized.ebitPerShare;
+  const effectiveCashPerShare = sanitized.cashPerShare;
+  const effectiveDebtPerShare = sanitized.debtPerShare;
+
+  const roe = effectiveBvps > 0 ? (effectiveEps / effectiveBvps) * 100 : 0;
   const targets = valuationTargets(revenueGrowth, roe, debtRatio);
+  const resolvedTargetPe = sanitized.targetPe ?? (hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : targets.targetPe);
+  const resolvedTargetPb = sanitized.targetPb ?? (hasFiniteValue(row.targetPb) ? numeric(row.targetPb) : targets.targetPb);
+
   const fundSectorPe = market === "US"
     ? fundSectorPeProfiles.find((profile) => profile.sector === normalizeSector(row.ticker, row.name, row.sector))
     : undefined;
@@ -151,28 +183,28 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     industry: row.industry,
     listingBoard: row.listingBoard,
     price,
-    eps,
+    eps: effectiveEps,
     epsHistory: row.epsHistory,
-    bvps,
-    fcfPerShare,
+    bvps: effectiveBvps,
+    fcfPerShare: effectiveFcfPerShare,
     dividendPerShare: Math.max(numeric(row.dividendPerShare ?? 0), 0),
     ...targets,
     revenueGrowth,
     roe,
     debtRatio,
-    revenuePerShare: hasRevenuePerShare ? numeric(row.revenuePerShare) : undefined,
-    ebitPerShare: hasEbitPerShare ? numeric(row.ebitPerShare) : undefined,
-    ebitdaPerShare: hasEbitdaPerShare ? numeric(row.ebitdaPerShare) : undefined,
-    cashPerShare: hasCashPerShare ? numeric(row.cashPerShare) : undefined,
-    debtPerShare: hasDebtPerShare ? numeric(row.debtPerShare) : undefined,
+    revenuePerShare: effectiveRevenuePerShare ?? undefined,
+    ebitPerShare: effectiveEbitPerShare ?? undefined,
+    ebitdaPerShare: effectiveEbitdaPerShare ?? undefined,
+    cashPerShare: effectiveCashPerShare ?? undefined,
+    debtPerShare: effectiveDebtPerShare ?? undefined,
     netMargin: hasNetMargin ? numeric(row.netMargin) : undefined,
     assetTurnover: hasAssetTurnover ? numeric(row.assetTurnover) : undefined,
     financialLeverage: hasFinancialLeverage ? numeric(row.financialLeverage) : undefined,
     ffoPerShare: hasFiniteValue(row.ffoPerShare) ? numeric(row.ffoPerShare) : undefined,
     affoPerShare: hasFiniteValue(row.affoPerShare) ? numeric(row.affoPerShare) : undefined,
     targetFfoMultiple: hasFiniteValue(row.targetFfoMultiple) ? numeric(row.targetFfoMultiple) : (hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : undefined),
-    targetPe: hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : targets.targetPe,
-    targetPb: hasFiniteValue(row.targetPb) ? numeric(row.targetPb) : targets.targetPb,
+    targetPe: resolvedTargetPe,
+    targetPb: resolvedTargetPb,
     targetPsMultiple: hasFiniteValue(row.targetPsMultiple) ? numeric(row.targetPsMultiple) : comparableMultiples?.psMedian ?? undefined,
     targetEvRevenueMultiple: hasFiniteValue(row.targetEvRevenueMultiple) ? numeric(row.targetEvRevenueMultiple) : comparableMultiples?.evRevenueMedian ?? undefined,
     targetEvEbitdaMultiple: hasFiniteValue(row.targetEvEbitdaMultiple) ? numeric(row.targetEvEbitdaMultiple) : comparableMultiples?.evEbitdaMedian ?? undefined,
