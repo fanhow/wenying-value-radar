@@ -109,12 +109,12 @@ export async function buildLiveMarketScan() {
   const usComparableMap = buildComparableMap(refreshedUsUniverse);
 
   const candidates = [
-    ...selectMarketCandidates(refreshedTaiwanUniverse, "undervalued"),
-    ...selectMarketCandidates(refreshedUsUniverse, "undervalued", 20, usComparableMap),
+    ...selectMarketCandidates(refreshedTaiwanUniverse, "undervalued", 100),
+    ...selectMarketCandidates(refreshedUsUniverse, "undervalued", 100, usComparableMap),
   ];
   const overvaluedCandidates = [
-    ...selectMarketCandidates(refreshedTaiwanUniverse, "overvalued"),
-    ...selectMarketCandidates(refreshedUsUniverse, "overvalued", 20, usComparableMap),
+    ...selectMarketCandidates(refreshedTaiwanUniverse, "overvalued", 100),
+    ...selectMarketCandidates(refreshedUsUniverse, "overvalued", 100, usComparableMap),
   ];
 
   const payload = {

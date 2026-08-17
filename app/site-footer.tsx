@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.17.9";
+const SITE_REVISION = "Rev. 2026.08.17.10";
 
 const REVISION_ENTRIES = [
+  ["2026.08.17.10", "公允價值排行榜支援延伸擴增：下方新增延伸 20 檔台股／美股排行按鈕，套用同套對數高斯共識與 InvestingPro 基準校準法則，提供更多深度多空研究選擇。", "Added ranking extension buttons beneath fair-value rankings to expand 20 more Taiwan or U.S. ranked stocks using the exact same log-Gaussian consensus and InvestingPro calibration models."],
   ["2026.08.17.9", "公允價值排行榜估值差距排版優化：箭頭水平置於百分比數字前方（同列 inline-flex、不換行），完全消除上下折行堆疊。", "Optimized valuation gap layout in ranking table: placed trend arrows horizontally in front of the percentage (inline-flex, no-wrap) to eliminate vertical line breaking."],
   ["2026.08.17.8", "修復 Cloudflare Free 私人站的公允價值排行榜與未快取個股查詢，改用部署時公開資料快照以避免 Worker CPU 超限；估值引擎不變。", "Fixed the Cloudflare Free private site's fair-value ranking and uncached ticker lookup by using deployment-time public-data snapshots to avoid Worker CPU limits; the valuation engine is unchanged."],
   ["2026.08.17.7", "日、週、月技術 K 線均線更新為 EMA15（黑色，預設勾選）、SMA50（紅色，預設勾選）及 SMA20（藍色，預設不勾選）。", "Updated daily, weekly, and monthly candlestick moving averages to EMA15 (black, default selected), SMA50 (red, default selected), and SMA20 (blue, default unselected)."],

@@ -347,6 +347,8 @@ export default function Home() {
   const [isTechnicalScanLoading, setIsTechnicalScanLoading] = useState(false);
   const [technicalAlertError, setTechnicalAlertError] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const [twDisplayLimit, setTwDisplayLimit] = useState(20);
+  const [usDisplayLimit, setUsDisplayLimit] = useState(20);
   const initialTickerHandled = useRef(false);
   const lookupRequest = useRef<AbortController | null>(null);
   const [form, setForm] = useState({
@@ -501,14 +503,44 @@ export default function Home() {
     return [...scanInputs.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
       .map((stock) => calculateStock(stock, formatNumber));
   }, [marketCandidates, overvaluedCandidates, stockInputs]);
-  const rankingStocks = useMemo(
+  const allRankingStocks = useMemo(
     () => marketCandidates.map((stock) => calculateStock(stock, formatNumber)),
     [marketCandidates],
   );
-  const overvaluedRankingStocks = useMemo(
+  const allOvervaluedRankingStocks = useMemo(
     () => overvaluedCandidates.map((stock) => calculateStock(stock, formatNumber)),
     [overvaluedCandidates],
   );
+
+  const totalTwUndervalued = useMemo(
+    () => allRankingStocks.filter((s) => s.market === "TW").length,
+    [allRankingStocks],
+  );
+  const totalUsUndervalued = useMemo(
+    () => allRankingStocks.filter((s) => s.market === "US").length,
+    [allRankingStocks],
+  );
+
+  const totalTwOvervalued = useMemo(
+    () => allOvervaluedRankingStocks.filter((s) => s.market === "TW").length,
+    [allOvervaluedRankingStocks],
+  );
+  const totalUsOvervalued = useMemo(
+    () => allOvervaluedRankingStocks.filter((s) => s.market === "US").length,
+    [allOvervaluedRankingStocks],
+  );
+
+  const rankingStocks = useMemo(() => {
+    const tw = allRankingStocks.filter((s) => s.market === "TW").slice(0, twDisplayLimit);
+    const us = allRankingStocks.filter((s) => s.market === "US").slice(0, usDisplayLimit);
+    return [...tw, ...us];
+  }, [allRankingStocks, twDisplayLimit, usDisplayLimit]);
+
+  const overvaluedRankingStocks = useMemo(() => {
+    const tw = allOvervaluedRankingStocks.filter((s) => s.market === "TW").slice(0, twDisplayLimit);
+    const us = allOvervaluedRankingStocks.filter((s) => s.market === "US").slice(0, usDisplayLimit);
+    return [...tw, ...us];
+  }, [allOvervaluedRankingStocks, twDisplayLimit, usDisplayLimit]);
   const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
   const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
   const selectedUpside = selected?.calibratedUpside ?? selected?.upside ?? 0;
@@ -914,7 +946,13 @@ export default function Home() {
               </div>
             </div>
             <div className="filter-tabs" role="tablist" aria-label={t("股票篩選", "Stock filters")}>
-              {([["all", t("全部", "All")], ["undervalued", t("低估候選 40", "Top 40 Undervalued")], ["overvalued", t("高估候選 40", "Top 40 Overvalued")], ["quality", t("高品質", "High quality")], ["risk", t("審慎檢視", "Needs review")]] as [Filter, string][]).map(([key, label]) => (
+              {([
+                ["all", t("全部", "All")],
+                ["undervalued", t(`低估候選 ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)} Undervalued`)],
+                ["overvalued", t(`高估候選 ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)} Overvalued`)],
+                ["quality", t("高品質", "High quality")],
+                ["risk", t("審慎檢視", "Needs review")],
+              ] as [Filter, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={filter === key ? "selected" : ""} onClick={() => setFilter(key)} role="tab" aria-selected={filter === key}>{label}</button>
               ))}
             </div>
@@ -948,7 +986,37 @@ export default function Home() {
               </table>
               {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{isMarketScanLoading ? t("正在掃描市場…", "Scanning the market…") : stocks.length ? t("目前名單沒有符合條件的標的", "No stocks in the current list match") : t("市場資料暫時無法載入", "Market data is temporarily unavailable")}</strong><p>{isMarketScanLoading ? t("正在整理上市與上櫃估值候選", "Reviewing listed and OTC valuation candidates") : stocks.length ? t("可切換篩選條件，或搜尋其他股票代碼", "Change the filter or search another ticker") : t("仍可在上方搜尋單一股票代碼", "You can still search for an individual ticker above")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{t("搜尋股票代碼", "Search tickers")}</button></div>}
             </div>
-            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t("檔高估候選；台股前 20＋美股前 20", "overvalued candidates; Taiwan top 20 + U.S. top 20") : filter === "undervalued" ? t("檔低估候選；台股前 20＋美股前 20", "undervalued candidates; Taiwan top 20 + U.S. top 20") : t("檔", "stocks")}</span><span><span className="legend-dot red-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot green-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
+            {(filter === "undervalued" || filter === "overvalued") && (
+              <div className="table-extend-bar">
+                <button
+                  type="button"
+                  className="extend-btn"
+                  onClick={() => setTwDisplayLimit((prev) => prev + 20)}
+                  disabled={filter === "undervalued" ? twDisplayLimit >= totalTwUndervalued : twDisplayLimit >= totalTwOvervalued}
+                >
+                  <span className="extend-icon">+</span>
+                  <span>
+                    {language === "zh"
+                      ? `延伸 20 檔台股排行（目前顯示 ${filter === "undervalued" ? Math.min(twDisplayLimit, totalTwUndervalued) : Math.min(twDisplayLimit, totalTwOvervalued)} / ${filter === "undervalued" ? totalTwUndervalued : totalTwOvervalued} 檔）`
+                      : `Extend 20 Taiwan stocks (Showing ${filter === "undervalued" ? Math.min(twDisplayLimit, totalTwUndervalued) : Math.min(twDisplayLimit, totalTwOvervalued)} / ${filter === "undervalued" ? totalTwUndervalued : totalTwOvervalued})`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="extend-btn"
+                  onClick={() => setUsDisplayLimit((prev) => prev + 20)}
+                  disabled={filter === "undervalued" ? usDisplayLimit >= totalUsUndervalued : usDisplayLimit >= totalUsOvervalued}
+                >
+                  <span className="extend-icon">+</span>
+                  <span>
+                    {language === "zh"
+                      ? `延伸 20 檔美股排行（目前顯示 ${filter === "undervalued" ? Math.min(usDisplayLimit, totalUsUndervalued) : Math.min(usDisplayLimit, totalUsOvervalued)} / ${filter === "undervalued" ? totalUsUndervalued : totalUsOvervalued} 檔）`
+                      : `Extend 20 U.S. stocks (Showing ${filter === "undervalued" ? Math.min(usDisplayLimit, totalUsUndervalued) : Math.min(usDisplayLimit, totalUsOvervalued)} / ${filter === "undervalued" ? totalUsUndervalued : totalUsOvervalued})`}
+                  </span>
+                </button>
+              </div>
+            )}
+            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t(`檔高估候選；台股 ${Math.min(twDisplayLimit, totalTwOvervalued)}＋美股 ${Math.min(usDisplayLimit, totalUsOvervalued)}`, `overvalued candidates; Taiwan ${Math.min(twDisplayLimit, totalTwOvervalued)} + U.S. ${Math.min(usDisplayLimit, totalUsOvervalued)}`) : filter === "undervalued" ? t(`檔低估候選；台股 ${Math.min(twDisplayLimit, totalTwUndervalued)}＋美股 ${Math.min(usDisplayLimit, totalUsUndervalued)}`, `undervalued candidates; Taiwan ${Math.min(twDisplayLimit, totalTwUndervalued)} + U.S. ${Math.min(usDisplayLimit, totalUsUndervalued)}`) : t("檔", "stocks")}</span><span><span className="legend-dot red-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot green-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
           </div>
 
           {selected && (
