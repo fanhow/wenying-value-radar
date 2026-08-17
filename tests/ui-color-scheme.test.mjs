@@ -56,4 +56,7 @@ test("validates Taiwan red-up / green-down styling in globals.css", async () => 
   assert.ok(css.includes(".fund-change-n3"));
   assert.ok(css.includes(".fund-change-n2"));
   assert.ok(css.includes(".fund-change-n1"));
+
+  // Upside Value must place trend arrow in front on the same line without breaking
+  assert.ok(css.includes(".upside-value { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap;"));
 });
