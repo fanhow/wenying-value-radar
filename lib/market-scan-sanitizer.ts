@@ -150,10 +150,10 @@ export function sanitizeMarketScanRatios(input: {
   const bm = BENCHMARK_MAP[ticker];
   let targetPe = bm?.targetPe;
   let targetPb = bm?.targetPb;
-  let targetPsMultiple = bm?.targetPsMultiple;
+  const targetPsMultiple = bm?.targetPsMultiple;
   let normalizedEps = bm?.eps ?? eps;
   let normalizedBvps = bm?.bvps ?? bvps;
-  let targetFcfMultiple = bm?.targetFcfMultiple;
+  const targetFcfMultiple = bm?.targetFcfMultiple;
 
   if (bm) {
     if (bm.revenuePerShare !== undefined) revenuePerShare = bm.revenuePerShare;
@@ -189,13 +189,14 @@ export function sanitizeMarketScanRatios(input: {
     bvps: normalizedBvps,
     revenuePerShare,
     fcfPerShare,
-    normalizedFcfPerShare,
+    normalizedFcfPerShare: normalizedFcfPerShare ?? undefined,
     ebitdaPerShare,
     ebitPerShare,
     cashPerShare,
     debtPerShare,
     targetPe,
     targetPb,
+    targetFcfMultiple,
     targetPsMultiple,
     isOneOffDisposalSpike: isOneOffDisposalSpike || isCyclicalPeak,
   };

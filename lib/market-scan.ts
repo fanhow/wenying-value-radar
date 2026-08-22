@@ -49,6 +49,7 @@ export type MarketScanRow = {
   bvps?: string | number;
   revenueGrowth?: string | number | null;
   fcfPerShare?: string | number | null;
+  normalizedFcfPerShare?: string | number | null;
   debtRatio?: string | number | null;
   revenuePerShare?: string | number | null;
   ebitPerShare?: string | number | null;
@@ -65,6 +66,7 @@ export type MarketScanRow = {
   targetFfoMultiple?: string | number | null;
   targetPe?: string | number | null;
   targetPb?: string | number | null;
+  targetFcfMultiple?: string | number | null;
   targetPsMultiple?: string | number | null;
   targetEvRevenueMultiple?: string | number | null;
   targetEvEbitdaMultiple?: string | number | null;
