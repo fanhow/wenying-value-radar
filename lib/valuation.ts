@@ -1378,10 +1378,16 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     );
   }
 
-  const comparablePsMultiple = Math.max(
+  const rawComparablePsMultiple = Math.max(
     suppliedTargetPsMultiple || numeric(comparableMultiples?.psMedian),
     0,
   );
+  const marginScaledCap = input.netMargin !== undefined && input.netMargin !== null
+    ? Math.max(0.15, (input.netMargin > 0 ? (input.netMargin / 100) : 0.02) * (targetPe || 15) * 1.5)
+    : Math.max(0.15, (valuationEps > 0 && revenuePerShare > 0 ? (valuationEps / revenuePerShare) : 0.05) * (targetPe || 15) * 1.5);
+  const comparablePsMultiple = suppliedTargetPsMultiple > 0
+    ? rawComparablePsMultiple
+    : Math.min(rawComparablePsMultiple, marginScaledCap);
   if (!financial && !reit && revenuePerShare > 0 && comparablePsMultiple > 0) {
     const value = revenuePerShare * comparablePsMultiple;
     const width = clamp(inputUncertainty * 0.6, 0.1, 0.25);
@@ -1562,7 +1568,13 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const explicitEvRevenueMultiple = Math.max(numeric(input.targetEvRevenueMultiple), 0);
   const explicitEvEbitdaMultiple = Math.max(numeric(input.targetEvEbitdaMultiple), 0);
   const explicitEvEbitMultiple = Math.max(numeric(input.targetEvEbitMultiple), 0);
-  const evRevenueMultiple = explicitEvRevenueMultiple || Math.max(numeric(comparableMultiples?.evRevenueMedian), 0);
+  const rawEvRevenueMultiple = explicitEvRevenueMultiple || Math.max(numeric(comparableMultiples?.evRevenueMedian), 0);
+  const marginScaledEvRevCap = input.netMargin !== undefined && input.netMargin !== null
+    ? Math.max(0.15, (input.netMargin > 0 ? (input.netMargin / 100) : 0.02) * (targetPe || 15) * 1.5)
+    : Math.max(0.15, (valuationEps > 0 && revenuePerShare > 0 ? (valuationEps / revenuePerShare) : 0.05) * (targetPe || 15) * 1.5);
+  const evRevenueMultiple = explicitEvRevenueMultiple > 0
+    ? rawEvRevenueMultiple
+    : Math.min(rawEvRevenueMultiple, marginScaledEvRevCap);
   const evEbitdaMultiple = explicitEvEbitdaMultiple || Math.max(numeric(comparableMultiples?.evEbitdaMedian), 0);
   const evEbitMultiple = explicitEvEbitMultiple || Math.max(numeric(comparableMultiples?.evEbitMedian), 0);
   const comparableSource = (kind: "EV/Revenue" | "EV/EBITDA" | "EV/EBIT") => {
@@ -1795,7 +1807,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   }
 
   const isHighGrowthOrHighMultiple = targetPe > 25 || revenueGrowth > 15 || roe > 25;
-  if (valuationEps > 0 && bvps > 0 && !reit && !assetLight && !isHighGrowthOrHighMultiple && debtRatio <= 70) {
+  if (valuationEps > 0 && bvps > 0 && !reit && !assetLight && !isHighGrowthOrHighMultiple && debtRatio <= 70 && suppliedTargetPsMultiple <= 0) {
     const value = Math.sqrt(22.5 * valuationEps * bvps);
     addCandidate(
       createModel(

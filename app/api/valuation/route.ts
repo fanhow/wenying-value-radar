@@ -20,6 +20,7 @@ import { buildComparableMap } from "../../../lib/market-comparables";
 import { normalizeSector } from "../../../lib/sector-normalization";
 import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry";
 import { financialInputsFromTaiwanHistory, loadTaiwanFinancialHistory } from "../../../lib/taiwan-financials";
+import { sanitizeMarketScanRatios } from "../../../lib/market-scan-sanitizer";
 import { readValuationQueryCache, saveValuationQueryCache } from "../../../lib/valuation-cache";
 import { marketStockFromRatio, type MarketScanRow } from "../../../lib/market-scan";
 import { getRuntimeMarketScanMode } from "../../../lib/runtime-env";
@@ -761,15 +762,38 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
   // The latest quote is display/current-price data. Keep EPS and BVPS tied to
   // the exchange ratio date so an intraday move cannot rewrite fundamentals.
   const ratioReferencePrice = closingPrice || currentMarketPrice;
-  const eps = pe > 0 ? ratioReferencePrice / pe : 0;
-  const bvps = pb > 0 ? ratioReferencePrice / pb : 0;
-  if (!eps && !bvps) throw new Error("目前沒有足夠的本益比／淨值比資料可建立估值");
+  const rawEps = pe > 0 ? ratioReferencePrice / pe : 0;
+  const rawBvps = pb > 0 ? ratioReferencePrice / pb : 0;
+  if (!rawEps && !rawBvps) throw new Error("目前沒有足夠的本益比／淨值比資料可建立估值");
   const financialHistory = await loadTaiwanFinancialHistory(ticker);
   const historicalInputs = financialInputsFromTaiwanHistory(financialHistory);
   const revenueGrowth = historicalInputs?.revenueGrowth ?? 0;
   const debtRatio = historicalInputs?.debtRatio ?? 0;
+
+  const sanitized = sanitizeMarketScanRatios({
+    ticker,
+    name: body.capturedName?.trim() || ratio.name || quote?.name || ticker,
+    market: "TW",
+    price,
+    pe,
+    pb,
+    eps: rawEps,
+    bvps: rawBvps,
+    revenueGrowth,
+    debtRatio,
+    fcfPerShare: historicalInputs?.fcfPerShare,
+    revenuePerShare: historicalInputs?.revenuePerShare,
+    ebitPerShare: historicalInputs?.ebitPerShare,
+    cashPerShare: historicalInputs?.cashPerShare,
+    debtPerShare: historicalInputs?.debtPerShare,
+  });
+
+  const eps = sanitized.eps;
+  const bvps = sanitized.bvps;
   const roe = bvps > 0 ? (eps / bvps) * 100 : 0;
   const targets = valuationTargets(revenueGrowth, roe, debtRatio);
+  const targetPe = sanitized.targetPe ?? targets.targetPe;
+  const targetPb = sanitized.targetPb ?? targets.targetPb;
   const hasHistoricalFinancials = financialHistory.length >= 3 && Boolean(historicalInputs);
 
   return {
@@ -792,18 +816,20 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     eps,
     epsHistory: historicalInputs?.epsHistory,
     bvps,
-    fcfPerShare: historicalInputs?.fcfPerShare ?? 0,
+    fcfPerShare: sanitized.fcfPerShare ?? historicalInputs?.fcfPerShare ?? 0,
+    normalizedFcfPerShare: sanitized.normalizedFcfPerShare,
     dividendPerShare: 0,
-    targetPe: targets.targetPe,
-    targetPb: targets.targetPb,
+    targetPe,
+    targetPb,
+    targetPsMultiple: sanitized.targetPsMultiple,
     targetFcfMultiple: 0,
     revenueGrowth,
     roe,
     debtRatio,
-    revenuePerShare: historicalInputs?.revenuePerShare,
-    ebitPerShare: historicalInputs?.ebitPerShare,
-    cashPerShare: historicalInputs?.cashPerShare,
-    debtPerShare: historicalInputs?.debtPerShare,
+    revenuePerShare: sanitized.revenuePerShare ?? historicalInputs?.revenuePerShare,
+    ebitPerShare: sanitized.ebitPerShare ?? historicalInputs?.ebitPerShare,
+    cashPerShare: sanitized.cashPerShare ?? historicalInputs?.cashPerShare,
+    debtPerShare: sanitized.debtPerShare ?? historicalInputs?.debtPerShare,
     netMargin: historicalInputs?.netMargin,
     assetTurnover: historicalInputs?.assetTurnover,
     financialLeverage: historicalInputs?.financialLeverage,

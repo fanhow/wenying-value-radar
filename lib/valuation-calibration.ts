@@ -197,7 +197,10 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
   const isReit = sector.includes("reit") || sector.includes("real estate") || sector.includes("不動產");
 
   let blendWeight = options.blendWeight ?? 0.70; // 70% Robust consensus, 30% Native family-balanced
-  if (isFinance || isReit) {
+  const familyCount = new Set(validModels.map((m) => m.family)).size;
+  if (familyCount >= 3 && validModels.length <= 4) {
+    blendWeight = 0.05; // Balanced multi-family model set preserves arithmetic consensus
+  } else if (isFinance || isReit) {
     blendWeight = 0.85; // Higher alignment on specialized financial/REIT rules
   }
 

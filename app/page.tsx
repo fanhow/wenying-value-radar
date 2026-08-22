@@ -1028,7 +1028,7 @@ export default function Home() {
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
               <div className="fair-value-focus">
                 <div className="dual-fair-value-header">
-                  <div><span className="focus-label">{t("InvestingPro 校準公允價值", "InvestingPro Calibrated Fair Value")}</span><strong>{formatPrice(selected.calibratedFairValue ?? selected.fairValue, selected.market)}</strong></div>
+                  <div><span className="focus-label">{t("多模型共識公允價值", "Multi-Model Consensus Fair Value")}</span><strong>{formatPrice(selected.calibratedFairValue ?? selected.fairValue, selected.market)}</strong></div>
                   <div className="native-fair-value-card"><span className="focus-label">{t("WenYing 原生模型中心公允價值", "WenYing Native Model Center Fair Value")}</span><span className="native-fair-value-price">{formatPrice(selected.fairValue, selected.market)}</span><small>{t("校準差距", "Gap")} {formatSignedPercent(selected.calibrationGap ?? 0)}</small></div>
                 </div>
                 {selected.isOutOfDistribution && selected.oodReasons && selected.oodReasons.length > 0 && (
