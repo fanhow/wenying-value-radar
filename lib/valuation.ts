@@ -1457,7 +1457,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
 
   const addDcf = (years: 5 | 10, label: string) => {
     const id = "dcf-fcf-" + years + "y";
-    if (financial || reit || fcfPerShare <= 0 || equityDiscountRate <= terminalGrowth) {
+    const isLeveragedStructure = suppliedTargetPe > 0 && targetPe <= 10 && debtRatio >= 65;
+    if (financial || reit || fcfPerShare <= 0 || equityDiscountRate <= terminalGrowth || isLeveragedStructure) {
       addExcluded(
         excludedModels,
         id,
@@ -1467,7 +1468,9 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
           ? "金融業資金與負債屬營運核心，不適用一般企業 FCF DCF。"
           : reit
             ? "REIT 優先使用 FFO／AFFO，不套用一般企業 FCF DCF。"
-            : "股權自由現金流或股權成本／永續成長條件不完整。",
+            : isLeveragedStructure
+              ? "高負債槓桿結構優先採用調整後倍數法，不套用未扣債之傳統股權 DCF。"
+              : "股權自由現金流或股權成本／永續成長條件不完整。",
       );
       return;
     }
@@ -1754,7 +1757,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     && bvps > 0
     && valuationEps > 0
     && equityDiscountRate > terminalGrowth
-    && valuationEps > equityDiscountRate * bvps;
+    && valuationEps > equityDiscountRate * bvps
+    && (suppliedTargetPe <= 0 || debtRatio < 65);
   if (residualIncomeEligible) {
     const base = residualIncomePerShare(
       bvps,

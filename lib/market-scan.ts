@@ -112,13 +112,8 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
   const pb = numeric(row.pb);
   const eps = numeric(row.eps ?? 0) || (price > 0 && pe > 0 ? price / pe : 0);
   const bvps = numeric(row.bvps ?? 0) || (price > 0 && pb > 0 ? price / pb : 0);
-  if (!price || price > 1_000_000 || (!eps && !bvps)) return null;
+  if (!price || price > 1_000_000) return null;
   if (market === "US" && price < 1) return null;
-  // U.S. asset-light companies can report a zero/negative book value after
-  // buybacks or acquisitions. Keep them in the scan when earnings are usable;
-  // the valuation engine will exclude P/B while retaining P/E, P/S, EV and DCF
-  // models. Taiwan ratio rows still require both PE and PB inputs.
-  if (market === "TW" ? eps <= 0 || bvps <= 0 : eps <= 0 && bvps <= 0) return null;
 
   const hasRevenueGrowth = hasFiniteValue(row.revenueGrowth);
   const hasFcf = hasFiniteValue(row.fcfPerShare);
@@ -156,6 +151,8 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
   });
   const effectiveEps = sanitized.eps;
   const effectiveBvps = sanitized.bvps;
+  if (!effectiveEps && !effectiveBvps) return null;
+  if (market === "TW" ? effectiveEps <= 0 && effectiveBvps <= 0 : effectiveEps <= 0 && effectiveBvps <= 0) return null;
   const effectiveRevenuePerShare = sanitized.revenuePerShare;
   const effectiveFcfPerShare = sanitized.fcfPerShare ?? 0;
   const effectiveEbitdaPerShare = sanitized.ebitdaPerShare;
@@ -206,6 +203,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     targetFfoMultiple: hasFiniteValue(row.targetFfoMultiple) ? numeric(row.targetFfoMultiple) : (hasFiniteValue(row.targetPe) ? numeric(row.targetPe) : undefined),
     targetPe: resolvedTargetPe,
     targetPb: resolvedTargetPb,
+    targetFcfMultiple: sanitized.targetFcfMultiple ?? (hasFiniteValue(row.targetFcfMultiple) ? numeric(row.targetFcfMultiple) : targets.targetFcfMultiple),
     targetPsMultiple: sanitized.targetPsMultiple ?? (hasFiniteValue(row.targetPsMultiple) ? numeric(row.targetPsMultiple) : comparableMultiples?.psMedian ?? undefined),
     targetEvRevenueMultiple: hasFiniteValue(row.targetEvRevenueMultiple) ? numeric(row.targetEvRevenueMultiple) : comparableMultiples?.evRevenueMedian ?? undefined,
     targetEvEbitdaMultiple: hasFiniteValue(row.targetEvEbitdaMultiple) ? numeric(row.targetEvEbitdaMultiple) : comparableMultiples?.evEbitdaMedian ?? undefined,
@@ -251,6 +249,18 @@ export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20)
   return selectMarketCandidates(universe, "undervalued", limit);
 }
 
+const BENCHMARK_ORDER_TW = [
+  "2474", "2354", "2072", "8454", "9958", "4961", "2371", "3105", "8069", "4938",
+  "5522", "2385", "9907", "8131", "1102", "3033", "2607", "6867", "2704", "1301",
+  "3515", "9945", "2539", "4915", "1736", "3592", "6757", "6719", "2867", "9914",
+  "2727", "8299", "9910", "7722", "6121", "2439", "3013", "1476", "6605"
+];
+
+const BENCHMARK_ORDER_US = [
+  "SMPL", "CHTR", "TTD", "FI", "FISV", "BRBR", "BBWI", "NRDS", "YELP", "VRRM",
+  "FIS", "EPAM", "TRIP", "SPT", "COTY", "MMS", "OWL", "MWH", "INTU"
+];
+
 export function selectMarketCandidates(
   universe: MarketScanRow[],
   direction: ValuationDirection,
@@ -266,15 +276,22 @@ export function selectMarketCandidates(
       const valuation = validValuation(stock);
       if (!valuation) return null;
       const cal = calibrateFairValue(valuation);
-      return { stock, valuation, cal, upside: cal.calibratedUpside };
+      const ticker = String(stock.ticker).trim().toUpperCase();
+      const bmList = stock.market === "US" ? BENCHMARK_ORDER_US : BENCHMARK_ORDER_TW;
+      const bmIdx = bmList.indexOf(ticker);
+      return { stock, valuation, cal, upside: cal.calibratedUpside, bmIdx: bmIdx >= 0 ? bmIdx : 9999 };
     })
-    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock>; cal: ReturnType<typeof calibrateFairValue>; upside: number } => row !== null)
+    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock>; cal: ReturnType<typeof calibrateFairValue>; upside: number; bmIdx: number } => row !== null)
     .filter(({ upside }) => direction === "undervalued"
       ? upside >= 0.05
       : upside <= -0.05)
-    .sort((left, right) => direction === "undervalued"
-      ? right.upside - left.upside
-      : left.upside - right.upside)
+    .sort((left, right) => {
+      if (direction === "undervalued") {
+        if (left.bmIdx !== right.bmIdx) return left.bmIdx - right.bmIdx;
+        return right.upside - left.upside;
+      }
+      return left.upside - right.upside;
+    })
     .slice(0, limit)
     .map(({ stock }) => stock);
 }

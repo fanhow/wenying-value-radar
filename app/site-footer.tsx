@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.22.1";
+const SITE_REVISION = "Rev. 2026.08.22.2";
 
 const REVISION_ENTRIES = [
+  ["2026.08.22.2", "完成台股前 40 檔（可成、鴻準、富邦媒、世紀鋼等）與美股前 20 檔（SMPL、CHTR、TTD、FISV、INTU 等）全數 60 檔多模型共識基準對齊；升級高 ROE 與優質商業模式估值擴展法則；排行榜全面優先呈現經量化篩選之高財務健康度標的。", "Completed end-to-end multi-model consensus alignment across all 60 benchmark stocks (TW top 40 including 2474, 2354, 8454, 9958 and US top 20 including SMPL, CHTR, TTD, FISV, INTU); upgraded ROE-driven valuation target expansion; prioritized high financial-health quality leaders across ranking tables."],
   ["2026.08.22.1", "全面升級多模型共識公允價值：上緯投控 (3708) 等處分業外標的完成投資模型校準（公允價值 $111.16，+7.4% 上行空間）；修正低利潤率與高週轉商業模式營收倍數上限；全站介面統一採用專業多模型共識術語。", "Upgraded multi-model consensus fair value: aligned 3708 to investment models ($111.16, +7.4% upside); introduced margin-adjusted revenue multiple caps; unified professional multi-model consensus terminology across the site."],
   ["2026.08.17.10", "公允價值排行榜支援延伸擴增：下方新增延伸 20 檔台股／美股排行按鈕，套用同套對數高斯共識與機構量化基準校準法則，提供更多深度多空研究選擇。", "Added ranking extension buttons beneath fair-value rankings to expand 20 more Taiwan or U.S. ranked stocks using the exact same log-Gaussian consensus and institutional quantitative calibration models."],
   ["2026.08.17.9", "公允價值排行榜估值差距排版優化：箭頭水平置於百分比數字前方（同列 inline-flex、不換行），完全消除上下折行堆疊。", "Optimized valuation gap layout in ranking table: placed trend arrows horizontally in front of the percentage (inline-flex, no-wrap) to eliminate vertical line breaking."],
