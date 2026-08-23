@@ -30,18 +30,36 @@ export type TechnicalLevel = {
   price: number;
 };
 
+export type TrendPullbackSetup = {
+  status: "confirmed" | "forming" | "none";
+  ema15: number | null;
+  sma50: number | null;
+  sma20: number | null;
+  peakSpreadPercent: number | null;
+  currentSpreadPercent: number | null;
+  supportZoneLow: number | null;
+  supportZoneHigh: number | null;
+  wBottomDetected: boolean;
+  stage: "w-bottom-buy" | "ma-support-test" | "none";
+  signalReasonZh: string;
+  signalReasonEn: string;
+};
+
 export type TechnicalAnalysis = {
   asOf: string;
   close: number;
   ma5: number | null;
   ma20: number | null;
   ma60: number | null;
+  ema15: number | null;
+  sma50: number | null;
   dailyTrend: "bullish" | "neutral" | "bearish";
   movingAverageSignal: "recent-golden-cross" | "bullish-alignment" | "mixed" | "bearish";
   goldenCrossDaysAgo: number | null;
   wBottom: "confirmed" | "forming" | "none";
   wBottomLow: number | null;
   wBottomNeckline: number | null;
+  trendPullback: TrendPullbackSetup | null;
   weeklyRangePosition: number | null;
   monthlyRangePosition: number | null;
   volumeRatio20: number | null;
@@ -402,16 +420,22 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
     : null;
   const details = { consecutiveLargeBearish, consecutiveLargeBullish, ma20Deviation, gapDirection };
 
+  // Morning Star (早晨之星): downtrend -> large bearish -> downward gap small star -> bullish recovering >= 50%
+  const morningStarGap = prior && first && (prior.open <= first.close || prior.high <= first.close * 1.002);
   if (first && prior && latest && declining && isBearish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline) && isBullish(latest) && realBody(latest) >= baseline * 0.8
+    && isSmallBody(prior, baseline) && morningStarGap && isBullish(latest) && realBody(latest) >= baseline * 0.75
     && latest.close >= (first.open + first.close) / 2) {
     return { pattern: "morning-star" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
+
+  // Evening Star (黃昏之星): uptrend -> large bullish -> upward gap small star -> bearish falling <= 50%
+  const eveningStarGap = prior && first && (prior.open >= first.close || prior.low >= first.close * 0.998);
   if (first && prior && latest && rising && isBullish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline) && isBearish(latest) && realBody(latest) >= baseline * 0.8
+    && isSmallBody(prior, baseline) && eveningStarGap && isBearish(latest) && realBody(latest) >= baseline * 0.75
     && latest.close <= (first.open + first.close) / 2) {
     return { pattern: "evening-star" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
+
   if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior) && isBullish(latest)
     && latest.open <= prior.close && latest.close >= prior.open) {
     return { pattern: "bullish-engulfing" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
@@ -420,14 +444,21 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
     && latest.open >= prior.close && latest.close <= prior.open) {
     return { pattern: "bearish-engulfing" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
+
+  // Morning Star Candidate: downtrend -> large bearish -> downward gap to Doji / small star
+  const latestDownGap = prior && latest && (latest.open <= prior.close || latest.high <= prior.close * 1.002);
   if (prior && latest && priorTrend(candles, candles.length - 2, "down") && consecutiveBearish >= 2 && isBearish(prior)
-    && isLargeBody(prior, baseline) && isDoji(latest) && farBelowMa20) {
+    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestDownGap && farBelowMa20) {
     return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
+
+  // Evening Star Candidate: uptrend -> large bullish -> upward gap to Doji / small star
+  const latestUpGap = prior && latest && (latest.open >= prior.close || latest.low >= prior.close * 0.998);
   if (prior && latest && priorTrend(candles, candles.length - 2, "up") && consecutiveBullish >= 2 && isBullish(prior)
-    && isLargeBody(prior, baseline) && isDoji(latest) && farAboveMa20) {
+    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestUpGap && farAboveMa20) {
     return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
+
   if (latest && priorTrend(candles, candles.length - 1, "down") && isHammer(latest)) {
     return { pattern: "hammer" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
@@ -480,6 +511,113 @@ function detectWBottom(candles: DailyCandle[]) {
   };
 }
 
+export function exponentialMovingAverageSeries(candles: DailyCandle[], period: number): (number | null)[] {
+  if (candles.length === 0) return [];
+  const multiplier = 2 / (period + 1);
+  const result: (number | null)[] = new Array(candles.length).fill(null);
+  if (candles.length < period) return result;
+
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += candles[i].close;
+  }
+  let prevEma = sum / period;
+  result[period - 1] = prevEma;
+
+  for (let i = period; i < candles.length; i++) {
+    prevEma = (candles[i].close - prevEma) * multiplier + prevEma;
+    result[i] = prevEma;
+  }
+  return result;
+}
+
+export function movingAverageSeries(candles: DailyCandle[], period: number): (number | null)[] {
+  return candles.map((_, index) => {
+    if (index + 1 < period) return null;
+    const window = candles.slice(index + 1 - period, index + 1);
+    return window.reduce((sum, candle) => sum + candle.close, 0) / period;
+  });
+}
+
+function detectTrendPullback(
+  candles: DailyCandle[],
+  wBottomResult: { status: "confirmed" | "forming" | "none"; low: number | null; neckline: number | null },
+  keyLevels: TechnicalLevel[],
+): TrendPullbackSetup | null {
+  if (candles.length < 40) return null;
+  const ema15Series = exponentialMovingAverageSeries(candles, 15);
+  const sma50Series = movingAverageSeries(candles, 50);
+  const sma20Series = movingAverageSeries(candles, 20);
+  const latestIndex = candles.length - 1;
+  const latestClose = candles[latestIndex].close;
+  const latestEma15 = ema15Series[latestIndex];
+  const latestSma50 = sma50Series[latestIndex];
+  const latestSma20 = sma20Series[latestIndex];
+
+  if (!latestEma15 || !latestSma50) return null;
+
+  let peakSpread = 0;
+  let waveUpDetected = false;
+  const lookbackStart = Math.max(0, latestIndex - 60);
+  for (let i = lookbackStart; i <= latestIndex - 4; i++) {
+    const e = ema15Series[i];
+    const s = sma50Series[i];
+    if (e && s && s > 0) {
+      const spread = (e - s) / s;
+      if (spread > peakSpread) peakSpread = spread;
+      if (spread >= 0.03) waveUpDetected = true;
+    }
+  }
+
+  const currentSpread = (latestEma15 - latestSma50) / latestSma50;
+  const isConverging = waveUpDetected && currentSpread <= 0.05 && latestClose >= latestSma50 * 0.94;
+
+  if (!isConverging) return null;
+
+  const supportLevel = keyLevels.find((lvl) => lvl.kind === "support" && Math.abs(lvl.price - latestSma50) <= latestSma50 * 0.06)?.price ?? latestSma50;
+  const zoneLow = Math.min(latestSma50 * 0.985, wBottomResult.low ?? (supportLevel * 0.98));
+  const zoneHigh = Math.max(latestSma50 * 1.025, wBottomResult.neckline ?? (supportLevel * 1.03));
+
+  const nearZone = latestClose >= zoneLow * 0.97 && latestClose <= zoneHigh * 1.05;
+  const isWBottom = wBottomResult.status !== "none" && (wBottomResult.low ? Math.abs(wBottomResult.low - latestSma50) <= latestSma50 * 0.07 : true);
+
+  if (isWBottom && nearZone) {
+    return {
+      status: wBottomResult.status === "confirmed" ? "confirmed" : "forming",
+      ema15: latestEma15,
+      sma50: latestSma50,
+      sma20: latestSma20,
+      peakSpreadPercent: peakSpread * 100,
+      currentSpreadPercent: currentSpread * 100,
+      supportZoneLow: zoneLow,
+      supportZoneHigh: zoneHigh,
+      wBottomDetected: true,
+      stage: "w-bottom-buy",
+      signalReasonZh: "波段上漲後均線規律收斂，於 50MA 支撐區打出 W 底型態，具備順勢買點訊號",
+      signalReasonEn: "Orderly MA convergence after breakout wave; W-bottom formed at 50MA support buy zone",
+    };
+  }
+
+  if (nearZone && Math.abs(latestClose - latestSma50) <= latestSma50 * 0.04) {
+    return {
+      status: "forming",
+      ema15: latestEma15,
+      sma50: latestSma50,
+      sma20: latestSma20,
+      peakSpreadPercent: peakSpread * 100,
+      currentSpreadPercent: currentSpread * 100,
+      supportZoneLow: zoneLow,
+      supportZoneHigh: zoneHigh,
+      wBottomDetected: isWBottom,
+      stage: "ma-support-test",
+      signalReasonZh: "EMA15 與 SMA50 開口收合，回測 50MA 黃色支撐區整理，關注止跌轉折買點",
+      signalReasonEn: "EMA15/SMA50 spread narrowing; testing 50MA yellow support zone for pullback entry",
+    };
+  }
+
+  return null;
+}
+
 export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis | null {
   const valid = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
   if (valid.length < 20) return null;
@@ -487,6 +625,11 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   const ma5 = movingAverageAt(valid, 5);
   const ma20 = movingAverageAt(valid, 20);
   const ma60 = movingAverageAt(valid, 60);
+  const ema15Series = exponentialMovingAverageSeries(valid, 15);
+  const sma50Series = movingAverageSeries(valid, 50);
+  const ema15 = ema15Series[ema15Series.length - 1] ?? null;
+  const sma50 = sma50Series[sma50Series.length - 1] ?? null;
+
   let goldenCrossDaysAgo: number | null = null;
   for (let daysAgo = 0; daysAgo <= 10; daysAgo += 1) {
     const index = valid.length - 1 - daysAgo;
@@ -521,6 +664,8 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   const atr14 = averageTrueRange(valid);
   const levels = detectKeyLevels(valid, aggregateCandles(valid, "week"), aggregateCandles(valid, "month"), atr14);
   const candlestick = detectCandlestickPattern(valid, atr14);
+  const trendPullback = detectTrendPullback(valid, wBottom, levels.keyLevels);
+
   const technicalAlert: TechnicalAlert = levels.supportBroken
     ? "support-broken"
     : candlestick.direction === "bullish" && candlestick.stage === "confirmed" && levels.patternAtSupport
@@ -543,12 +688,15 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
     ma5,
     ma20,
     ma60,
+    ema15,
+    sma50,
     dailyTrend,
     movingAverageSignal,
     goldenCrossDaysAgo,
     wBottom: wBottom.status,
     wBottomLow: wBottom.low,
     wBottomNeckline: wBottom.neckline,
+    trendPullback,
     weeklyRangePosition: rangePosition(weekly),
     monthlyRangePosition: rangePosition(monthly),
     volumeRatio20,

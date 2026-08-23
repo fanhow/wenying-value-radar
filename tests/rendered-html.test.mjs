@@ -37,7 +37,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /穩盈 - 價值雷達/);
   assert.match(html, /關於我們/);
   assert.match(html, /市場情緒/);
-  assert.match(html, /市場情緒[\s\S]*關於我們/);
+  assert.match(html, /公允價值[\s\S]*技術分析[\s\S]*大戶追蹤/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
   assert.match(html, /MARKET SCAN \/ 02/);
@@ -48,7 +48,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.08\.22\.2/);
+  assert.match(html, /Rev\. 2026\.08\.23\.1/);
   assert.doesNotMatch(html, /InvestingPro/i);
   assert.match(source, /className="table-extend-bar"/);
   assert.match(styles, /\.table-extend-bar \{ display: flex; flex-wrap: wrap;/);

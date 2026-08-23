@@ -117,6 +117,33 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
     z: 2,
   });
 
+  const pullbackArea = analysis?.trendPullback?.supportZoneLow && analysis?.trendPullback?.supportZoneHigh
+    ? [
+      [
+        {
+          name: language === "zh" ? "黃色支撐買點區" : "Pullback Buy Zone",
+          yAxis: analysis.trendPullback.supportZoneLow,
+          itemStyle: {
+            color: "rgba(250, 204, 21, 0.28)",
+            borderColor: "#eab308",
+            borderWidth: 1.5,
+            borderType: "dashed",
+          },
+          label: {
+            show: true,
+            position: "insideRight",
+            color: "#a16207",
+            fontSize: 10,
+            fontWeight: 700,
+          },
+        },
+        {
+          yAxis: analysis.trendPullback.supportZoneHigh,
+        },
+      ],
+    ]
+    : [];
+
   return {
     animation: false,
     backgroundColor: "#fbfcfb",
@@ -158,6 +185,7 @@ function buildEChartsOption({ candles, ticker, language, analysis, timeframe }: 
         data: candles.map((candle) => [candle.open, candle.close, candle.low, candle.high]),
         itemStyle: { color: "#d94b45", color0: "#15986c", borderColor: "#d94b45", borderColor0: "#15986c" },
         markLine: { silent: true, symbol: "none", data: keyLevels },
+        ...(pullbackArea.length > 0 ? { markArea: { silent: true, data: pullbackArea } } : {}),
         z: 4,
       },
       emaSeries(15, "EMA15", "#111827"),
