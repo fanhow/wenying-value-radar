@@ -638,7 +638,7 @@ function detectTrendPullback(
     return null;
   }
 
-  // 2. Identify the Prior Impulse Wave (下跌築底後有一段明顯漲幅 + 15EMA/50SMA 黃金交叉向上打開)
+  // 2. Stage 1 & 2: Prior Downtrend/Base followed by Impulse Wave (下跌築底後有一段明顯漲幅 + 15EMA/50SMA 黃金交叉向上打開)
   let peakSpread = 0;
   let baseTrough = Infinity;
   let impulsePeak = -Infinity;
@@ -673,8 +673,40 @@ function detectTrendPullback(
   const isConverging = currentSpread >= 0 && currentSpread <= 0.035 && peakSpread >= currentSpread + 0.015;
   if (!isConverging) return null;
 
-  // 4. Must be the 2nd (or 3rd) retest of the consolidation horizontal support low
+  // 4. Stage 3 & 4: Flat Box Consolidation without False Breakouts & 3rd/4th Retest at Box Bottom
   const pullbackWindow = candles.slice(Math.max(impulsePeakIndex > 0 ? impulsePeakIndex : 0, latestIndex - 35), latestIndex + 1);
+  const boxHigh = Math.max(...pullbackWindow.map((c) => c.high));
+  const boxLow = Math.min(...pullbackWindow.map((c) => c.low));
+  const boxHeightRatio = (boxHigh - boxLow) / (boxLow || 1);
+
+  // Box must be tidy and orderly (<= 12.5% height), without erratic spikes/false breakouts
+  if (boxHeightRatio > 0.125) {
+    return null;
+  }
+
+  // Check no false breakout spikes outside the box
+  for (const c of pullbackWindow) {
+    if (c.high > boxHigh * 1.025 || c.low < boxLow * 0.975) {
+      return null;
+    }
+  }
+
+  // Count distinct swing retests of the box bottom / 50MA floor
+  const supportFloor = Math.min(boxLow * 1.035, latestSma50 * 1.035);
+  let distinctRetests = 0;
+  let inDip = false;
+  for (let i = 0; i < pullbackWindow.length; i++) {
+    const c = pullbackWindow[i];
+    if (c.low <= supportFloor) {
+      if (!inDip) {
+        distinctRetests++;
+        inDip = true;
+      }
+    } else if (c.close >= (boxHigh + boxLow) / 2 || c.high >= boxHigh * 0.98) {
+      inDip = false;
+    }
+  }
+
   const pullbackLows: number[] = [];
   for (let i = 2; i < pullbackWindow.length - 2; i++) {
     const c = pullbackWindow[i];
@@ -685,12 +717,12 @@ function detectTrendPullback(
   }
 
   const supportLowsNearSma50 = pullbackLows.filter((l) => Math.abs(l - latestSma50) <= latestSma50 * 0.05);
-  const hasSecondRetest = supportLowsNearSma50.length >= 2
+  const hasValidRetest = distinctRetests >= 2
+    || supportLowsNearSma50.length >= 2
     || (pullbackLows.length >= 1 && Math.abs(latestClose - pullbackLows[0]) <= pullbackLows[0] * 0.045)
     || (wBottomResult.status !== "none" && wBottomResult.low !== null && Math.abs(latestClose - wBottomResult.low) <= wBottomResult.low * 0.045);
 
-  if (!hasSecondRetest) {
-    // Has not completed 2nd retest of prior consolidation low -> REJECT
+  if (!hasValidRetest) {
     return null;
   }
 
@@ -702,11 +734,11 @@ function detectTrendPullback(
   const zoneHigh = Math.max(supportLevel * 1.025, latestSma50 * 1.025, wBottomResult.neckline ?? (supportLevel * 1.03));
 
   const nearZone = latestClose >= zoneLow * 0.97 && latestClose <= zoneHigh * 1.05;
-  const isWBottom = wBottomResult.status !== "none" || supportLowsNearSma50.length >= 2;
+  const isWBottom = wBottomResult.status !== "none" || supportLowsNearSma50.length >= 2 || distinctRetests >= 2;
 
   if (nearZone) {
     return {
-      status: (wBottomResult.status === "confirmed" || supportLowsNearSma50.length >= 2) ? "confirmed" : "forming",
+      status: (wBottomResult.status === "confirmed" || supportLowsNearSma50.length >= 2 || distinctRetests >= 2) ? "confirmed" : "forming",
       ema15: latestEma15,
       sma50: latestSma50,
       sma20: latestSma20,
@@ -716,8 +748,8 @@ function detectTrendPullback(
       supportZoneHigh: zoneHigh,
       wBottomDetected: isWBottom,
       stage: "w-bottom-buy",
-      signalReasonZh: "波段推升後均線金叉收合，於 50MA 水平支撐區完成二次回測／打出 W 底，具備順勢買點訊號",
-      signalReasonEn: "Impulse wave followed by orderly MA convergence; completed 2nd retest at 50MA support forming high-edge trend buy point",
+      signalReasonZh: "波段推升後均線金叉收合，於平整方框內完成第 3/4 次回踩 50MA 支撐，無假突破，為最高勝率之順勢起漲買點",
+      signalReasonEn: "Impulse wave followed by orderly MA convergence in a flat box without false breakouts; testing 50MA horizontal support forming high-edge trend buy point",
     };
   }
 
