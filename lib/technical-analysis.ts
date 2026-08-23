@@ -672,8 +672,8 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   // Strict Rule: Morning Star / Bullish reversal patterns MUST form on a Day/Week/Month support line.
   // Evening Star / Bearish reversal patterns MUST form on a Day/Week/Month resistance line.
   const hasKeyLevels = levels.keyLevels.length > 0 || levels.support !== null || levels.resistance !== null;
-  const isBullishPattern = rawCandlestick.direction === "bullish" && rawCandlestick.pattern !== "none";
-  const isBearishPattern = rawCandlestick.direction === "bearish" && rawCandlestick.pattern !== "none";
+  const isBullishPattern = rawCandlestick.direction === "bullish";
+  const isBearishPattern = rawCandlestick.direction === "bearish";
   const validPatternAtLevel = !hasKeyLevels || (
     isBullishPattern
       ? (levels.patternAtSupport || levels.nearSupport)
