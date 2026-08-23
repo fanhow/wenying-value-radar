@@ -121,3 +121,13 @@ test("EMA and SMA calculations are accurate", () => {
   // ema3[4] = (14 - 12)*0.5 + 12 = 13
   assert.equal(ema3[4], 13);
 });
+
+test("Technical Analysis page links all listed stocks directly to Fair Value page and fetches real price history", async () => {
+  const pageSource = await readFile(new URL("../app/technical/page.tsx", import.meta.url), "utf8");
+  assert.match(pageSource, /\/api\/price-history\?ticker=/);
+  assert.match(pageSource, /stockDetailHref\(candidate\.ticker\)/);
+  assert.match(pageSource, /stockDetailHref\(selectedCandidate\.ticker\)/);
+  assert.match(pageSource, /candidate-name-link/);
+  assert.match(pageSource, /direct-valuation-btn/);
+  assert.match(pageSource, /view-valuation-link/);
+});

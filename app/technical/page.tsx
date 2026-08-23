@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SiteHeader } from "../site-header";
 import { SiteFooter } from "../site-footer";
 import { useLanguage } from "../language-context";
 import { stockDetailHref } from "../../lib/navigation";
 import { EChartsCandlestickChart } from "../echarts-candlestick-chart";
+import type { DailyCandle } from "../../lib/price-history";
+import type { TechnicalAnalysis } from "../../lib/technical-analysis";
 import {
   buildTechnicalSnapshot,
   type TechnicalCandidate,
@@ -16,6 +18,14 @@ import {
 type MarketFilter = "ALL" | "TW" | "US";
 type StageFilter = "ALL" | "candidate" | "confirmed";
 type ChartTimeframe = "daily" | "weekly" | "monthly";
+
+type RealChartResult = {
+  candles: DailyCandle[];
+  weeklyCandles: DailyCandle[];
+  monthlyCandles: DailyCandle[];
+  technicalAnalysis: TechnicalAnalysis | null;
+  state: "loading" | "ready" | "empty";
+};
 
 function formatIndicator(value: number | null | undefined, digits = 2) {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
@@ -37,6 +47,7 @@ export default function TechnicalAnalysisPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("daily");
+  const [chartDataMap, setChartDataMap] = useState<Record<string, RealChartResult>>({});
 
   const currentCategoryCandidates = useMemo(() => {
     if (!snapshot) return [];
@@ -67,12 +78,69 @@ export default function TechnicalAnalysisPage() {
     return currentCategoryCandidates.find((c) => c.ticker === resolvedSelectedTicker) || currentCategoryCandidates[0] || null;
   }, [resolvedSelectedTicker, currentCategoryCandidates]);
 
+  // Dynamically load real public candlestick price history from Yahoo Finance / TWSE
+  useEffect(() => {
+    if (!selectedCandidate) return;
+    const key = `${selectedCandidate.market}-${selectedCandidate.ticker}`;
+    if (chartDataMap[key]?.state === "ready") return;
+
+    const controller = new AbortController();
+    setChartDataMap((prev) => ({
+      ...prev,
+      [key]: prev[key] || { candles: [], weeklyCandles: [], monthlyCandles: [], technicalAnalysis: null, state: "loading" },
+    }));
+
+    void fetch(`/api/price-history?ticker=${encodeURIComponent(selectedCandidate.ticker)}&market=${selectedCandidate.market}`, {
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const payload = await res.json() as {
+          symbol?: string;
+          candles?: DailyCandle[];
+          weeklyCandles?: DailyCandle[];
+          monthlyCandles?: DailyCandle[];
+          technicalAnalysis?: TechnicalAnalysis | null;
+        };
+        const candles = Array.isArray(payload.candles) ? payload.candles : [];
+        if (res.ok && candles.length >= 20) {
+          setChartDataMap((prev) => ({
+            ...prev,
+            [key]: {
+              candles,
+              weeklyCandles: Array.isArray(payload.weeklyCandles) ? payload.weeklyCandles : [],
+              monthlyCandles: Array.isArray(payload.monthlyCandles) ? payload.monthlyCandles : [],
+              technicalAnalysis: payload.technicalAnalysis ?? null,
+              state: "ready",
+            },
+          }));
+        } else {
+          setChartDataMap((prev) => ({
+            ...prev,
+            [key]: { candles: [], weeklyCandles: [], monthlyCandles: [], technicalAnalysis: null, state: "empty" },
+          }));
+        }
+      })
+      .catch((err) => {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          setChartDataMap((prev) => ({
+            ...prev,
+            [key]: { candles: [], weeklyCandles: [], monthlyCandles: [], technicalAnalysis: null, state: "empty" },
+          }));
+        }
+      });
+
+    return () => controller.abort();
+  }, [chartDataMap, selectedCandidate]);
+
+  const activeChartResult = selectedCandidate ? chartDataMap[`${selectedCandidate.market}-${selectedCandidate.ticker}`] : null;
+  const chartState = activeChartResult?.state ?? "loading";
   const displayedCandles = useMemo(() => {
-    if (!selectedCandidate) return [];
-    if (timeframe === "weekly") return selectedCandidate.weeklyCandles;
-    if (timeframe === "monthly") return selectedCandidate.monthlyCandles;
-    return selectedCandidate.candles;
-  }, [selectedCandidate, timeframe]);
+    if (!activeChartResult || activeChartResult.state !== "ready") return [];
+    if (timeframe === "weekly") return activeChartResult.weeklyCandles;
+    if (timeframe === "monthly") return activeChartResult.monthlyCandles;
+    return activeChartResult.candles;
+  }, [activeChartResult, timeframe]);
+  const activeTechnicalAnalysis = activeChartResult?.technicalAnalysis ?? selectedCandidate?.technicalAnalysis ?? null;
 
   return (
     <div className="layout-shell">
@@ -315,7 +383,14 @@ export default function TechnicalAnalysisPage() {
                     </span>
                   </div>
                   <h3 className="stock-title">
-                    <span className="ticker-code">{selectedCandidate.ticker}</span> {selectedCandidate.name}
+                    <Link
+                      href={stockDetailHref(selectedCandidate.ticker)}
+                      className="stock-title-link"
+                      title={t("點擊直接回到公允價值頁面查看完整估值詳細資料", "Click to return to Fair Value page for complete details")}
+                    >
+                      <span className="ticker-code">{selectedCandidate.ticker}</span> {selectedCandidate.name}
+                      <span className="title-detail-link-tag">{t("公允價值詳細資料 ↗", "Fair Value Details ↗")}</span>
+                    </Link>
                   </h3>
                 </div>
 
@@ -379,19 +454,35 @@ export default function TechnicalAnalysisPage() {
                 </div>
 
                 <Link href={stockDetailHref(selectedCandidate.ticker)} className="view-valuation-link">
-                  {t("查看完整公允價值模型 →", "View Full Fair Value Model →")}
+                  {t("回到公允價值頁面查看詳細資料 →", "Return to Fair Value Page for Full Details →")}
                 </Link>
               </div>
 
-              {/* Candlestick Chart */}
+              {/* Real Candlestick Chart from Public Yahoo Finance History */}
               <div className="chart-canvas-container">
-                <EChartsCandlestickChart
-                  candles={displayedCandles}
-                  ticker={selectedCandidate.ticker}
-                  language={language}
-                  analysis={selectedCandidate.technicalAnalysis}
-                  timeframe={timeframe}
-                />
+                {chartState === "loading" && (
+                  <div className="chart-state-box loading">
+                    <div className="chart-loading-spinner" />
+                    <p>{t("正在載入 Yahoo Finance 公開真實技術 K 線…", "Loading Yahoo Finance real candlestick market data…")}</p>
+                  </div>
+                )}
+                {chartState === "empty" && (
+                  <div className="chart-state-box empty">
+                    <p>{t("公開行情資料暫時無法載入，您可以點擊下方按鈕回到公允價值頁面查看完整財報模型與詳細資料。", "Public market chart temporarily unavailable. Click below to view full valuation details.")}</p>
+                    <Link href={stockDetailHref(selectedCandidate.ticker)} className="chart-empty-action-btn">
+                      {t("回到公允價值頁面查看 →", "View Fair Value Model →")}
+                    </Link>
+                  </div>
+                )}
+                {chartState === "ready" && (
+                  <EChartsCandlestickChart
+                    candles={displayedCandles}
+                    ticker={selectedCandidate.ticker}
+                    language={language}
+                    analysis={activeTechnicalAnalysis}
+                    timeframe={timeframe}
+                  />
+                )}
               </div>
 
               {/* Technical Indicator Analysis Metrics */}
@@ -399,21 +490,21 @@ export default function TechnicalAnalysisPage() {
                 <div className="tech-summary-box">
                   <span className="box-title">{t("均線架構與趨勢", "MA Alignment & Trend")}</span>
                   <p className="box-desc">
-                    {selectedCandidate.technicalAnalysis.dailyTrend === "bullish"
+                    {activeTechnicalAnalysis?.dailyTrend === "bullish"
                       ? t("多頭排列／短多發散", "Bullish alignment")
-                      : selectedCandidate.technicalAnalysis.dailyTrend === "bearish"
+                      : activeTechnicalAnalysis?.dailyTrend === "bearish"
                         ? t("空頭排列／高檔轉弱", "Bearish alignment")
                         : t("均線收斂整理中", "MA convergence consolidation")}
-                    {selectedCandidate.technicalAnalysis.ema15 && ` · EMA15: ${formatIndicator(selectedCandidate.technicalAnalysis.ema15)}`}
-                    {selectedCandidate.technicalAnalysis.sma50 && ` · SMA50: ${formatIndicator(selectedCandidate.technicalAnalysis.sma50)}`}
+                    {activeTechnicalAnalysis?.ema15 && ` · EMA15: ${formatIndicator(activeTechnicalAnalysis.ema15)}`}
+                    {activeTechnicalAnalysis?.sma50 && ` · SMA50: ${formatIndicator(activeTechnicalAnalysis.sma50)}`}
                   </p>
                 </div>
 
                 <div className="tech-summary-box">
                   <span className="box-title">{t("關鍵支撐與壓力", "Support & Resistance")}</span>
                   <p className="box-desc">
-                    {selectedCandidate.supportLevel && `${t("主要支撐", "Support")}: ${formatIndicator(selectedCandidate.supportLevel)}`}
-                    {selectedCandidate.resistanceLevel && ` · ${t("主要壓力", "Resistance")}: ${formatIndicator(selectedCandidate.resistanceLevel)}`}
+                    {activeTechnicalAnalysis?.supportLevel && `${t("主要支撐", "Support")}: ${formatIndicator(activeTechnicalAnalysis.supportLevel)}`}
+                    {activeTechnicalAnalysis?.resistanceLevel && ` · ${t("主要壓力", "Resistance")}: ${formatIndicator(activeTechnicalAnalysis.resistanceLevel)}`}
                     {selectedCandidate.supportZoneLow && selectedCandidate.supportZoneHigh && ` · ${t("黃色買點帶", "Buy Zone")}: ${formatIndicator(selectedCandidate.supportZoneLow)}~${formatIndicator(selectedCandidate.supportZoneHigh)}`}
                   </p>
                 </div>
@@ -437,7 +528,7 @@ export default function TechnicalAnalysisPage() {
               <span className="candidate-count-tag">({currentCategoryCandidates.length})</span>
             </h3>
             <p className="section-subtext">
-              {t("點擊下方任一檔標的，即可即時切換上方 K 線圖與量化技術指標儀表板。", "Click any stock below to interactively view its full candlestick chart and technical metrics above.")}
+              {t("點擊下方任一檔標的名稱或「公允價值 ↗」，即可直接回到公允價值頁面並開啟完整詳細資料；點擊「看線圖」可在上方即時預覽真實技術 K 線。", "Click any stock name or 'Valuation ↗' below to directly return to the Fair Value page with complete details, or click 'Chart' to preview its real candlestick chart above.")}
             </p>
           </div>
 
@@ -446,7 +537,7 @@ export default function TechnicalAnalysisPage() {
               <thead>
                 <tr>
                   <th>{t("市場", "Market")}</th>
-                  <th>{t("代碼 / 名稱", "Ticker / Name")}</th>
+                  <th>{t("代碼 / 名稱 (點擊回公允價值)", "Ticker / Name (Click for Fair Value)")}</th>
                   <th>{t("目前價格", "Current Price")}</th>
                   <th>{t("公允價值", "Fair Value")}</th>
                   <th>{t("空間幅度", "Upside / Margin")}</th>
@@ -464,16 +555,23 @@ export default function TechnicalAnalysisPage() {
                     <tr
                       key={`${candidate.market}-${candidate.ticker}`}
                       className={`candidate-row ${isSelected ? "selected-row" : ""}`}
-                      onClick={() => setSelectedTicker(candidate.ticker)}
                     >
                       <td>
                         <span className="market-pill">{candidate.market}</span>
                       </td>
                       <td>
-                        <div className="candidate-name-cell">
-                          <strong className="candidate-ticker">{candidate.ticker}</strong>
-                          <span className="candidate-subname">{candidate.name}</span>
-                        </div>
+                        <Link
+                          href={stockDetailHref(candidate.ticker)}
+                          className="candidate-name-link"
+                          title={t("點擊直接回到公允價值頁面查看完整估值詳細資料", "Click to return to Fair Value page for complete details")}
+                        >
+                          <div className="candidate-name-cell">
+                            <strong className="candidate-ticker">
+                              {candidate.ticker} <span className="ticker-link-arrow">↗</span>
+                            </strong>
+                            <span className="candidate-subname">{candidate.name}</span>
+                          </div>
+                        </Link>
                       </td>
                       <td className="price-cell">{formatIndicator(candidate.price)}</td>
                       <td className="price-cell">{formatIndicator(candidate.fairValue)}</td>
@@ -498,16 +596,23 @@ export default function TechnicalAnalysisPage() {
                         <span className="guide-short-text">{candidate.actionGuideZh}</span>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className={`select-chart-btn ${isSelected ? "active" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedTicker(candidate.ticker);
-                          }}
-                        >
-                          {isSelected ? t("檢視中", "Viewing") : t("看線圖", "Chart")}
-                        </button>
+                        <div className="table-actions-cell">
+                          <button
+                            type="button"
+                            className={`select-chart-btn ${isSelected ? "active" : ""}`}
+                            onClick={() => setSelectedTicker(candidate.ticker)}
+                            title={t("在上方載入真實技術 K 線", "Preview real technical chart above")}
+                          >
+                            {isSelected ? t("預覽中", "Viewing") : t("看線圖", "Chart")}
+                          </button>
+                          <Link
+                            href={stockDetailHref(candidate.ticker)}
+                            className="direct-valuation-btn"
+                            title={t("直接回到公允價值頁面查看詳細資料", "Directly view details on Fair Value page")}
+                          >
+                            {t("公允價值 ↗", "Valuation ↗")}
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

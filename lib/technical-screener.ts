@@ -223,7 +223,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     { ticker: "2474", market: "TW", mode: "morning-star-candidate" },
     { ticker: "8454", market: "TW", mode: "morning-star-candidate" },
     { ticker: "8069", market: "TW", mode: "morning-star" },
-    { ticker: "3105", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "3708", market: "TW", mode: "morning-star-candidate" },
     { ticker: "4961", market: "TW", mode: "morning-star" },
 
     // Taiwan Evening Star: Candidates and Confirmed

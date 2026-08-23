@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.23.2";
+const SITE_REVISION = "Rev. 2026.08.23.3";
 
 const REVISION_ENTRIES = [
+  ["2026.08.23.3", "技術分析頁面升級：全面採用 Yahoo Finance / TWSE 公開真實歷史日週月 K 線（完全根除模擬線圖），且技術分析頁面上所有列出的個股（代碼／名稱／操作按鈕／圖表標題）皆支援點擊直接回到「公允價值」頁面並即時顯示該檔個股的完整模型與詳細資料。", "Technical Analysis upgraded: 100% genuine Yahoo Finance / TWSE public historical daily, weekly, and monthly candlestick data (completely eliminating simulated candles); all listed stocks, chart titles, and action links directly return to the Fair Value page and automatically display full valuation breakdown and details."],
   ["2026.08.23.2", "技術分析「早晨之星」與「黃昏之星」支援「十字星收盤即時卡位」：於第二根十字星（Doji）向下/向上跳空收盤時第一時間列入「可能形成」推薦與警示名單，提供實戰進出指引，掌握隔日跳空開盤最佳起漲點與避險時機。", "Technical Analysis 'Morning Star' and 'Evening Star' support instant positioning upon Doji close: listed as 'Candidate' on the day the star candle closes after a gap, with actionable next-day entry and exit guidance."],
   ["2026.08.23.1", "新增「技術分析」專屬頁面（導覽列位於公允價值之後、大戶追蹤之前）：全面支援早晨之星（放量長陰後向下跳空十字星 ＋ 週月支撐 ＋ 正向公允價值）、黃昏之星（放量長陽後向上跳空十字星 ＋ 週月壓力 ＋ 高檔估值警示）與順勢交易（15EMA/50MA 打開發散後收合 ＋ 50MA 黃色支撐區 W 底買點）三大量化策略推薦與互動式 K 線圖。", "Added dedicated Technical Analysis page (positioned between Fair Value and Fund Tracker in navigation): fully supports Morning Star (gap-down Doji on volume at key support with fair-value upside), Evening Star (gap-up Doji at resistance with downside warning), and Trend Pullback (EMA15/SMA50 convergence with W-bottom in yellow 50MA support buy zone), complete with interactive K-line charting."],
   ["2026.08.22.2", "完成台股前 40 檔（可成、鴻準、富邦媒、世紀鋼等）與美股前 20 檔（SMPL、CHTR、TTD、FISV、INTU 等）全數 60 檔多模型共識基準對齊；升級高 ROE 與優質商業模式估值擴展法則；排行榜全面優先呈現經量化篩選之高財務健康度標的。", "Completed end-to-end multi-model consensus alignment across all 60 benchmark stocks (TW top 40 including 2474, 2354, 8454, 9958 and US top 20 including SMPL, CHTR, TTD, FISV, INTU); upgraded ROE-driven valuation target expansion; prioritized high financial-health quality leaders across ranking tables."],
