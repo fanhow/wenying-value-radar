@@ -21,7 +21,7 @@ test("Technical Analysis page exports valid component and includes all 3 strateg
   assert.match(pageSource, /EMA15/);
   assert.match(pageSource, /SMA50/);
   assert.match(pageSource, /SMA20/);
-  assert.match(pageSource, /黃色支撐買點區|Pullback Buy Zone/);
+  assert.match(pageSource, /50MA 支撐區 W 底|50MA Support Zone/);
 });
 
 test("buildTechnicalSnapshot produces calibrated candidates for Morning Star, Evening Star, and Trend Pullback", () => {
@@ -170,4 +170,9 @@ test("3708 上緯投控 historical Morning Star (2026-07-30~31) is accurately de
   const todayResult = analyzeTechnicalSetup(historical3708Candles);
   assert.ok(todayResult);
   assert.equal(todayResult.candlestickPattern, "none", "3708 is in consolidation today and has no active candlestick pattern");
+});
+
+test("2317 鴻海 is NOT a Morning Star because it does not form on a Daily/Weekly/Monthly support line", () => {
+  const snapshot = buildTechnicalSnapshot();
+  assert.ok(!snapshot.morningStar.some((c) => c.ticker === "2317"), "2317 must not be listed in Morning Star");
 });

@@ -666,18 +666,44 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   const volumeRatio20 = averageVolume20 && latest.volume > 0 ? latest.volume / averageVolume20 : null;
   const atr14 = averageTrueRange(valid);
   const levels = detectKeyLevels(valid, aggregateCandles(valid, "week"), aggregateCandles(valid, "month"), atr14);
-  const candlestick = detectCandlestickPattern(valid, atr14);
+  const rawCandlestick = detectCandlestickPattern(valid, atr14);
   const trendPullback = detectTrendPullback(valid, wBottom, levels.keyLevels);
+
+  // Strict Rule: Morning Star / Bullish reversal patterns MUST form on a Day/Week/Month support line.
+  // Evening Star / Bearish reversal patterns MUST form on a Day/Week/Month resistance line.
+  const hasKeyLevels = levels.keyLevels.length > 0 || levels.support !== null || levels.resistance !== null;
+  const isBullishPattern = rawCandlestick.direction === "bullish" && rawCandlestick.pattern !== "none";
+  const isBearishPattern = rawCandlestick.direction === "bearish" && rawCandlestick.pattern !== "none";
+  const validPatternAtLevel = !hasKeyLevels || (
+    isBullishPattern
+      ? (levels.patternAtSupport || levels.nearSupport)
+      : isBearishPattern
+        ? (levels.patternAtResistance || levels.nearResistance)
+        : true
+  );
+
+  const candlestick = validPatternAtLevel
+    ? rawCandlestick
+    : {
+        pattern: "none" as const,
+        direction: "neutral" as const,
+        stage: "none" as const,
+        consecutiveLargeBearish: rawCandlestick.consecutiveLargeBearish,
+        consecutiveLargeBullish: rawCandlestick.consecutiveLargeBullish,
+        consecutiveTrendCandles: rawCandlestick.consecutiveTrendCandles,
+        ma20Deviation: rawCandlestick.ma20Deviation,
+        gapDirection: rawCandlestick.gapDirection,
+      };
 
   const technicalAlert: TechnicalAlert = levels.supportBroken
     ? "support-broken"
-    : candlestick.direction === "bullish" && candlestick.stage === "confirmed" && levels.patternAtSupport
+    : candlestick.direction === "bullish" && candlestick.stage === "confirmed" && (levels.patternAtSupport || levels.nearSupport)
       ? "bullish-confirmed"
-      : candlestick.direction === "bearish" && candlestick.stage === "confirmed" && levels.patternAtResistance
+      : candlestick.direction === "bearish" && candlestick.stage === "confirmed" && (levels.patternAtResistance || levels.nearResistance)
         ? "bearish-confirmed"
-        : candlestick.direction === "bullish" && candlestick.stage === "candidate" && levels.patternAtSupport
+        : candlestick.direction === "bullish" && candlestick.stage === "candidate" && (levels.patternAtSupport || levels.nearSupport)
           ? "bullish-candidate"
-          : candlestick.direction === "bearish" && candlestick.stage === "candidate" && levels.patternAtResistance
+          : candlestick.direction === "bearish" && candlestick.stage === "candidate" && (levels.patternAtResistance || levels.nearResistance)
             ? "bearish-candidate"
             : levels.nearSupport
               ? "near-support"

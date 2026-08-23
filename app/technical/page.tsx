@@ -187,7 +187,7 @@ export default function TechnicalAnalysisPage() {
             >
               <div className="tab-badge trend-badge">{t("順勢買點", "Trend Buy")}</div>
               <div className="tab-title">{t("C. 順勢交易 (W底買點)", "C. Trend Pullback (W-Bottom)")}</div>
-              <div className="tab-desc">{t("EMA15/50MA 收斂 ＋ 50MA 黃色支撐區 W 底", "EMA15/SMA50 convergence + 50MA yellow support")}</div>
+              <div className="tab-desc">{t("EMA15/50MA 收斂 ＋ 50MA 支撐區 W 底", "EMA15/SMA50 convergence + 50MA support W-bottom")}</div>
             </button>
           </div>
         </section>
@@ -203,8 +203,8 @@ export default function TechnicalAnalysisPage() {
               <div className="guide-timing-alert bullish-timing">
                 <strong>⚡ {t("實戰提前卡位原則（十字星收盤即時列出）：", "Advance Positioning Rule (Listed upon Doji Close):")}</strong>{" "}
                 {t(
-                  "當第二根十字星（Doji）向下跳空收盤時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向上跳空或開高，即可在第一時間買在最低成本、最佳起漲位置！",
-                  "Listed immediately as a 'Candidate' at the close of the downward gap Doji. If tomorrow opens with an upward gap or higher, enter early at the lowest cost basis!",
+                  "當第二根十字星（Doji）向下跳空收盤且精確落在日/週/月支撐線上時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向上跳空或開高，即可在第一時間買在最低成本、最佳起漲位置！",
+                  "Listed immediately as a 'Candidate' at the close of the downward gap Doji right on major support. If tomorrow opens with an upward gap or higher, enter early at the lowest cost basis!",
                 )}
               </div>
               <ul className="guide-rules-list">
@@ -221,8 +221,8 @@ export default function TechnicalAnalysisPage() {
                   {t("第三根長紅陽燭強勢反彈，收盤價收復第一根陰線實體 50% 以上。", "Third candle rallies strongly, closing above 50% of the first candle's real body.")}
                 </li>
                 <li>
-                  <strong>{t("4. 週線／月線主要支撐：", "4. Weekly/Monthly Key Support:")}</strong>{" "}
-                  {t("型態出現在週線或月線關鍵支撐位，或週月線上行趨勢線通道下軌。", "Must form at major weekly/monthly horizontal support or ascending trendline support.")}
+                  <strong>{t("4. 必須位於日/週/月主要支撐線：", "4. Must Form on Day/Week/Month Key Support:")}</strong>{" "}
+                  {t("十字星之最低價或收盤價必須精確觸及或落在日線、週線或月線主要支撐線上，獲得實質支撐方能列入觀察，確保絕佳買入優勢與高盈虧比。", "Doji low or close must strictly touch or sit on daily, weekly, or monthly major support line to ensure high-probability entry advantage.")}
                 </li>
                 <li>
                   <strong>{t("5. 公允價值為正：", "5. Positive Fair Value Upside:")}</strong>{" "}
@@ -241,8 +241,8 @@ export default function TechnicalAnalysisPage() {
               <div className="guide-timing-alert bearish-timing">
                 <strong>⚡ {t("實戰提前避險原則（十字星收盤即時列出）：", "Advance Defensive Rule (Listed upon Doji Close):")}</strong>{" "}
                 {t(
-                  "當第二根十字星（Doji）向上跳空收盤時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向下跳空或開低走弱，即可在第一時間積極減碼、鎖定獲利避險！",
-                  "Listed immediately as a 'Candidate' at the close of the upward gap Doji. If tomorrow opens with a downward gap or lower, take defensive exits early!",
+                  "當第二根十字星（Doji）向上跳空收盤且精確落在日/週/月壓力線上時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向下跳空或開低走弱，即可在第一時間積極減碼、鎖定獲利避險！",
+                  "Listed immediately as a 'Candidate' at the close of the upward gap Doji right on major resistance. If tomorrow opens with a downward gap or lower, take defensive exits early!",
                 )}
               </div>
               <ul className="guide-rules-list">
@@ -259,8 +259,8 @@ export default function TechnicalAnalysisPage() {
                   {t("第三根長黑陰燭向下貫穿，收盤價跌破第一根陽線實體 50% 以下。", "Third candle drops sharply, closing below 50% of the first candle's real body.")}
                 </li>
                 <li>
-                  <strong>{t("4. 週線／月線主要壓力：", "4. Weekly/Monthly Major Resistance:")}</strong>{" "}
-                  {t("型態出現在週線或月線歷史壓力區，或下降通道上軌，避免高檔追價。", "Occurs near major weekly/monthly resistance or descending channel top.")}
+                  <strong>{t("4. 必須位於日/週/月主要壓力線：", "4. Must Form on Day/Week/Month Major Resistance:")}</strong>{" "}
+                  {t("十字星之最高價或收盤價必須精確觸及或落在日線、週線或月線主要壓力線上，高檔遇阻方能列入警示。", "Doji high or close must strictly touch or sit on daily, weekly, or monthly major resistance line.")}
                 </li>
                 <li>
                   <strong>{t("5. 公允價值偏高警示：", "5. Fair Value Downside Warning:")}</strong>{" "}
@@ -286,8 +286,8 @@ export default function TechnicalAnalysisPage() {
                   {t("股價進入規律調整，15EMA 慢慢向 50SMA 靠攏收合，波動幅度收窄、成交量溫和萎縮。", "Orderly pullback where EMA15 converges back toward SMA50 on contracting volatility.")}
                 </li>
                 <li>
-                  <strong>{t("3. 黃色支撐區 W 底買點：", "3. Yellow Support Zone & W-Bottom:")}</strong>{" "}
-                  {t("股價在 50SMA 或前波支撐位附近打出 W 底（雙重底）或回踩確認，形成最佳起漲買點。", "Price forms a W-bottom double test or bounces cleanly in the yellow 50MA support buy zone.")}
+                  <strong>{t("3. 50MA 均線支撐區 W 底買點：", "3. 50MA Support Zone & W-Bottom:")}</strong>{" "}
+                  {t("股價在 50SMA 或前波支撐位附近打出 W 底（雙重底）或回踩確認，形成最佳起漲買點。", "Price forms a W-bottom double test or bounces cleanly in the 50MA support buy zone.")}
                 </li>
                 <li>
                   <strong>{t("4. 公允價值安全邊際：", "4. Fair Value Upside:")}</strong>{" "}
@@ -444,9 +444,6 @@ export default function TechnicalAnalysisPage() {
                   <span className="legend-item"><span className="dot dot-ema15" /> EMA15 ({t("黑色", "Black")})</span>
                   <span className="legend-item"><span className="dot dot-sma50" /> SMA50 ({t("紅色", "Red")})</span>
                   <span className="legend-item"><span className="dot dot-sma20" /> SMA20 ({t("藍色", "Blue")})</span>
-                  {activeCategory === "trend-pullback" && (
-                    <span className="legend-item"><span className="dot dot-yellow" /> {t("黃色支撐買點區", "Yellow Buy Zone")}</span>
-                  )}
                 </div>
 
                 <Link href={stockDetailHref(selectedCandidate.ticker)} className="view-valuation-link">
@@ -501,7 +498,7 @@ export default function TechnicalAnalysisPage() {
                   <p className="box-desc">
                     {activeTechnicalAnalysis?.supportLevel && `${t("主要支撐", "Support")}: ${formatIndicator(activeTechnicalAnalysis.supportLevel)}`}
                     {activeTechnicalAnalysis?.resistanceLevel && ` · ${t("主要壓力", "Resistance")}: ${formatIndicator(activeTechnicalAnalysis.resistanceLevel)}`}
-                    {selectedCandidate.supportZoneLow && selectedCandidate.supportZoneHigh && ` · ${t("黃色買點帶", "Buy Zone")}: ${formatIndicator(selectedCandidate.supportZoneLow)}~${formatIndicator(selectedCandidate.supportZoneHigh)}`}
+                    {selectedCandidate.supportZoneLow && selectedCandidate.supportZoneHigh && ` · ${t("50MA 支撐帶", "50MA Zone")}: ${formatIndicator(selectedCandidate.supportZoneLow)}~${formatIndicator(selectedCandidate.supportZoneHigh)}`}
                   </p>
                 </div>
 

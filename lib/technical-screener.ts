@@ -221,9 +221,8 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
   }> = [
     // Taiwan Morning Star: Candidates (Doji close today at support) and Confirmed (3-bar recovery)
     { ticker: "2354", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "2317", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "2324", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "2327", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "1537", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "1512", market: "TW", mode: "morning-star-candidate" },
     { ticker: "1309", market: "TW", mode: "morning-star" },
     { ticker: "1476", market: "TW", mode: "morning-star" },
     { ticker: "1773", market: "TW", mode: "morning-star" },
@@ -233,7 +232,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     { ticker: "2491", market: "TW", mode: "evening-star-candidate" },
     { ticker: "6805", market: "TW", mode: "evening-star" },
 
-    // Taiwan Trend Pullback (15EMA & 50MA convergence at 50MA yellow support zone / W-bottom)
+    // Taiwan Trend Pullback (15EMA & 50MA convergence at 50MA support zone / W-bottom)
     { ticker: "2385", market: "TW", mode: "trend-pullback" },
     { ticker: "2704", market: "TW", mode: "trend-pullback" },
     { ticker: "3515", market: "TW", mode: "trend-pullback" },
@@ -350,10 +349,10 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     let stage: "confirmed" | "forming" | "candidate" = "confirmed";
     let patternNameZh = "順勢回踩 W 底買點";
     let patternNameEn = "Trend Pullback W-Bottom";
-    let descriptionZh = "15EMA 與 50SMA 均線開口收合，回測 50MA 黃色支撐區打出 W 底，具備多頭順勢起漲訊號。";
-    let descriptionEn = "EMA15/SMA50 convergence with W-bottom bounce off 50MA yellow support buy zone.";
-    let actionGuideZh = "股價於 50MA 黃色支撐區回踩確認／打出 W 底，為高盈虧比順勢起漲買點。";
-    let actionGuideEn = "Price bouncing off 50MA yellow support zone; excellent trend risk/reward entry.";
+    let descriptionZh = "15EMA 與 50SMA 均線開口收合，回測 50MA 支撐區打出 W 底，具備多頭順勢起漲訊號。";
+    let descriptionEn = "EMA15/SMA50 convergence with W-bottom bounce off 50MA support buy zone.";
+    let actionGuideZh = "股價於 50MA 均線支撐區回踩確認／打出 W 底，為高盈虧比順勢起漲買點。";
+    let actionGuideEn = "Price bouncing off 50MA support zone; excellent trend risk/reward entry.";
 
     if (assign.mode === "morning-star-candidate") {
       category = "morning-star";
