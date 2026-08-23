@@ -85,10 +85,6 @@ export default function TechnicalAnalysisPage() {
     if (chartDataMap[key]?.state === "ready") return;
 
     const controller = new AbortController();
-    setChartDataMap((prev) => ({
-      ...prev,
-      [key]: prev[key] || { candles: [], weeklyCandles: [], monthlyCandles: [], technicalAnalysis: null, state: "loading" },
-    }));
 
     void fetch(`/api/price-history?ticker=${encodeURIComponent(selectedCandidate.ticker)}&market=${selectedCandidate.market}`, {
       signal: controller.signal,
