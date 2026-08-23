@@ -17,6 +17,7 @@ import type { DailyCandle } from "../../lib/price-history";
 import type { TechnicalAnalysis } from "../../lib/technical-analysis";
 
 type MarketFilter = "ALL" | "TW" | "US";
+type StageFilter = "ALL" | "candidate" | "confirmed";
 type ChartTimeframe = "daily" | "weekly" | "monthly";
 
 function formatIndicator(value: number | null | undefined, digits = 2) {
@@ -35,12 +36,12 @@ export default function TechnicalAnalysisPage() {
   const [snapshot, setSnapshot] = useState<TechnicalSnapshot | null>(null);
   const [activeCategory, setActiveCategory] = useState<TechnicalCategory>("morning-star");
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("daily");
 
   useEffect(() => {
-    // Generate snapshot data
     const data = buildTechnicalSnapshot();
     setSnapshot(data);
   }, []);
@@ -55,14 +56,16 @@ export default function TechnicalAnalysisPage() {
     if (marketFilter !== "ALL") {
       list = list.filter((c) => c.market === marketFilter);
     }
+    if (stageFilter !== "ALL") {
+      list = list.filter((c) => c.stage === stageFilter);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter((c) => c.ticker.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
     }
     return list;
-  }, [snapshot, activeCategory, marketFilter, searchQuery]);
+  }, [snapshot, activeCategory, marketFilter, stageFilter, searchQuery]);
 
-  // Set default selected candidate when category or market changes
   useEffect(() => {
     if (currentCategoryCandidates.length > 0) {
       if (!selectedTicker || !currentCategoryCandidates.some((c) => c.ticker === selectedTicker)) {
@@ -99,8 +102,8 @@ export default function TechnicalAnalysisPage() {
             </div>
             <p className="hero-lead">
               {t(
-                "結合多模型公允價值共識與三大經典實戰型態（早晨之星、黃昏之星、順勢回踩 W 底），精準辨識關鍵轉折買點與高檔風險警示。",
-                "Combining multi-model fair value consensus with three classic battle-tested technical patterns (Morning Star, Evening Star, Trend Pullback W-Bottom) to capture high-probability entries and exit warnings.",
+                "結合多模型公允價值共識與三大經典實戰型態（早晨之星、黃昏之星、順勢回踩 W 底），十字星收盤即時提示「可能形成」，助您在隔日跳空開盤時買賣在最佳起漲點與避險位。",
+                "Combining multi-model fair value consensus with three battle-tested technical patterns (Morning Star, Evening Star, Trend Pullback). Real-time Doji close detection allows early positioning on next-day gap opens.",
               )}
             </p>
           </div>
@@ -114,7 +117,7 @@ export default function TechnicalAnalysisPage() {
             >
               <div className="tab-badge bullish-badge">{t("看漲反轉", "Bullish Reversal")}</div>
               <div className="tab-title">{t("A. 早晨之星", "A. Morning Star")}</div>
-              <div className="tab-desc">{t("向下跳空十字星 ＋ 週月支撐 ＋ 公允價值低估", "Gap down Doji + Key support + Undervalued")}</div>
+              <div className="tab-desc">{t("十字星收盤提前卡位 ＋ 週月支撐 ＋ 公允價值低估", "Doji Close Early Entry + Key support + Undervalued")}</div>
             </button>
 
             <button
@@ -124,7 +127,7 @@ export default function TechnicalAnalysisPage() {
             >
               <div className="tab-badge bearish-badge">{t("高檔警示", "Bearish Reversal")}</div>
               <div className="tab-title">{t("B. 黃昏之星", "B. Evening Star")}</div>
-              <div className="tab-desc">{t("向上跳空十字星 ＋ 週月壓力 ＋ 估值偏高警示", "Gap up Doji + Key resistance + Overvalued")}</div>
+              <div className="tab-desc">{t("十字星收盤提前避險 ＋ 週月壓力 ＋ 估值偏高警示", "Doji Close Early Exit + Key resistance + Overvalued")}</div>
             </button>
 
             <button
@@ -147,26 +150,33 @@ export default function TechnicalAnalysisPage() {
                 <h3>{t("🌟 早晨之星（Morning Star）識別原則與量化條件", "🌟 Morning Star Recognition Rules & Filter Criteria")}</h3>
                 <span className="badge-tag">{t("多頭反轉訊號", "Bullish Reversal")}</span>
               </div>
+              <div className="guide-timing-alert bullish-timing">
+                <strong>⚡ {t("實戰提前卡位原則（十字星收盤即時列出）：", "Advance Positioning Rule (Listed upon Doji Close):")}</strong>{" "}
+                {t(
+                  "當第二根十字星（Doji）向下跳空收盤時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向上跳空或開高，即可在第一時間買在最低成本、最佳起漲位置！",
+                  "Listed immediately as a 'Candidate' at the close of the downward gap Doji. If tomorrow opens with an upward gap or higher, enter early at the lowest cost basis!",
+                )}
+              </div>
               <ul className="guide-rules-list">
                 <li>
                   <strong>{t("1. 連續大跌放量陰線：", "1. Downtrend Climax with Volume:")}</strong>{" "}
                   {t("股價經歷一波明顯下跌，最後出現實體放大的長黑陰燭，並伴隨成交量顯著放大。", "Prolonged downtrend climaxing with a large bearish candle on expanded volume.")}
                 </li>
                 <li>
-                  <strong>{t("2. 向下跳空十字星（必須條件）：", "2. Downward Gap Doji (Required):")}</strong>{" "}
-                  {t("第二根 K 線必須向下跳空開低，收出實體細小之十字星（Doji）或紡錘線，代表賣壓竭盡。", "Second candle must gap down into a Doji or small spinning top, indicating seller exhaustion.")}
+                  <strong>{t("2. 向下跳空十字星（收盤即列入）：", "2. Downward Gap Doji (Listed at Close):")}</strong>{" "}
+                  {t("第二根 K 線向下跳空開低，收出十字星（Doji）或細小實體，代表空頭賣壓竭盡。", "Second candle gaps down into a Doji or small body, indicating seller exhaustion.")}
                 </li>
                 <li>
-                  <strong>{t("3. 第三根確認陽燭：", "3. Confirmed Bullish Reversal:")}</strong>{" "}
+                  <strong>{t("3. 第三根確認陽燭（完全確認）：", "3. Confirmed Third Bullish Candle:")}</strong>{" "}
                   {t("第三根長紅陽燭強勢反彈，收盤價收復第一根陰線實體 50% 以上。", "Third candle rallies strongly, closing above 50% of the first candle's real body.")}
                 </li>
                 <li>
                   <strong>{t("4. 週線／月線主要支撐：", "4. Weekly/Monthly Key Support:")}</strong>{" "}
-                  {t("型態必須出現在週線或月線關鍵支撐位，或週月線上行趨勢線通道下軌。", "Must form at major weekly/monthly horizontal support or ascending trendline support.")}
+                  {t("型態出現在週線或月線關鍵支撐位，或週月線上行趨勢線通道下軌。", "Must form at major weekly/monthly horizontal support or ascending trendline support.")}
                 </li>
                 <li>
                   <strong>{t("5. 公允價值為正：", "5. Positive Fair Value Upside:")}</strong>{" "}
-                  {t("本站多模型公允價值高於現價，具備明確安全邊際與上行空間（↗ 紅色標示）。", "Multi-model fair value exceeds current market price with solid upside margin (↗ in Red).")}
+                  {t("多模型公允價值高於現價，具備明確安全邊際與上行空間（↗ 紅色標示）。", "Multi-model fair value exceeds current market price with solid upside margin (↗ in Red).")}
                 </li>
               </ul>
             </div>
@@ -178,17 +188,24 @@ export default function TechnicalAnalysisPage() {
                 <h3>{t("🌙 黃昏之星（Evening Star）識別原則與警示條件", "🌙 Evening Star Recognition Rules & Warning Criteria")}</h3>
                 <span className="badge-tag caution">{t("空頭轉折警示", "Bearish Warning")}</span>
               </div>
+              <div className="guide-timing-alert bearish-timing">
+                <strong>⚡ {t("實戰提前避險原則（十字星收盤即時列出）：", "Advance Defensive Rule (Listed upon Doji Close):")}</strong>{" "}
+                {t(
+                  "當第二根十字星（Doji）向上跳空收盤時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向下跳空或開低走弱，即可在第一時間積極減碼、鎖定獲利避險！",
+                  "Listed immediately as a 'Candidate' at the close of the upward gap Doji. If tomorrow opens with a downward gap or lower, take defensive exits early!",
+                )}
+              </div>
               <ul className="guide-rules-list">
                 <li>
                   <strong>{t("1. 連續大漲放量陽線：", "1. Uptrend Climax with Volume:")}</strong>{" "}
                   {t("股價經歷一波強勁上漲，最後放量出現實體放大的長紅陽燭，市場情緒過熱。", "Extended uptrend climaxing with a large bullish candle on heavy volume.")}
                 </li>
                 <li>
-                  <strong>{t("2. 向上跳空十字星（必須條件）：", "2. Upward Gap Doji (Required):")}</strong>{" "}
-                  {t("第二根 K 線必須向上跳空開高，收出十字星或細小實體，代表多頭動能停滯。", "Second candle must gap up into a Doji or small body, indicating buyer momentum stall.")}
+                  <strong>{t("2. 向上跳空十字星（收盤即列入）：", "2. Upward Gap Doji (Listed at Close):")}</strong>{" "}
+                  {t("第二根 K 線向上跳空開高，收出十字星或細小實體，代表多頭動能停滯。", "Second candle gaps up into a Doji or small body, indicating buyer momentum stall.")}
                 </li>
                 <li>
-                  <strong>{t("3. 第三根確認陰燭：", "3. Confirmed Bearish Reversal:")}</strong>{" "}
+                  <strong>{t("3. 第三根確認陰燭（完全確認）：", "3. Confirmed Third Bearish Candle:")}</strong>{" "}
                   {t("第三根長黑陰燭向下貫穿，收盤價跌破第一根陽線實體 50% 以下。", "Third candle drops sharply, closing below 50% of the first candle's real body.")}
                 </li>
                 <li>
@@ -234,28 +251,54 @@ export default function TechnicalAnalysisPage() {
         {/* Filter Controls */}
         <section className="section-block filter-bar-section">
           <div className="filter-controls-row">
-            <div className="market-toggle-group">
-              <button
-                type="button"
-                className={`market-btn ${marketFilter === "ALL" ? "active" : ""}`}
-                onClick={() => setMarketFilter("ALL")}
-              >
-                {t("全部市場", "All Markets")}
-              </button>
-              <button
-                type="button"
-                className={`market-btn ${marketFilter === "TW" ? "active" : ""}`}
-                onClick={() => setMarketFilter("TW")}
-              >
-                🇹🇼 {t("台股", "Taiwan")}
-              </button>
-              <button
-                type="button"
-                className={`market-btn ${marketFilter === "US" ? "active" : ""}`}
-                onClick={() => setMarketFilter("US")}
-              >
-                🇺🇸 {t("美股", "US")}
-              </button>
+            <div className="filter-button-group">
+              <div className="market-toggle-group">
+                <button
+                  type="button"
+                  className={`market-btn ${marketFilter === "ALL" ? "active" : ""}`}
+                  onClick={() => setMarketFilter("ALL")}
+                >
+                  {t("全部市場", "All Markets")}
+                </button>
+                <button
+                  type="button"
+                  className={`market-btn ${marketFilter === "TW" ? "active" : ""}`}
+                  onClick={() => setMarketFilter("TW")}
+                >
+                  🇹🇼 {t("台股", "Taiwan")}
+                </button>
+                <button
+                  type="button"
+                  className={`market-btn ${marketFilter === "US" ? "active" : ""}`}
+                  onClick={() => setMarketFilter("US")}
+                >
+                  🇺🇸 {t("美股", "US")}
+                </button>
+              </div>
+
+              <div className="stage-toggle-group">
+                <button
+                  type="button"
+                  className={`stage-btn ${stageFilter === "ALL" ? "active" : ""}`}
+                  onClick={() => setStageFilter("ALL")}
+                >
+                  {t("全部階段", "All Stages")}
+                </button>
+                <button
+                  type="button"
+                  className={`stage-btn ${stageFilter === "candidate" ? "active candidate" : ""}`}
+                  onClick={() => setStageFilter("candidate")}
+                >
+                  ⚡ {t("十字星收盤 (可能形成)", "Doji Close (Candidate)")}
+                </button>
+                <button
+                  type="button"
+                  className={`stage-btn ${stageFilter === "confirmed" ? "active confirmed" : ""}`}
+                  onClick={() => setStageFilter("confirmed")}
+                >
+                  ✅ {t("已確認反轉", "Confirmed")}
+                </button>
+              </div>
             </div>
 
             <div className="search-box-wrap">
@@ -279,7 +322,11 @@ export default function TechnicalAnalysisPage() {
                   <div className="stock-badges">
                     <span className="market-tag">{selectedCandidate.market}</span>
                     <span className="pattern-badge">{selectedCandidate.patternNameZh}</span>
-                    <span className="stage-badge">{t("型態已確認", "Confirmed")}</span>
+                    <span className={`stage-badge ${selectedCandidate.stage === "candidate" ? "candidate-stage" : "confirmed-stage"}`}>
+                      {selectedCandidate.stage === "candidate"
+                        ? t("⚡ 十字星收盤 (可能形成 · 關注明日開盤/跳空)", "⚡ Doji Close (Candidate · Watch Gap Open)")
+                        : t("✅ 型態已確認 (第3根突破確立)", "✅ Confirmed Reversal")}
+                    </span>
                   </div>
                   <h3 className="stock-title">
                     <span className="ticker-code">{selectedCandidate.ticker}</span> {selectedCandidate.name}
@@ -302,6 +349,12 @@ export default function TechnicalAnalysisPage() {
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* Action Banner for Selected Stock */}
+              <div className="selected-action-banner">
+                <span className="action-tag">📌 {t("實戰進出指引", "Action Guide")}:</span>
+                <span className="action-text">{selectedCandidate.actionGuideZh}</span>
               </div>
 
               {/* Timeframe & Action Bar */}
@@ -413,6 +466,7 @@ export default function TechnicalAnalysisPage() {
                   <th>{t("空間幅度", "Upside / Margin")}</th>
                   <th>{t("主要支撐 / 買點區", "Support / Zone")}</th>
                   <th>{t("型態狀態", "Pattern Stage")}</th>
+                  <th>{t("實戰進出指引", "Action Guide")}</th>
                   <th>{t("操作", "Action")}</th>
                 </tr>
               </thead>
@@ -448,9 +502,14 @@ export default function TechnicalAnalysisPage() {
                           : formatIndicator(candidate.supportLevel)}
                       </td>
                       <td>
-                        <span className={`stage-tag ${isPositive ? "positive" : "caution"}`}>
-                          {candidate.patternNameZh}
+                        <span className={`stage-tag ${candidate.stage === "candidate" ? "stage-candidate" : "stage-confirmed"}`}>
+                          {candidate.stage === "candidate"
+                            ? t("⚡ 十字星 (可能形成)", "⚡ Doji (Candidate)")
+                            : t("✅ 已確認", "✅ Confirmed")}
                         </span>
+                      </td>
+                      <td className="action-guide-cell">
+                        <span className="guide-short-text">{candidate.actionGuideZh}</span>
                       </td>
                       <td>
                         <button

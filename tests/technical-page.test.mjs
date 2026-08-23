@@ -30,21 +30,30 @@ test("buildTechnicalSnapshot produces calibrated candidates for Morning Star, Ev
   assert.ok(snapshot.eveningStar.length >= 3, "should have Evening Star candidates");
   assert.ok(snapshot.trendPullback.length >= 3, "should have Trend Pullback candidates");
 
-  // Verify Morning Star rules: upside > 0 (fair value > price), gap down
+  // Verify Morning Star rules: upside > 0 (fair value > price), gap down, action guide
   for (const candidate of snapshot.morningStar) {
     assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
     assert.ok(candidate.fairValue > 0, `${candidate.ticker} should have valid fair value`);
     assert.ok(candidate.upside >= 0, `${candidate.ticker} Morning Star should have positive upside (FV >= price)`);
     assert.equal(candidate.category, "morning-star");
+    assert.ok(candidate.actionGuideZh.length > 5, `${candidate.ticker} should have action guide`);
     assert.ok(candidate.candles.length >= 20, `${candidate.ticker} should have candle history`);
   }
 
-  // Verify Evening Star rules: overvalued / downside warning
+  // Verify Evening Star rules: overvalued / downside warning, action guide
   for (const candidate of snapshot.eveningStar) {
     assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
     assert.equal(candidate.category, "evening-star");
+    assert.ok(candidate.actionGuideZh.length > 5, `${candidate.ticker} should have action guide`);
     assert.ok(candidate.candles.length >= 20, `${candidate.ticker} should have candle history`);
   }
+
+  // Verify presence of both candidates (Doji close today) and confirmed
+  const morningCandidates = snapshot.morningStar.filter((c) => c.stage === "candidate");
+  assert.ok(morningCandidates.length >= 1, "should have Morning Star candidate (Doji close today)");
+
+  const eveningCandidates = snapshot.eveningStar.filter((c) => c.stage === "candidate");
+  assert.ok(eveningCandidates.length >= 1, "should have Evening Star candidate (Doji close today)");
 
   // Verify Trend Pullback rules: EMA15/SMA50 convergence + support zone
   for (const candidate of snapshot.trendPullback) {
@@ -54,6 +63,36 @@ test("buildTechnicalSnapshot produces calibrated candidates for Morning Star, Ev
     assert.ok(candidate.supportZoneLow !== null && candidate.supportZoneHigh !== null, `${candidate.ticker} should have support buy zone`);
     assert.ok(candidate.supportZoneLow <= candidate.supportZoneHigh, `${candidate.ticker} supportZoneLow <= supportZoneHigh`);
   }
+});
+
+test("detects Morning Star candidate at the close of the downward gap Doji candle", () => {
+  const candles = [];
+  for (let i = 0; i < 20; i++) {
+    candles.push({ date: `2026-07-${String(i + 1).padStart(2, "0")}`, open: 120 - i, high: 121 - i, low: 119 - i, close: 120 - i, volume: 1000 });
+  }
+  candles.push({ date: "2026-08-18", open: 100, high: 101, low: 91, close: 92, volume: 3500 }); // Big bearish bar
+  candles.push({ date: "2026-08-19", open: 89.5, high: 90.2, low: 89.0, close: 89.6, volume: 1800 }); // Downward gap Doji closing today!
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.candlestickPattern, "morning-star-candidate");
+  assert.equal(result.patternStage, "candidate");
+  assert.equal(result.patternDirection, "bullish");
+});
+
+test("detects Evening Star candidate at the close of the upward gap Doji candle", () => {
+  const candles = [];
+  for (let i = 0; i < 20; i++) {
+    candles.push({ date: `2026-07-${String(i + 1).padStart(2, "0")}`, open: 80 + i, high: 81 + i, low: 79 + i, close: 80 + i, volume: 1000 });
+  }
+  candles.push({ date: "2026-08-18", open: 100, high: 109, low: 99, close: 108, volume: 3500 }); // Big bullish bar
+  candles.push({ date: "2026-08-19", open: 110.5, high: 111.2, low: 110.0, close: 110.6, volume: 1800 }); // Upward gap Doji closing today!
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.equal(result.candlestickPattern, "evening-star-candidate");
+  assert.equal(result.patternStage, "candidate");
+  assert.equal(result.patternDirection, "bearish");
 });
 
 test("EMA and SMA calculations are accurate", () => {

@@ -26,6 +26,8 @@ export type TechnicalCandidate = {
   patternNameEn: string;
   descriptionZh: string;
   descriptionEn: string;
+  actionGuideZh: string;
+  actionGuideEn: string;
   supportLevel?: number | null;
   resistanceLevel?: number | null;
   supportZoneLow?: number | null;
@@ -48,7 +50,7 @@ export type TechnicalSnapshot = {
 export function generateSyntheticHistory(
   ticker: string,
   price: number,
-  mode: "morning-star" | "evening-star" | "trend-pullback" | "neutral",
+  mode: "morning-star" | "morning-star-candidate" | "evening-star" | "evening-star-candidate" | "trend-pullback" | "neutral",
   asOf = "2026-08-21",
 ): DailyCandle[] {
   const result: DailyCandle[] = [];
@@ -56,9 +58,9 @@ export function generateSyntheticHistory(
   const startDate = new Date(`${asOf}T00:00:00Z`);
   startDate.setUTCDate(startDate.getUTCDate() - days * 1.45);
 
-  let currentPrice = mode === "morning-star"
+  let currentPrice = mode.startsWith("morning-star")
     ? price * 1.35
-    : mode === "evening-star"
+    : mode.startsWith("evening-star")
       ? price * 0.75
       : mode === "trend-pullback"
         ? price * 0.82
@@ -80,21 +82,18 @@ export function generateSyntheticHistory(
 
     if (mode === "morning-star") {
       if (progress < 0.8) {
-        // Prolonged downtrend
         const drift = -0.0035;
         close = currentPrice * (1 + drift + (Math.sin(result.length) * 0.006));
         open = currentPrice;
         high = Math.max(open, close) * 1.008;
         low = Math.min(open, close) * 0.992;
       } else if (result.length === days - 3) {
-        // Big bearish breakdown candle with elevated volume
         open = currentPrice;
         close = currentPrice * 0.965;
         high = open * 1.003;
         low = close * 0.995;
         volume = 2_800_000;
       } else if (result.length === days - 2) {
-        // Downward gap Doji / spinning top
         const prevClose = result[result.length - 1].close;
         open = prevClose * 0.985;
         close = open * 1.002;
@@ -102,30 +101,48 @@ export function generateSyntheticHistory(
         low = Math.min(open, close) * 0.992;
         volume = 1_200_000;
       } else if (result.length === days - 1) {
-        // Bullish reversal candle recovering > 50%
         open = result[result.length - 1].close * 1.005;
         close = price;
         high = close * 1.008;
         low = open * 0.994;
         volume = 2_200_000;
       }
+    } else if (mode === "morning-star-candidate") {
+      // Latest candle is today's closing Doji after a gap down
+      if (progress < 0.85) {
+        const drift = -0.0035;
+        close = currentPrice * (1 + drift + (Math.sin(result.length) * 0.006));
+        open = currentPrice;
+        high = Math.max(open, close) * 1.008;
+        low = Math.min(open, close) * 0.992;
+      } else if (result.length === days - 2) {
+        open = currentPrice;
+        close = currentPrice * 0.962;
+        high = open * 1.003;
+        low = close * 0.995;
+        volume = 3_000_000;
+      } else if (result.length === days - 1) {
+        const prevClose = result[result.length - 1].close;
+        open = prevClose * 0.982;
+        close = price;
+        high = Math.max(open, close) * 1.006;
+        low = Math.min(open, close) * 0.992;
+        volume = 1_200_000;
+      }
     } else if (mode === "evening-star") {
       if (progress < 0.8) {
-        // Prolonged uptrend
         const drift = 0.0035;
         close = currentPrice * (1 + drift + (Math.sin(result.length) * 0.006));
         open = currentPrice;
         high = Math.max(open, close) * 1.008;
         low = Math.min(open, close) * 0.992;
       } else if (result.length === days - 3) {
-        // Big bullish breakout candle with elevated volume
         open = currentPrice;
         close = currentPrice * 1.035;
         high = close * 1.005;
         low = open * 0.997;
         volume = 2_800_000;
       } else if (result.length === days - 2) {
-        // Upward gap Doji
         const prevClose = result[result.length - 1].close;
         open = prevClose * 1.015;
         close = open * 0.998;
@@ -133,23 +150,42 @@ export function generateSyntheticHistory(
         low = Math.min(open, close) * 0.994;
         volume = 1_200_000;
       } else if (result.length === days - 1) {
-        // Bearish breakdown candle piercing > 50%
         open = result[result.length - 1].close * 0.995;
         close = price;
         high = open * 1.006;
         low = close * 0.992;
         volume = 2_200_000;
       }
+    } else if (mode === "evening-star-candidate") {
+      // Latest candle is today's closing Doji after a gap up
+      if (progress < 0.85) {
+        const drift = 0.0035;
+        close = currentPrice * (1 + drift + (Math.sin(result.length) * 0.006));
+        open = currentPrice;
+        high = Math.max(open, close) * 1.008;
+        low = Math.min(open, close) * 0.992;
+      } else if (result.length === days - 2) {
+        open = currentPrice;
+        close = currentPrice * 1.038;
+        high = close * 1.005;
+        low = open * 0.997;
+        volume = 3_000_000;
+      } else if (result.length === days - 1) {
+        const prevClose = result[result.length - 1].close;
+        open = prevClose * 1.018;
+        close = price;
+        high = Math.max(open, close) * 1.008;
+        low = Math.min(open, close) * 0.994;
+        volume = 1_200_000;
+      }
     } else if (mode === "trend-pullback") {
       if (progress < 0.45) {
-        // Wave up: EMA15 and SMA50 open widely
         close = currentPrice * 1.006;
         open = currentPrice;
         high = close * 1.01;
         low = open * 0.995;
         volume = 2_500_000;
       } else {
-        // Orderly pullback & consolidation near 50MA / W bottom
         const cycle = Math.sin((result.length - 50) * 0.35);
         close = (price * 0.98) + (cycle * price * 0.035);
         open = currentPrice;
@@ -179,24 +215,26 @@ export function generateSyntheticHistory(
 
 export function buildTechnicalSnapshot(): TechnicalSnapshot {
   const candidates: TechnicalCandidate[] = [];
-  const twList = (marketScanSnapshot.candidates || []).filter((r) => r.market === "TW");
-  const usList = (usMarketSnapshot || []).slice(0, 100);
 
   // Curated prominent pattern candidates for Taiwan and US markets
-  const patternAssignments: Array<{ ticker: string; market: "TW" | "US"; mode: "morning-star" | "evening-star" | "trend-pullback" }> = [
-    // Taiwan Morning Star
-    { ticker: "2474", market: "TW", mode: "morning-star" },
-    { ticker: "8454", market: "TW", mode: "morning-star" },
+  const patternAssignments: Array<{
+    ticker: string;
+    market: "TW" | "US";
+    mode: "morning-star" | "morning-star-candidate" | "evening-star" | "evening-star-candidate" | "trend-pullback";
+  }> = [
+    // Taiwan Morning Star: Candidates (Doji close today) and Confirmed (3-bar)
+    { ticker: "2474", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "8454", market: "TW", mode: "morning-star-candidate" },
     { ticker: "8069", market: "TW", mode: "morning-star" },
-    { ticker: "3105", market: "TW", mode: "morning-star" },
+    { ticker: "3105", market: "TW", mode: "morning-star-candidate" },
     { ticker: "4961", market: "TW", mode: "morning-star" },
 
-    // Taiwan Evening Star (Overvalued resistance top)
-    { ticker: "2491", market: "TW", mode: "evening-star" },
+    // Taiwan Evening Star: Candidates and Confirmed
+    { ticker: "2491", market: "TW", mode: "evening-star-candidate" },
     { ticker: "6805", market: "TW", mode: "evening-star" },
-    { ticker: "3481", market: "TW", mode: "evening-star" },
+    { ticker: "3481", market: "TW", mode: "evening-star-candidate" },
 
-    // Taiwan Trend Pullback (W Bottom / 50MA buy zone)
+    // Taiwan Trend Pullback
     { ticker: "2354", market: "TW", mode: "trend-pullback" },
     { ticker: "2072", market: "TW", mode: "trend-pullback" },
     { ticker: "9958", market: "TW", mode: "trend-pullback" },
@@ -205,13 +243,13 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     { ticker: "1102", market: "TW", mode: "trend-pullback" },
 
     // US Morning Star
-    { ticker: "SMPL", market: "US", mode: "morning-star" },
-    { ticker: "TTD", market: "US", mode: "morning-star" },
+    { ticker: "SMPL", market: "US", mode: "morning-star-candidate" },
+    { ticker: "TTD", market: "US", mode: "morning-star-candidate" },
     { ticker: "NRDS", market: "US", mode: "morning-star" },
     { ticker: "INTU", market: "US", mode: "morning-star" },
 
     // US Evening Star
-    { ticker: "VRRM", market: "US", mode: "evening-star" },
+    { ticker: "VRRM", market: "US", mode: "evening-star-candidate" },
     { ticker: "CHTR", market: "US", mode: "evening-star" },
 
     // US Trend Pullback
@@ -296,23 +334,50 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     };
 
     let category: TechnicalCategory = "trend-pullback";
+    let stage: "confirmed" | "forming" | "candidate" = "confirmed";
     let patternNameZh = "順勢回踩 W 底買點";
     let patternNameEn = "Trend Pullback W-Bottom";
     let descriptionZh = "15EMA 與 50SMA 均線開口收合，回測 50MA 黃色支撐區打出 W 底，具備多頭順勢起漲訊號。";
     let descriptionEn = "EMA15/SMA50 convergence with W-bottom bounce off 50MA yellow support buy zone.";
+    let actionGuideZh = "股價於 50MA 黃色支撐區回踩確認／打出 W 底，為高盈虧比順勢起漲買點。";
+    let actionGuideEn = "Price bouncing off 50MA yellow support zone; excellent trend risk/reward entry.";
 
-    if (assign.mode === "morning-star") {
+    if (assign.mode === "morning-star-candidate") {
       category = "morning-star";
-      patternNameZh = "早晨之星 (向下跳空)";
-      patternNameEn = "Morning Star (Gap Down)";
-      descriptionZh = "連續下跌放量長陰後，向下跳空收出十字星，第三根陽線強勢收復陰燭 50% 實體並獲得週/月線支撐。";
-      descriptionEn = "Downtrend climax with volume; downward gap Doji confirmed by bullish bounce off key support.";
+      stage = "candidate";
+      patternNameZh = "早晨之星 (十字星收盤·可能形成)";
+      patternNameEn = "Morning Star (Doji Close · Candidate)";
+      descriptionZh = "連續大跌放量長黑後，今日向下跳空收出十字星（Doji），賣壓竭盡並獲週／月線支撐，型態處於可能形成階段。";
+      descriptionEn = "Downtrend climax with volume; downward gap Doji closed today at support (forming candidate).";
+      actionGuideZh = "十字星收盤成立：若明日向上跳空或開高收紅，即可在極佳低檔成本位置積極進場買入。";
+      actionGuideEn = "Doji star closed at support: if tomorrow opens with an upward gap, enter aggressively at early low cost.";
+    } else if (assign.mode === "morning-star") {
+      category = "morning-star";
+      stage = "confirmed";
+      patternNameZh = "早晨之星 (第三根確認)";
+      patternNameEn = "Morning Star (Confirmed 3-Bar)";
+      descriptionZh = "向下跳空十字星後，第三根長紅陽燭強勢收復長陰 50% 實體並獲關鍵支撐。";
+      descriptionEn = "Downtrend reversed: third bullish candle recovered >50% of prior drop with volume confirmation.";
+      actionGuideZh = "型態已完全確立反轉，可順勢布局多單。";
+      actionGuideEn = "Reversal pattern fully confirmed; trend buy position active.";
+    } else if (assign.mode === "evening-star-candidate") {
+      category = "evening-star";
+      stage = "candidate";
+      patternNameZh = "黃昏之星 (十字星收盤·可能形成)";
+      patternNameEn = "Evening Star (Doji Close · Candidate)";
+      descriptionZh = "連續大漲放量長紅後，今日向上跳空收出十字星（Doji），多頭動能停滯並遇重大歷史壓力，高檔轉弱警示。";
+      descriptionEn = "Uptrend exhaustion; upward gap Doji closed today at major resistance (forming warning).";
+      actionGuideZh = "十字星收盤成立：若明日向下跳空或開低，應第一時間積極減碼避險。";
+      actionGuideEn = "Doji star closed at resistance: if tomorrow opens lower or gaps down, reduce position immediately.";
     } else if (assign.mode === "evening-star") {
       category = "evening-star";
-      patternNameZh = "黃昏之星 (向上跳空)";
-      patternNameEn = "Evening Star (Gap Up)";
-      descriptionZh = "連續上漲放量長陽後，向上跳空收出十字星，第三根陰燭反轉貫穿並面臨週/月線重大壓力。";
-      descriptionEn = "Uptrend exhaustion; upward gap Doji confirmed by bearish breakdown at key resistance.";
+      stage = "confirmed";
+      patternNameZh = "黃昏之星 (第三根確認)";
+      patternNameEn = "Evening Star (Confirmed 3-Bar)";
+      descriptionZh = "向上跳空十字星後，第三根長黑陰燭向下貫穿 50% 實體，高檔轉弱確立。";
+      descriptionEn = "Bearish reversal: third candle pierced >50% of the rally; downtrend confirmed.";
+      actionGuideZh = "空頭轉折完全確立，嚴禁追高，宜逢高減碼。";
+      actionGuideEn = "Bearish reversal fully confirmed; avoid chasing, take defensive actions.";
     }
 
     candidates.push({
@@ -323,11 +388,13 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
       price,
       fairValue,
       upside,
-      stage: "confirmed",
+      stage,
       patternNameZh,
       patternNameEn,
       descriptionZh,
       descriptionEn,
+      actionGuideZh,
+      actionGuideEn,
       supportLevel: analysis.supportLevel,
       resistanceLevel: analysis.resistanceLevel,
       supportZoneLow: analysis.trendPullback?.supportZoneLow ?? analysis.supportLevel,

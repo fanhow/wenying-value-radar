@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.23.1";
+const SITE_REVISION = "Rev. 2026.08.23.2";
 
 const REVISION_ENTRIES = [
+  ["2026.08.23.2", "技術分析「早晨之星」與「黃昏之星」支援「十字星收盤即時卡位」：於第二根十字星（Doji）向下/向上跳空收盤時第一時間列入「可能形成」推薦與警示名單，提供實戰進出指引，掌握隔日跳空開盤最佳起漲點與避險時機。", "Technical Analysis 'Morning Star' and 'Evening Star' support instant positioning upon Doji close: listed as 'Candidate' on the day the star candle closes after a gap, with actionable next-day entry and exit guidance."],
   ["2026.08.23.1", "新增「技術分析」專屬頁面（導覽列位於公允價值之後、大戶追蹤之前）：全面支援早晨之星（放量長陰後向下跳空十字星 ＋ 週月支撐 ＋ 正向公允價值）、黃昏之星（放量長陽後向上跳空十字星 ＋ 週月壓力 ＋ 高檔估值警示）與順勢交易（15EMA/50MA 打開發散後收合 ＋ 50MA 黃色支撐區 W 底買點）三大量化策略推薦與互動式 K 線圖。", "Added dedicated Technical Analysis page (positioned between Fair Value and Fund Tracker in navigation): fully supports Morning Star (gap-down Doji on volume at key support with fair-value upside), Evening Star (gap-up Doji at resistance with downside warning), and Trend Pullback (EMA15/SMA50 convergence with W-bottom in yellow 50MA support buy zone), complete with interactive K-line charting."],
   ["2026.08.22.2", "完成台股前 40 檔（可成、鴻準、富邦媒、世紀鋼等）與美股前 20 檔（SMPL、CHTR、TTD、FISV、INTU 等）全數 60 檔多模型共識基準對齊；升級高 ROE 與優質商業模式估值擴展法則；排行榜全面優先呈現經量化篩選之高財務健康度標的。", "Completed end-to-end multi-model consensus alignment across all 60 benchmark stocks (TW top 40 including 2474, 2354, 8454, 9958 and US top 20 including SMPL, CHTR, TTD, FISV, INTU); upgraded ROE-driven valuation target expansion; prioritized high financial-health quality leaders across ranking tables."],
   ["2026.08.22.1", "全面升級多模型共識公允價值：上緯投控 (3708) 等處分業外標的完成投資模型校準（公允價值 $111.16，+7.4% 上行空間）；修正低利潤率與高週轉商業模式營收倍數上限；全站介面統一採用專業多模型共識術語。", "Upgraded multi-model consensus fair value: aligned 3708 to investment models ($111.16, +7.4% upside); introduced margin-adjusted revenue multiple caps; unified professional multi-model consensus terminology across the site."],

@@ -445,17 +445,17 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
     return { pattern: "bearish-engulfing" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
-  // Morning Star Candidate: downtrend -> large bearish -> downward gap to Doji / small star
+  // Morning Star Candidate (十字星收盤·可能形成): downtrend -> large bearish -> downward gap to Doji / small star
   const latestDownGap = prior && latest && (latest.open <= prior.close || latest.high <= prior.close * 1.002);
-  if (prior && latest && priorTrend(candles, candles.length - 2, "down") && consecutiveBearish >= 2 && isBearish(prior)
-    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestDownGap && farBelowMa20) {
+  if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior)
+    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestDownGap) {
     return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
 
-  // Evening Star Candidate: uptrend -> large bullish -> upward gap to Doji / small star
+  // Evening Star Candidate (十字星收盤·可能形成): uptrend -> large bullish -> upward gap to Doji / small star
   const latestUpGap = prior && latest && (latest.open >= prior.close || latest.low >= prior.close * 0.998);
-  if (prior && latest && priorTrend(candles, candles.length - 2, "up") && consecutiveBullish >= 2 && isBullish(prior)
-    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestUpGap && farAboveMa20) {
+  if (prior && latest && priorTrend(candles, candles.length - 2, "up") && isBullish(prior)
+    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestUpGap) {
     return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
