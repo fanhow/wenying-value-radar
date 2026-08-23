@@ -2,9 +2,7 @@ import type { DailyCandle } from "./price-history.ts";
 import {
   aggregateCandles,
   analyzeTechnicalSetup,
-  type CandlestickPattern,
   type TechnicalAnalysis,
-  type TrendPullbackSetup,
 } from "./technical-analysis.ts";
 import { calculateStock, type StockInput } from "./valuation.ts";
 import { calibrateFairValue } from "./valuation-calibration.ts";
@@ -66,7 +64,6 @@ export function generateSyntheticHistory(
         ? price * 0.82
         : price * 0.95;
 
-  let dayCounter = 0;
   while (result.length < days) {
     startDate.setUTCDate(startDate.getUTCDate() + 1);
     const dayOfWeek = startDate.getUTCDay();

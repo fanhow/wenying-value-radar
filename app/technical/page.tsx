@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { SiteHeader } from "../site-header";
 import { SiteFooter } from "../site-footer";
@@ -11,10 +11,7 @@ import {
   buildTechnicalSnapshot,
   type TechnicalCandidate,
   type TechnicalCategory,
-  type TechnicalSnapshot,
 } from "../../lib/technical-screener";
-import type { DailyCandle } from "../../lib/price-history";
-import type { TechnicalAnalysis } from "../../lib/technical-analysis";
 
 type MarketFilter = "ALL" | "TW" | "US";
 type StageFilter = "ALL" | "candidate" | "confirmed";
@@ -33,18 +30,13 @@ function formatPercent(value: number | null | undefined) {
 
 export default function TechnicalAnalysisPage() {
   const { language, t } = useLanguage();
-  const [snapshot, setSnapshot] = useState<TechnicalSnapshot | null>(null);
+  const snapshot = useMemo(() => buildTechnicalSnapshot(), []);
   const [activeCategory, setActiveCategory] = useState<TechnicalCategory>("morning-star");
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("daily");
-
-  useEffect(() => {
-    const data = buildTechnicalSnapshot();
-    setSnapshot(data);
-  }, []);
 
   const currentCategoryCandidates = useMemo(() => {
     if (!snapshot) return [];
@@ -66,20 +58,14 @@ export default function TechnicalAnalysisPage() {
     return list;
   }, [snapshot, activeCategory, marketFilter, stageFilter, searchQuery]);
 
-  useEffect(() => {
-    if (currentCategoryCandidates.length > 0) {
-      if (!selectedTicker || !currentCategoryCandidates.some((c) => c.ticker === selectedTicker)) {
-        setSelectedTicker(currentCategoryCandidates[0].ticker);
-      }
-    } else {
-      setSelectedTicker(null);
-    }
-  }, [currentCategoryCandidates, selectedTicker]);
+  const resolvedSelectedTicker = selectedTicker && currentCategoryCandidates.some((c) => c.ticker === selectedTicker)
+    ? selectedTicker
+    : currentCategoryCandidates[0]?.ticker ?? null;
 
   const selectedCandidate = useMemo(() => {
-    if (!selectedTicker || !currentCategoryCandidates.length) return currentCategoryCandidates[0] || null;
-    return currentCategoryCandidates.find((c) => c.ticker === selectedTicker) || currentCategoryCandidates[0] || null;
-  }, [selectedTicker, currentCategoryCandidates]);
+    if (!resolvedSelectedTicker || !currentCategoryCandidates.length) return currentCategoryCandidates[0] || null;
+    return currentCategoryCandidates.find((c) => c.ticker === resolvedSelectedTicker) || currentCategoryCandidates[0] || null;
+  }, [resolvedSelectedTicker, currentCategoryCandidates]);
 
   const displayedCandles = useMemo(() => {
     if (!selectedCandidate) return [];
@@ -532,7 +518,10 @@ export default function TechnicalAnalysisPage() {
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter
+        disclaimer={["技術型態與估值僅供投資研究，不構成投資建議。", "Technical patterns and valuation are for investment research only and do not constitute investment advice."]}
+        motto={["先驗證型態，再獨立估值", "Validate the pattern, then value independently"]}
+      />
     </div>
   );
 }
