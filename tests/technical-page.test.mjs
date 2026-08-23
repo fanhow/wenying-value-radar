@@ -58,10 +58,55 @@ test("buildTechnicalSnapshot produces calibrated candidates for Trend Pullback a
   }
 });
 
-test("1537 廣隆 and 2354 鴻準 are rigorously rejected by Morning Star engine", () => {
+test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, and 2385 群光 is rejected by Trend Pullback", () => {
   const snapshot = buildTechnicalSnapshot();
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "1537"), "1537 must NOT be a Morning Star candidate (no prior downtrend / illiquid)");
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "2354"), "2354 must NOT be a Morning Star candidate (neckline retest with lower candles to the left)");
+  assert.ok(!snapshot.trendPullback.some((c) => c.ticker === "2385"), "2385 must NOT be in Trend Pullback (SMA50 sloping down in death-cross breakdown)");
+});
+
+test("detects textbook Trend Pullback buy point (bottoming -> impulse surge -> orderly pullback -> 3rd test MA convergence)", () => {
+  // Simulate textbook progression from user diagram:
+  // Base at 43.5~45 -> Surge to 54.0 (Golden Cross + wide spread) -> Pullback to 50.0 (3rd test with EMA15/SMA50 convergence)
+  const candles = [];
+  let d = 1;
+  // 1. Base stage (30 days around 44.0)
+  for (let i = 0; i < 30; i++) {
+    candles.push({ date: `2026-03-${String(d++).padStart(2, "0")}`, open: 44.2, high: 44.8, low: 43.5, close: 44.0, volume: 1000000 });
+  }
+  // 2. Impulse surge to 54.0 (+23% rise)
+  for (let i = 1; i <= 15; i++) {
+    const p = 44.0 + (54.0 - 44.0) * (i / 15);
+    candles.push({ date: `2026-04-${String(i).padStart(2, "0")}`, open: p - 0.4, high: p + 0.6, low: p - 0.5, close: p, volume: 3000000 });
+  }
+  // 3. Orderly consolidation pullback back to 50.0 support with 3 tests
+  // Retest 1 to 50.5
+  for (let i = 0; i < 6; i++) {
+    candles.push({ date: `2026-05-${String(i + 1).padStart(2, "0")}`, open: 53 - i * 0.4, high: 53.5, low: 50.5, close: 51.5, volume: 1500000 });
+  }
+  // Bounce to 53
+  for (let i = 0; i < 5; i++) {
+    candles.push({ date: `2026-05-${String(i + 7).padStart(2, "0")}`, open: 51.5 + i * 0.3, high: 53.2, low: 51.0, close: 52.8, volume: 1200000 });
+  }
+  // Retest 2 to 50.2
+  for (let i = 0; i < 6; i++) {
+    candles.push({ date: `2026-05-${String(i + 13).padStart(2, "0")}`, open: 52.5 - i * 0.4, high: 52.8, low: 50.2, close: 50.8, volume: 1100000 });
+  }
+  // Bounce to 52.5
+  for (let i = 0; i < 5; i++) {
+    candles.push({ date: `2026-05-${String(i + 20).padStart(2, "0")}`, open: 50.8 + i * 0.3, high: 52.6, low: 50.5, close: 52.2, volume: 1000000 });
+  }
+  // Retest 3 right at 50.0 with 15EMA & 50SMA convergence (The Buy Point)
+  for (let i = 0; i < 5; i++) {
+    candles.push({ date: `2026-05-${String(i + 26).padStart(2, "0")}`, open: 51.5 - i * 0.25, high: 51.8, low: 50.0, close: 50.4, volume: 900000 });
+  }
+
+  const result = analyzeTechnicalSetup(candles);
+  assert.ok(result);
+  assert.ok(result.trendPullback, "Textbook Trend Pullback setup must be detected");
+  assert.equal(result.trendPullback.stage, "w-bottom-buy");
+  assert.ok(result.trendPullback.peakSpreadPercent >= 3.5, "Must have recorded prior impulse spread");
+  assert.ok(Math.abs(result.trendPullback.currentSpreadPercent) <= 4.0, "Must be converged at the buy point");
 });
 
 test("detects Morning Star candidate at the close of the downward gap Doji candle", () => {

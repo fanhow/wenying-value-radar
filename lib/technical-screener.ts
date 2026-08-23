@@ -215,27 +215,21 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
 
   // Trend Pullback candidates: verified liquid stocks with 15EMA & 50MA convergence bouncing off 50MA support with W-bottom
   const trendPullbackTickers: Array<{ ticker: string; market: "TW" | "US" }> = [
-    { ticker: "2385", market: "TW" }, // 群光
     { ticker: "1216", market: "TW" }, // 統一
-    { ticker: "1232", market: "TW" }, // 大統益
     { ticker: "1437", market: "TW" }, // 勤益控
     { ticker: "2704", market: "TW" }, // 國賓
     { ticker: "2474", market: "TW" }, // 可成
     { ticker: "8299", market: "TW" }, // 群聯
     { ticker: "9910", market: "TW" }, // 豐泰
     { ticker: "4938", market: "TW" }, // 和碩
-    { ticker: "5522", market: "TW" }, // 遠雄
     { ticker: "6757", market: "TW" }, // 台灣虎航
     { ticker: "2727", market: "TW" }, // 王品
     { ticker: "ACGL", market: "US" },
     { ticker: "AER", market: "US" },
-    { ticker: "ALL", market: "US" },
-    { ticker: "AR", market: "US" },
     { ticker: "ABG", market: "US" },
-    { ticker: "ACVA", market: "US" },
     { ticker: "AMN", market: "US" },
     { ticker: "AN", market: "US" },
-    { ticker: "ALV", market: "US" },
+    { ticker: "ALL", market: "US" },
   ];
 
   // NOTE: Morning Star and Evening Star strictly require:

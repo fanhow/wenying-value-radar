@@ -621,51 +621,75 @@ function detectTrendPullback(
 
   if (!latestEma15 || !latestSma50) return null;
 
+  // 1. Strict Trend Filter: SMA50 must NOT be in a downward collapse or death-cross!
+  // In a genuine Trend Pullback, SMA50 is flat or rising to provide dynamic support.
+  const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
+  if (sma50Lookback && latestSma50 < sma50Lookback * 0.99) {
+    // 50MA is sloping downwards (e.g. 2385 collapsing from peak) -> REJECT
+    return null;
+  }
+  if (latestEma15 < latestSma50 * 0.985 || latestClose < latestSma50 * 0.96) {
+    // EMA15 in death-cross below SMA50 -> REJECT
+    return null;
+  }
+
+  // 2. Identify the Prior Impulse Wave (下跌築底後有一段明顯漲幅 + 15EMA/50SMA 黃金交叉向上打開)
   let peakSpread = 0;
-  let waveUpDetected = false;
-  const lookbackStart = Math.max(0, latestIndex - 60);
-  for (let i = lookbackStart; i <= latestIndex - 4; i++) {
+  let baseTrough = Infinity;
+  let impulsePeak = -Infinity;
+  const searchStart = Math.max(0, latestIndex - 70);
+  const searchEnd = latestIndex - 4;
+
+  for (let i = searchStart; i < searchStart + 25 && i < searchEnd; i++) {
+    if (candles[i].low < baseTrough) baseTrough = candles[i].low;
+  }
+  for (let i = searchStart; i <= searchEnd; i++) {
     const e = ema15Series[i];
     const s = sma50Series[i];
     if (e && s && s > 0) {
       const spread = (e - s) / s;
       if (spread > peakSpread) peakSpread = spread;
-      if (spread >= 0.03) waveUpDetected = true;
+      if (candles[i].high > impulsePeak) impulsePeak = candles[i].high;
     }
   }
 
-  const currentSpread = (latestEma15 - latestSma50) / latestSma50;
-  const isConverging = waveUpDetected && currentSpread <= 0.05 && latestClose >= latestSma50 * 0.94;
-
-  if (!isConverging) return null;
-
-  const supportLevel = keyLevels.find((lvl) => lvl.kind === "support" && Math.abs(lvl.price - latestSma50) <= latestSma50 * 0.06)?.price ?? latestSma50;
-  const zoneLow = Math.min(latestSma50 * 0.985, wBottomResult.low ?? (supportLevel * 0.98));
-  const zoneHigh = Math.max(latestSma50 * 1.025, wBottomResult.neckline ?? (supportLevel * 1.03));
-
-  const nearZone = latestClose >= zoneLow * 0.97 && latestClose <= zoneHigh * 1.05;
-  const isWBottom = wBottomResult.status !== "none" && (wBottomResult.low ? Math.abs(wBottomResult.low - latestSma50) <= latestSma50 * 0.07 : true);
-
-  if (isWBottom && nearZone) {
-    return {
-      status: wBottomResult.status === "confirmed" ? "confirmed" : "forming",
-      ema15: latestEma15,
-      sma50: latestSma50,
-      sma20: latestSma20,
-      peakSpreadPercent: peakSpread * 100,
-      currentSpreadPercent: currentSpread * 100,
-      supportZoneLow: zoneLow,
-      supportZoneHigh: zoneHigh,
-      wBottomDetected: true,
-      stage: "w-bottom-buy",
-      signalReasonZh: "波段上漲後均線規律收斂，於 50MA 支撐區打出 W 底型態，具備順勢買點訊號",
-      signalReasonEn: "Orderly MA convergence after breakout wave; W-bottom formed at 50MA support buy zone",
-    };
+  // Minimum impulse wave rise amplitude >= 10% and peak MA spread opening >= 3.5%
+  const impulseRatio = (impulsePeak - baseTrough) / (baseTrough || 1);
+  if (impulseRatio < 0.10 || peakSpread < 0.035) {
+    return null;
   }
 
-  if (nearZone && Math.abs(latestClose - latestSma50) <= latestSma50 * 0.04) {
+  // 3. MA Convergence Condition (穩定回調後兩均線於關鍵位收攏)
+  // Current spread between EMA15 and SMA50 must be contracted to <= 4.0%
+  const currentSpread = (latestEma15 - latestSma50) / latestSma50;
+  const isConverging = currentSpread >= -0.015 && currentSpread <= 0.04 && peakSpread >= currentSpread + 0.015;
+  if (!isConverging) return null;
+
+  // 4. Horizontal Support / Multi-touch W-Bottom
+  const pullbackWindow = candles.slice(Math.max(0, latestIndex - 35), latestIndex + 1);
+  const pullbackLows: number[] = [];
+  for (let i = 2; i < pullbackWindow.length - 2; i++) {
+    const c = pullbackWindow[i];
+    if (c.low <= pullbackWindow[i - 1].low && c.low <= pullbackWindow[i - 2].low
+      && c.low <= pullbackWindow[i + 1].low && c.low <= pullbackWindow[i + 2].low) {
+      pullbackLows.push(c.low);
+    }
+  }
+
+  const supportLowsNearSma50 = pullbackLows.filter((l) => Math.abs(l - latestSma50) <= latestSma50 * 0.05);
+  const supportLevel = supportLowsNearSma50.length >= 1
+    ? (supportLowsNearSma50.reduce((a, b) => a + b, 0) / supportLowsNearSma50.length)
+    : keyLevels.find((lvl) => lvl.kind === "support" && Math.abs(lvl.price - latestSma50) <= latestSma50 * 0.05)?.price ?? latestSma50;
+
+  const zoneLow = Math.min(supportLevel * 0.98, latestSma50 * 0.985, wBottomResult.low ?? (supportLevel * 0.98));
+  const zoneHigh = Math.max(supportLevel * 1.025, latestSma50 * 1.025, wBottomResult.neckline ?? (supportLevel * 1.03));
+
+  const nearZone = latestClose >= zoneLow * 0.97 && latestClose <= zoneHigh * 1.05;
+  const isWBottom = wBottomResult.status !== "none" || supportLowsNearSma50.length >= 2;
+
+  if (nearZone) {
     return {
-      status: "forming",
+      status: (wBottomResult.status === "confirmed" || supportLowsNearSma50.length >= 2) ? "confirmed" : "forming",
       ema15: latestEma15,
       sma50: latestSma50,
       sma20: latestSma20,
@@ -674,9 +698,9 @@ function detectTrendPullback(
       supportZoneLow: zoneLow,
       supportZoneHigh: zoneHigh,
       wBottomDetected: isWBottom,
-      stage: "ma-support-test",
-      signalReasonZh: "EMA15 與 SMA50 開口收合，回測 50MA 黃色支撐區整理，關注止跌轉折買點",
-      signalReasonEn: "EMA15/SMA50 spread narrowing; testing 50MA yellow support zone for pullback entry",
+      stage: "w-bottom-buy",
+      signalReasonZh: "波段推升後均線收合，於 50MA 水平支撐區完成多次回測／打出 W 底，具備順勢買點訊號",
+      signalReasonEn: "Impulse wave followed by orderly MA convergence; testing 50MA horizontal support forming high-edge trend buy point",
     };
   }
 
