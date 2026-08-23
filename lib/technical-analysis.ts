@@ -340,14 +340,15 @@ function nearestMajorLevel(
     }
   }
 
-  const eligible = clusters.filter((level) => level.score >= 2 && level.touchMonths.size >= 2 && (
-    kind === "support" ? level.price <= close + tolerance * 2 : level.price >= close
+  const eligible = clusters.filter((level) => (level.score >= 1.5 || level.timeframe === "weekly" || level.timeframe === "monthly" || level.touchMonths.size >= 2) && (
+    kind === "support" ? level.price <= close + tolerance * 2.5 : level.price >= close - tolerance
   ));
-  if (!eligible.length) return null;
   const primaryLevels = kind === "resistance"
-    ? eligible.filter((level) => level.score >= Math.max(2, Math.max(...eligible.map((item) => item.score)) * 0.6))
+    ? eligible.filter((level) => level.score >= Math.max(1.5, Math.max(...eligible.map((item) => item.score)) * 0.6))
     : eligible;
-  return primaryLevels.reduce((best, level) => Math.abs(level.price - close) < Math.abs(best.price - close) ? level : best);
+  const targetLevels = primaryLevels.length > 0 ? primaryLevels : eligible;
+  if (!targetLevels.length) return null;
+  return targetLevels.reduce((best, level) => Math.abs(level.price - close) < Math.abs(best.price - close) ? level : best);
 }
 
 function detectKeyLevels(candles: DailyCandle[], weekly: DailyCandle[], monthly: DailyCandle[], atr14: number | null) {
@@ -621,15 +622,19 @@ function detectTrendPullback(
 
   if (!latestEma15 || !latestSma50) return null;
 
-  // 1. Strict Trend Filter: SMA50 must NOT be in a downward collapse or death-cross!
-  // In a genuine Trend Pullback, SMA50 is flat or rising to provide dynamic support.
-  const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
-  if (sma50Lookback && latestSma50 < sma50Lookback * 0.99) {
-    // 50MA is sloping downwards (e.g. 2385 collapsing from peak) -> REJECT
+  // 1. Strict Golden Cross Filter: EMA15 MUST be >= SMA50 (No death-cross allowed!)
+  // And SMA50 must be flat or rising to provide solid dynamic support.
+  if (latestEma15 < latestSma50) {
+    // 15EMA is below 50SMA (Death cross) -> REJECT
     return null;
   }
-  if (latestEma15 < latestSma50 * 0.985 || latestClose < latestSma50 * 0.96) {
-    // EMA15 in death-cross below SMA50 -> REJECT
+  const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
+  if (sma50Lookback && latestSma50 < sma50Lookback * 0.99) {
+    // 50MA is sloping downwards -> REJECT
+    return null;
+  }
+  if (latestClose < latestSma50 * 0.975) {
+    // Price sunken below 50SMA -> REJECT
     return null;
   }
 
@@ -637,6 +642,7 @@ function detectTrendPullback(
   let peakSpread = 0;
   let baseTrough = Infinity;
   let impulsePeak = -Infinity;
+  let impulsePeakIndex = -1;
   const searchStart = Math.max(0, latestIndex - 70);
   const searchEnd = latestIndex - 4;
 
@@ -649,7 +655,10 @@ function detectTrendPullback(
     if (e && s && s > 0) {
       const spread = (e - s) / s;
       if (spread > peakSpread) peakSpread = spread;
-      if (candles[i].high > impulsePeak) impulsePeak = candles[i].high;
+      if (candles[i].high > impulsePeak) {
+        impulsePeak = candles[i].high;
+        impulsePeakIndex = i;
+      }
     }
   }
 
@@ -659,14 +668,13 @@ function detectTrendPullback(
     return null;
   }
 
-  // 3. MA Convergence Condition (穩定回調後兩均線於關鍵位收攏)
-  // Current spread between EMA15 and SMA50 must be contracted to <= 4.0%
+  // 3. MA Convergence Condition (穩定回調後兩均線於關鍵位收攏，15EMA >= 50SMA 且差距 <= 3.5%)
   const currentSpread = (latestEma15 - latestSma50) / latestSma50;
-  const isConverging = currentSpread >= -0.015 && currentSpread <= 0.04 && peakSpread >= currentSpread + 0.015;
+  const isConverging = currentSpread >= 0 && currentSpread <= 0.035 && peakSpread >= currentSpread + 0.015;
   if (!isConverging) return null;
 
-  // 4. Horizontal Support / Multi-touch W-Bottom
-  const pullbackWindow = candles.slice(Math.max(0, latestIndex - 35), latestIndex + 1);
+  // 4. Must be the 2nd (or 3rd) retest of the consolidation horizontal support low
+  const pullbackWindow = candles.slice(Math.max(impulsePeakIndex > 0 ? impulsePeakIndex : 0, latestIndex - 35), latestIndex + 1);
   const pullbackLows: number[] = [];
   for (let i = 2; i < pullbackWindow.length - 2; i++) {
     const c = pullbackWindow[i];
@@ -677,6 +685,15 @@ function detectTrendPullback(
   }
 
   const supportLowsNearSma50 = pullbackLows.filter((l) => Math.abs(l - latestSma50) <= latestSma50 * 0.05);
+  const hasSecondRetest = supportLowsNearSma50.length >= 2
+    || (pullbackLows.length >= 1 && Math.abs(latestClose - pullbackLows[0]) <= pullbackLows[0] * 0.045)
+    || (wBottomResult.status !== "none" && wBottomResult.low !== null && Math.abs(latestClose - wBottomResult.low) <= wBottomResult.low * 0.045);
+
+  if (!hasSecondRetest) {
+    // Has not completed 2nd retest of prior consolidation low -> REJECT
+    return null;
+  }
+
   const supportLevel = supportLowsNearSma50.length >= 1
     ? (supportLowsNearSma50.reduce((a, b) => a + b, 0) / supportLowsNearSma50.length)
     : keyLevels.find((lvl) => lvl.kind === "support" && Math.abs(lvl.price - latestSma50) <= latestSma50 * 0.05)?.price ?? latestSma50;
@@ -699,8 +716,8 @@ function detectTrendPullback(
       supportZoneHigh: zoneHigh,
       wBottomDetected: isWBottom,
       stage: "w-bottom-buy",
-      signalReasonZh: "波段推升後均線收合，於 50MA 水平支撐區完成多次回測／打出 W 底，具備順勢買點訊號",
-      signalReasonEn: "Impulse wave followed by orderly MA convergence; testing 50MA horizontal support forming high-edge trend buy point",
+      signalReasonZh: "波段推升後均線金叉收合，於 50MA 水平支撐區完成二次回測／打出 W 底，具備順勢買點訊號",
+      signalReasonEn: "Impulse wave followed by orderly MA convergence; completed 2nd retest at 50MA support forming high-edge trend buy point",
     };
   }
 
@@ -757,14 +774,15 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
 
   // Strict Rule: Morning Star / Bullish reversal patterns MUST form on a Day/Week/Month support line.
   // Evening Star / Bearish reversal patterns MUST form on a Day/Week/Month resistance line.
-  const hasKeyLevels = levels.keyLevels.length > 0 || levels.support !== null || levels.resistance !== null;
+  const hasSupportLevels = levels.support !== null || levels.keyLevels.some((l) => l.kind === "support");
+  const hasResistanceLevels = levels.resistance !== null || levels.keyLevels.some((l) => l.kind === "resistance");
   const isBullishPattern = rawCandlestick.direction === "bullish";
   const isBearishPattern = rawCandlestick.direction === "bearish";
-  const validPatternAtLevel = !hasKeyLevels || (
+  const validPatternAtLevel = (
     isBullishPattern
-      ? (levels.patternAtSupport || levels.nearSupport)
+      ? (!hasSupportLevels || levels.patternAtSupport || levels.nearSupport)
       : isBearishPattern
-        ? (levels.patternAtResistance || levels.nearResistance)
+        ? (!hasResistanceLevels || levels.patternAtResistance || levels.nearResistance)
         : true
   );
 

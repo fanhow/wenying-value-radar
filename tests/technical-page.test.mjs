@@ -58,11 +58,25 @@ test("buildTechnicalSnapshot produces calibrated candidates for Trend Pullback a
   }
 });
 
-test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, and 2385 群光 is rejected by Trend Pullback", () => {
+test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, and 2385 群光 & 8299 群聯 are rejected by Trend Pullback", () => {
   const snapshot = buildTechnicalSnapshot();
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "1537"), "1537 must NOT be a Morning Star candidate (no prior downtrend / illiquid)");
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "2354"), "2354 must NOT be a Morning Star candidate (neckline retest with lower candles to the left)");
   assert.ok(!snapshot.trendPullback.some((c) => c.ticker === "2385"), "2385 must NOT be in Trend Pullback (SMA50 sloping down in death-cross breakdown)");
+  assert.ok(!snapshot.trendPullback.some((c) => c.ticker === "8299"), "8299 must NOT be in Trend Pullback (15EMA < 50SMA death-cross & hasn't retested prior low)");
+});
+
+test("8299 群聯 historical Morning Star candidate (2026-07-30) is recognized at weekly support 1460", async () => {
+  const { loadPublicTechnicalData } = await import("../lib/public-technical-data.ts");
+  const data = await loadPublicTechnicalData("8299", "TW");
+  assert.ok(data && data.candles);
+  const idx30 = data.candles.findIndex((c) => c.date === "2026-07-30");
+  assert.ok(idx30 > 0);
+  const result = analyzeTechnicalSetup(data.candles.slice(0, idx30 + 1));
+  assert.ok(result);
+  // On 7/30, 8299 plunged from 2850 to 1445 right onto weekly support 1460 with a downward gap Doji
+  assert.equal(result.candlestickPattern, "morning-star-candidate");
+  assert.equal(result.patternStage, "candidate");
 });
 
 test("detects textbook Trend Pullback buy point (bottoming -> impulse surge -> orderly pullback -> 3rd test MA convergence)", () => {
