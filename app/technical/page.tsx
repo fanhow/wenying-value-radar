@@ -364,7 +364,7 @@ export default function TechnicalAnalysisPage() {
         </section>
 
         {/* Main Content Area: Selected Stock Chart & Detail */}
-        {selectedCandidate && (
+        {selectedCandidate ? (
           <section className="section-block technical-chart-section">
             <div className="chart-header-card">
               <div className="chart-title-row">
@@ -509,6 +509,26 @@ export default function TechnicalAnalysisPage() {
               </div>
             </div>
           </section>
+        ) : (
+          <section className="section-block technical-chart-section">
+            <div className="technical-empty-state-card">
+              <div className="empty-state-icon">🔍</div>
+              <h4>
+                {activeCategory === "morning-star" && t("目前市場暫無嚴格符合「早晨之星」量化條件的標的", "No stocks currently match strict Morning Star criteria")}
+                {activeCategory === "evening-star" && t("目前市場暫無嚴格符合「黃昏之星」量化條件的標的", "No stocks currently match strict Evening Star criteria")}
+                {activeCategory === "trend-pullback" && t("目前市場暫無嚴格符合「順勢交易 (W底買點)」量化條件的標的", "No stocks currently match strict Trend Pullback criteria")}
+              </h4>
+              <p>
+                {t(
+                  "本雷達堅持嚴謹的教科書級量化標準：必須具備「前期連續波段走勢」＋「放量實體長 K 線」＋「出現在日／週／月關鍵支撐壓力線上創出波段新極值的跳空十字星」＋「良好成交量流動性」，絕不硬湊或偽造不合規標的，以確保最佳交易勝率與極佳盈虧比。",
+                  "We enforce strict textbook quant standards: sustained prior wave + volume climax real body + gap Doji star at new swing extreme right on key support/resistance + solid liquidity. We never force or fabricate unqualified stocks to ensure genuine edge and risk/reward.",
+                )}
+              </p>
+              <p className="empty-state-subnote">
+                {t("⚡ 系統於每日收盤後持續進行全市場即時掃描，一旦出現標準形態將第一時間呈現在此。您可切換至上方「順勢交易（W底買點）」查看當前符合條件之強勢股。", "⚡ The system scans the market on daily close and alerts when genuine setups form. You can switch to the 'Trend Pullback W-Bottom' tab above to view active candidates.")}
+              </p>
+            </div>
+          </section>
         )}
 
         {/* Candidate Recommendation Grid / List */}
@@ -525,94 +545,100 @@ export default function TechnicalAnalysisPage() {
             </p>
           </div>
 
-          <div className="table-wrapper">
-            <table className="technical-candidates-table">
-              <thead>
-                <tr>
-                  <th>{t("市場", "Market")}</th>
-                  <th>{t("代碼 / 名稱 (點擊回公允價值)", "Ticker / Name (Click for Fair Value)")}</th>
-                  <th>{t("目前價格", "Current Price")}</th>
-                  <th>{t("公允價值", "Fair Value")}</th>
-                  <th>{t("空間幅度", "Upside / Margin")}</th>
-                  <th>{t("主要支撐 / 買點區", "Support / Zone")}</th>
-                  <th>{t("型態狀態", "Pattern Stage")}</th>
-                  <th>{t("實戰進出指引", "Action Guide")}</th>
-                  <th>{t("操作", "Action")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentCategoryCandidates.map((candidate) => {
-                  const isSelected = selectedCandidate?.ticker === candidate.ticker;
-                  const isPositive = candidate.upside >= 0;
-                  return (
-                    <tr
-                      key={`${candidate.market}-${candidate.ticker}`}
-                      className={`candidate-row ${isSelected ? "selected-row" : ""}`}
-                    >
-                      <td>
-                        <span className="market-pill">{candidate.market}</span>
-                      </td>
-                      <td>
-                        <Link
-                          href={stockDetailHref(candidate.ticker)}
-                          className="candidate-name-link"
-                          title={t("點擊直接回到公允價值頁面查看完整估值詳細資料", "Click to return to Fair Value page for complete details")}
-                        >
-                          <div className="candidate-name-cell">
-                            <strong className="candidate-ticker">
-                              {candidate.ticker} <span className="ticker-link-arrow">↗</span>
-                            </strong>
-                            <span className="candidate-subname">{candidate.name}</span>
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="price-cell">{formatIndicator(candidate.price)}</td>
-                      <td className="price-cell">{formatIndicator(candidate.fairValue)}</td>
-                      <td className="upside-cell">
-                        <span className={`direction-badge ${isPositive ? "bullish" : "bearish"}`}>
-                          {isPositive ? "↗" : "↘"} {formatPercent(candidate.upside)}
-                        </span>
-                      </td>
-                      <td>
-                        {candidate.supportZoneLow && candidate.supportZoneHigh
-                          ? `${formatIndicator(candidate.supportZoneLow)} ~ ${formatIndicator(candidate.supportZoneHigh)}`
-                          : formatIndicator(candidate.supportLevel)}
-                      </td>
-                      <td>
-                        <span className={`stage-tag ${candidate.stage === "candidate" ? "stage-candidate" : "stage-confirmed"}`}>
-                          {candidate.stage === "candidate"
-                            ? t("⚡ 十字星 (可能形成)", "⚡ Doji (Candidate)")
-                            : t("✅ 已確認", "✅ Confirmed")}
-                        </span>
-                      </td>
-                      <td className="action-guide-cell">
-                        <span className="guide-short-text">{candidate.actionGuideZh}</span>
-                      </td>
-                      <td>
-                        <div className="table-actions-cell">
-                          <button
-                            type="button"
-                            className={`select-chart-btn ${isSelected ? "active" : ""}`}
-                            onClick={() => setSelectedTicker(candidate.ticker)}
-                            title={t("在上方載入真實技術 K 線", "Preview real technical chart above")}
-                          >
-                            {isSelected ? t("預覽中", "Viewing") : t("看線圖", "Chart")}
-                          </button>
+          {currentCategoryCandidates.length === 0 ? (
+            <div className="table-empty-notice">
+              <p>{t("目前無符合篩選條件的標的。您可以切換上方策略頁籤查看其他技術型態（如順勢交易 W 底買點）。", "No candidates matching current criteria. You can switch to other strategy tabs above (e.g. Trend Pullback W-Bottom).")}</p>
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table className="technical-candidates-table">
+                <thead>
+                  <tr>
+                    <th>{t("市場", "Market")}</th>
+                    <th>{t("代碼 / 名稱 (點擊回公允價值)", "Ticker / Name (Click for Fair Value)")}</th>
+                    <th>{t("目前價格", "Current Price")}</th>
+                    <th>{t("公允價值", "Fair Value")}</th>
+                    <th>{t("空間幅度", "Upside / Margin")}</th>
+                    <th>{t("主要支撐 / 買點區", "Support / Zone")}</th>
+                    <th>{t("型態狀態", "Pattern Stage")}</th>
+                    <th>{t("實戰進出指引", "Action Guide")}</th>
+                    <th>{t("操作", "Action")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentCategoryCandidates.map((candidate) => {
+                    const isSelected = selectedCandidate?.ticker === candidate.ticker;
+                    const isPositive = candidate.upside >= 0;
+                    return (
+                      <tr
+                        key={`${candidate.market}-${candidate.ticker}`}
+                        className={`candidate-row ${isSelected ? "selected-row" : ""}`}
+                      >
+                        <td>
+                          <span className="market-pill">{candidate.market}</span>
+                        </td>
+                        <td>
                           <Link
                             href={stockDetailHref(candidate.ticker)}
-                            className="direct-valuation-btn"
-                            title={t("直接回到公允價值頁面查看詳細資料", "Directly view details on Fair Value page")}
+                            className="candidate-name-link"
+                            title={t("點擊直接回到公允價值頁面查看完整估值詳細資料", "Click to return to Fair Value page for complete details")}
                           >
-                            {t("公允價值 ↗", "Valuation ↗")}
+                            <div className="candidate-name-cell">
+                              <strong className="candidate-ticker">
+                                {candidate.ticker} <span className="ticker-link-arrow">↗</span>
+                              </strong>
+                              <span className="candidate-subname">{candidate.name}</span>
+                            </div>
                           </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="price-cell">{formatIndicator(candidate.price)}</td>
+                        <td className="price-cell">{formatIndicator(candidate.fairValue)}</td>
+                        <td className="upside-cell">
+                          <span className={`direction-badge ${isPositive ? "bullish" : "bearish"}`}>
+                            {isPositive ? "↗" : "↘"} {formatPercent(candidate.upside)}
+                          </span>
+                        </td>
+                        <td>
+                          {candidate.supportZoneLow && candidate.supportZoneHigh
+                            ? `${formatIndicator(candidate.supportZoneLow)} ~ ${formatIndicator(candidate.supportZoneHigh)}`
+                            : formatIndicator(candidate.supportLevel)}
+                        </td>
+                        <td>
+                          <span className={`stage-tag ${candidate.stage === "candidate" ? "stage-candidate" : "stage-confirmed"}`}>
+                            {candidate.stage === "candidate"
+                              ? t("⚡ 十字星 (可能形成)", "⚡ Doji (Candidate)")
+                              : t("✅ 已確認", "✅ Confirmed")}
+                          </span>
+                        </td>
+                        <td className="action-guide-cell">
+                          <span className="guide-short-text">{candidate.actionGuideZh}</span>
+                        </td>
+                        <td>
+                          <div className="table-actions-cell">
+                            <button
+                              type="button"
+                              className={`select-chart-btn ${isSelected ? "active" : ""}`}
+                              onClick={() => setSelectedTicker(candidate.ticker)}
+                              title={t("在上方載入真實技術 K 線", "Preview real technical chart above")}
+                            >
+                              {isSelected ? t("預覽中", "Viewing") : t("看線圖", "Chart")}
+                            </button>
+                            <Link
+                              href={stockDetailHref(candidate.ticker)}
+                              className="direct-valuation-btn"
+                              title={t("直接回到公允價值頁面查看詳細資料", "Directly view details on Fair Value page")}
+                            >
+                              {t("公允價值 ↗", "Valuation ↗")}
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </main>
 

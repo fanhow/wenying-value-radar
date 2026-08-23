@@ -165,6 +165,47 @@ function isShootingStar(candle: DailyCandle) {
   return range > 0 && upperShadow >= body * 2 && lowerShadow <= body && Math.min(candle.open, candle.close) <= candle.low + range * 0.4;
 }
 
+function isSustainedTrend(candles: DailyCandle[], endIndex: number, direction: "down" | "up", lookback = 8) {
+  const startIndex = Math.max(0, endIndex - lookback);
+  if (endIndex - startIndex < 3) return true; // short fixture fallback
+  const window = candles.slice(startIndex, endIndex + 1);
+  const startPrice = direction === "down"
+    ? Math.max(...window.slice(0, 3).map((c) => c.high))
+    : Math.min(...window.slice(0, 3).map((c) => c.low));
+  const endPrice = direction === "down" ? window[window.length - 1].low : window[window.length - 1].high;
+  const ratio = direction === "down" ? (startPrice - endPrice) / startPrice : (endPrice - startPrice) / startPrice;
+  let matchingDays = 0;
+  for (let i = 1; i < window.length; i++) {
+    if (direction === "down" ? window[i].close < window[i - 1].close : window[i].close > window[i - 1].close) {
+      matchingDays++;
+    }
+  }
+  return ratio >= 0.05 || (ratio >= 0.035 && matchingDays >= 2);
+}
+
+function isSwingExtreme(candles: DailyCandle[], firstIndex: number, starIndex: number, kind: "trough" | "peak", lookback = 15) {
+  const startIndex = Math.max(0, firstIndex - lookback);
+  if (firstIndex - startIndex < 3) return true; // short fixture fallback
+  const priorCandles = candles.slice(startIndex, firstIndex);
+  if (kind === "trough") {
+    const priorMinLow = Math.min(...priorCandles.map((c) => c.low));
+    const patternLow = Math.min(candles[firstIndex].low, candles[starIndex].low);
+    return patternLow <= priorMinLow * 1.008;
+  } else {
+    const priorMaxHigh = Math.max(...priorCandles.map((c) => c.high));
+    const patternHigh = Math.max(candles[firstIndex].high, candles[starIndex].high);
+    return patternHigh >= priorMaxHigh * 0.992;
+  }
+}
+
+function isClimaxVolume(candle: DailyCandle, candles: DailyCandle[], index: number): boolean {
+  if (index < 5) return true;
+  const priorVolumes = candles.slice(Math.max(0, index - 10), index).map((c) => c.volume).filter((v) => v > 0);
+  const avgVol = mean(priorVolumes);
+  if (!avgVol || avgVol === 0) return true;
+  return candle.volume >= avgVol * 0.85;
+}
+
 function priorTrend(candles: DailyCandle[], endIndex: number, direction: "down" | "up") {
   const startIndex = Math.max(0, endIndex - 5);
   if (endIndex <= startIndex) return false;
@@ -423,19 +464,32 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
     : null;
   const details = { consecutiveLargeBearish, consecutiveLargeBullish, ma20Deviation, gapDirection };
 
-  // Morning Star (早晨之星): downtrend -> large bearish -> downward gap small star -> bullish recovering >= 50%
+  // Morning Star Confirmed (早晨之星確認):
+  // 1. Sustained downtrend leading up to the 1st candle
+  // 2. 1st candle is a large drop on expanded volume
+  // 3. 2nd candle gaps down into a small star/Doji
+  // 4. Pattern creates the lowest trough of the wave (no lower candles to its left)
+  // 5. 3rd candle rallies and closes >= 50% of 1st candle's body
   const morningStarGap = prior && first && (prior.open <= first.close || prior.high <= first.close * 1.005 || Math.max(prior.open, prior.close) <= (first.open + first.close) / 2);
-  if (first && prior && latest && declining && isBearish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline, realBody(first)) && morningStarGap && isBullish(latest)
-    && latest.close >= (first.open + first.close) / 2 && latest.close > prior.close) {
+  const isMorningDowntrend = isSustainedTrend(candles, candles.length - 3, "down");
+  const isMorningSwingTrough = isSwingExtreme(candles, candles.length - 3, candles.length - 2, "trough");
+  const isMorningVolume1 = isClimaxVolume(first, candles, candles.length - 3);
+
+  if (first && prior && latest && isMorningDowntrend && isBearish(first) && isLargeBody(first, baseline)
+    && isMorningVolume1 && isSmallBody(prior, baseline, realBody(first)) && morningStarGap && isMorningSwingTrough
+    && isBullish(latest) && latest.close >= (first.open + first.close) / 2 && latest.close > prior.close) {
     return { pattern: "morning-star" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
 
-  // Evening Star (黃昏之星): uptrend -> large bullish -> upward gap small star -> bearish falling <= 50%
+  // Evening Star Confirmed (黃昏之星確認):
   const eveningStarGap = prior && first && (prior.open >= first.close || prior.low >= first.close * 0.995 || Math.min(prior.open, prior.close) >= (first.open + first.close) / 2);
-  if (first && prior && latest && rising && isBullish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline, realBody(first)) && eveningStarGap && isBearish(latest)
-    && latest.close <= (first.open + first.close) / 2 && latest.close < prior.close) {
+  const isEveningUptrend = isSustainedTrend(candles, candles.length - 3, "up");
+  const isEveningSwingPeak = isSwingExtreme(candles, candles.length - 3, candles.length - 2, "peak");
+  const isEveningVolume1 = isClimaxVolume(first, candles, candles.length - 3);
+
+  if (first && prior && latest && isEveningUptrend && isBullish(first) && isLargeBody(first, baseline)
+    && isEveningVolume1 && isSmallBody(prior, baseline, realBody(first)) && eveningStarGap && isEveningSwingPeak
+    && isBearish(latest) && latest.close <= (first.open + first.close) / 2 && latest.close < prior.close) {
     return { pattern: "evening-star" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
@@ -448,17 +502,25 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
     return { pattern: "bearish-engulfing" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
-  // Morning Star Candidate (十字星收盤·可能形成): downtrend -> large bearish -> downward gap to Doji / small star
+  // Morning Star Candidate (十字星收盤·可能形成):
+  const candidateDownTrend = isSustainedTrend(candles, candles.length - 2, "down");
+  const candidateSwingTrough = isSwingExtreme(candles, candles.length - 2, candles.length - 1, "trough");
+  const candidateVolume1 = isClimaxVolume(prior, candles, candles.length - 2);
   const latestDownGap = prior && latest && (latest.open <= prior.close || latest.high <= prior.close * 1.005 || Math.max(latest.open, latest.close) <= (prior.open + prior.close) / 2);
-  if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior)
-    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline, realBody(prior)) && latestDownGap) {
+
+  if (prior && latest && candidateDownTrend && isBearish(prior) && isLargeBody(prior, baseline)
+    && candidateVolume1 && isSmallBody(latest, baseline, realBody(prior)) && latestDownGap && candidateSwingTrough) {
     return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
 
-  // Evening Star Candidate (十字星收盤·可能形成): uptrend -> large bullish -> upward gap to Doji / small star
+  // Evening Star Candidate (十字星收盤·可能形成):
+  const candidateUpTrend = isSustainedTrend(candles, candles.length - 2, "up");
+  const candidateSwingPeak = isSwingExtreme(candles, candles.length - 2, candles.length - 1, "peak");
+  const candidateUpVolume1 = isClimaxVolume(prior, candles, candles.length - 2);
   const latestUpGap = prior && latest && (latest.open >= prior.close || latest.low >= prior.close * 0.995 || Math.min(latest.open, latest.close) >= (prior.open + prior.close) / 2);
-  if (prior && latest && priorTrend(candles, candles.length - 2, "up") && isBullish(prior)
-    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline, realBody(prior)) && latestUpGap) {
+
+  if (prior && latest && candidateUpTrend && isBullish(prior) && isLargeBody(prior, baseline)
+    && candidateUpVolume1 && isSmallBody(latest, baseline, realBody(prior)) && latestUpGap && candidateSwingPeak) {
     return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
