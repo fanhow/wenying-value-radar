@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.23.3";
+const SITE_REVISION = "Rev. 2026.08.23.4";
 
 const REVISION_ENTRIES = [
+  ["2026.08.23.4", "技術分析量化判定法則全面校準：優化早晨之星／黃昏之星星線實體與跳空判定法則，修復型態時效性過濾機制；確保僅有最新交易日（或活躍回踩區）真實符合標準的標的列入推薦；歷史型態（如 3708 上緯投控於 2026-07-30~31 經典早晨之星）精確識別且目前整理狀態不再誤報為即時形態。", "Technical pattern screening rules rigorously calibrated: refined Morning Star / Evening Star candle ratio and gap criteria; enforced recency filtering so only stocks genuinely forming active patterns on latest dates are listed; historical patterns (e.g. 3708 on 2026-07-30~31) are accurately recognized while active consolidation states are cleanly excluded."],
   ["2026.08.23.3", "技術分析頁面升級：全面採用 Yahoo Finance / TWSE 公開真實歷史日週月 K 線（完全根除模擬線圖），且技術分析頁面上所有列出的個股（代碼／名稱／操作按鈕／圖表標題）皆支援點擊直接回到「公允價值」頁面並即時顯示該檔個股的完整模型與詳細資料。", "Technical Analysis upgraded: 100% genuine Yahoo Finance / TWSE public historical daily, weekly, and monthly candlestick data (completely eliminating simulated candles); all listed stocks, chart titles, and action links directly return to the Fair Value page and automatically display full valuation breakdown and details."],
   ["2026.08.23.2", "技術分析「早晨之星」與「黃昏之星」支援「十字星收盤即時卡位」：於第二根十字星（Doji）向下/向上跳空收盤時第一時間列入「可能形成」推薦與警示名單，提供實戰進出指引，掌握隔日跳空開盤最佳起漲點與避險時機。", "Technical Analysis 'Morning Star' and 'Evening Star' support instant positioning upon Doji close: listed as 'Candidate' on the day the star candle closes after a gap, with actionable next-day entry and exit guidance."],
   ["2026.08.23.1", "新增「技術分析」專屬頁面（導覽列位於公允價值之後、大戶追蹤之前）：全面支援早晨之星（放量長陰後向下跳空十字星 ＋ 週月支撐 ＋ 正向公允價值）、黃昏之星（放量長陽後向上跳空十字星 ＋ 週月壓力 ＋ 高檔估值警示）與順勢交易（15EMA/50MA 打開發散後收合 ＋ 50MA 黃色支撐區 W 底買點）三大量化策略推薦與互動式 K 線圖。", "Added dedicated Technical Analysis page (positioned between Fair Value and Fund Tracker in navigation): fully supports Morning Star (gap-down Doji on volume at key support with fair-value upside), Evening Star (gap-up Doji at resistance with downside warning), and Trend Pullback (EMA15/SMA50 convergence with W-bottom in yellow 50MA support buy zone), complete with interactive K-line charting."],

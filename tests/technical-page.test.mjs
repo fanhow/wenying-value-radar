@@ -131,3 +131,43 @@ test("Technical Analysis page links all listed stocks directly to Fair Value pag
   assert.match(pageSource, /direct-valuation-btn/);
   assert.match(pageSource, /view-valuation-link/);
 });
+
+test("3708 上緯投控 historical Morning Star (2026-07-30~31) is accurately detected and is NOT an active candidate today", () => {
+  const snapshot = buildTechnicalSnapshot();
+  // 3708 should not be in the active candidate lists for today
+  assert.ok(!snapshot.morningStar.some((c) => c.ticker === "3708"), "3708 must not be listed as an active Morning Star today");
+
+  // Verify historical candle pattern recognition for 3708 on 2026-07-30 and 2026-07-31
+  const historical3708Candles = [];
+  for (let i = 1; i <= 20; i++) {
+    historical3708Candles.push({ date: `2026-07-${String(i).padStart(2, "0")}`, open: 105.0, high: 106.0, low: 104.0, close: 105.0, volume: 300000 });
+  }
+  historical3708Candles.push(
+    { date: "2026-07-23", open: 104.0, high: 104.5, low: 100.0, close: 101.0, volume: 355000 },
+    { date: "2026-07-24", open: 101.0, high: 103.0, low: 99.9, close: 100.0, volume: 176000 },
+    { date: "2026-07-27", open: 100.0, high: 100.0, low: 97.8, close: 98.4, volume: 399000 },
+    { date: "2026-07-28", open: 97.1, high: 97.1, low: 91.3, close: 91.3, volume: 814000 },
+    { date: "2026-07-29", open: 91.6, high: 91.8, low: 85.6, close: 88.1, volume: 1156000 }, // Day 1: Large drop
+    { date: "2026-07-30", open: 86.4, high: 88.8, low: 86.4, close: 87.8, volume: 493000 },  // Day 2: Downward gap Doji/star
+  );
+
+  const dojiResult = analyzeTechnicalSetup(historical3708Candles);
+  assert.ok(dojiResult);
+  assert.equal(dojiResult.candlestickPattern, "morning-star-candidate", "2026-07-30 close is a Morning Star candidate");
+  assert.equal(dojiResult.patternStage, "candidate");
+
+  // Day 3: Reversal confirmation
+  historical3708Candles.push({ date: "2026-07-31", open: 90.7, high: 92.2, low: 90.0, close: 91.9, volume: 363000 });
+  const confirmedResult = analyzeTechnicalSetup(historical3708Candles);
+  assert.ok(confirmedResult);
+  assert.equal(confirmedResult.candlestickPattern, "morning-star", "2026-07-31 is a confirmed Morning Star");
+  assert.equal(confirmedResult.patternStage, "confirmed");
+
+  // Today (2026-08-21 after consolidation): pattern is none
+  for (let i = 1; i <= 15; i++) {
+    historical3708Candles.push({ date: `2026-08-${String(i + 3).padStart(2, "0")}`, open: 102.0, high: 104.0, low: 101.0, close: 103.5, volume: 300000 });
+  }
+  const todayResult = analyzeTechnicalSetup(historical3708Candles);
+  assert.ok(todayResult);
+  assert.equal(todayResult.candlestickPattern, "none", "3708 is in consolidation today and has no active candlestick pattern");
+});

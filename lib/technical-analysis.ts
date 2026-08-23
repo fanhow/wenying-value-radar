@@ -133,17 +133,20 @@ function isBearish(candle: DailyCandle) {
 
 function isDoji(candle: DailyCandle) {
   const range = candleRange(candle);
-  return range > 0 && realBody(candle) <= range * 0.1;
+  return range > 0 && (realBody(candle) <= range * 0.18 || realBody(candle) <= candle.close * 0.0035);
 }
 
-function isSmallBody(candle: DailyCandle, baseline: number) {
+function isSmallBody(candle: DailyCandle, baseline: number, comparisonBody?: number) {
   const range = candleRange(candle);
-  return range > 0 && (isDoji(candle) || realBody(candle) <= Math.max(baseline * 0.55, range * 0.25));
+  if (range === 0) return true;
+  if (isDoji(candle)) return true;
+  if (comparisonBody && comparisonBody > 0 && realBody(candle) <= comparisonBody * 0.6) return true;
+  return realBody(candle) <= Math.max(baseline * 0.85, range * 0.5, candle.close * 0.018);
 }
 
 function isLargeBody(candle: DailyCandle, baseline: number) {
   const range = candleRange(candle);
-  return range > 0 && realBody(candle) >= baseline * 1.25 && realBody(candle) >= range * 0.55;
+  return range > 0 && (realBody(candle) >= baseline * 1.1 || realBody(candle) >= range * 0.5 || realBody(candle) >= candle.close * 0.02);
 }
 
 function isHammer(candle: DailyCandle) {
@@ -421,18 +424,18 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
   const details = { consecutiveLargeBearish, consecutiveLargeBullish, ma20Deviation, gapDirection };
 
   // Morning Star (早晨之星): downtrend -> large bearish -> downward gap small star -> bullish recovering >= 50%
-  const morningStarGap = prior && first && (prior.open <= first.close || prior.high <= first.close * 1.002);
+  const morningStarGap = prior && first && (prior.open <= first.close || prior.high <= first.close * 1.005 || Math.max(prior.open, prior.close) <= (first.open + first.close) / 2);
   if (first && prior && latest && declining && isBearish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline) && morningStarGap && isBullish(latest) && realBody(latest) >= baseline * 0.75
-    && latest.close >= (first.open + first.close) / 2) {
+    && isSmallBody(prior, baseline, realBody(first)) && morningStarGap && isBullish(latest)
+    && latest.close >= (first.open + first.close) / 2 && latest.close > prior.close) {
     return { pattern: "morning-star" as const, direction: "bullish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
 
   // Evening Star (黃昏之星): uptrend -> large bullish -> upward gap small star -> bearish falling <= 50%
-  const eveningStarGap = prior && first && (prior.open >= first.close || prior.low >= first.close * 0.998);
+  const eveningStarGap = prior && first && (prior.open >= first.close || prior.low >= first.close * 0.995 || Math.min(prior.open, prior.close) >= (first.open + first.close) / 2);
   if (first && prior && latest && rising && isBullish(first) && isLargeBody(first, baseline)
-    && isSmallBody(prior, baseline) && eveningStarGap && isBearish(latest) && realBody(latest) >= baseline * 0.75
-    && latest.close <= (first.open + first.close) / 2) {
+    && isSmallBody(prior, baseline, realBody(first)) && eveningStarGap && isBearish(latest)
+    && latest.close <= (first.open + first.close) / 2 && latest.close < prior.close) {
     return { pattern: "evening-star" as const, direction: "bearish" as const, stage: "confirmed" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 
@@ -446,16 +449,16 @@ function detectCandlestickPattern(candles: DailyCandle[], atr14: number | null) 
   }
 
   // Morning Star Candidate (十字星收盤·可能形成): downtrend -> large bearish -> downward gap to Doji / small star
-  const latestDownGap = prior && latest && (latest.open <= prior.close || latest.high <= prior.close * 1.002);
+  const latestDownGap = prior && latest && (latest.open <= prior.close || latest.high <= prior.close * 1.005 || Math.max(latest.open, latest.close) <= (prior.open + prior.close) / 2);
   if (prior && latest && priorTrend(candles, candles.length - 2, "down") && isBearish(prior)
-    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestDownGap) {
+    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline, realBody(prior)) && latestDownGap) {
     return { pattern: "morning-star-candidate" as const, direction: "bullish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBearish, ...details };
   }
 
   // Evening Star Candidate (十字星收盤·可能形成): uptrend -> large bullish -> upward gap to Doji / small star
-  const latestUpGap = prior && latest && (latest.open >= prior.close || latest.low >= prior.close * 0.998);
+  const latestUpGap = prior && latest && (latest.open >= prior.close || latest.low >= prior.close * 0.995 || Math.min(latest.open, latest.close) >= (prior.open + prior.close) / 2);
   if (prior && latest && priorTrend(candles, candles.length - 2, "up") && isBullish(prior)
-    && isLargeBody(prior, baseline) && (isDoji(latest) || isSmallBody(latest, baseline)) && latestUpGap) {
+    && isLargeBody(prior, baseline) && isSmallBody(latest, baseline, realBody(prior)) && latestUpGap) {
     return { pattern: "evening-star-candidate" as const, direction: "bearish" as const, stage: "candidate" as const, consecutiveTrendCandles: consecutiveBullish, ...details };
   }
 

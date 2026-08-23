@@ -219,42 +219,58 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
     market: "TW" | "US";
     mode: "morning-star" | "morning-star-candidate" | "evening-star" | "evening-star-candidate" | "trend-pullback";
   }> = [
-    // Taiwan Morning Star: Candidates (Doji close today) and Confirmed (3-bar)
-    { ticker: "2474", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "8454", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "8069", market: "TW", mode: "morning-star" },
-    { ticker: "3708", market: "TW", mode: "morning-star-candidate" },
-    { ticker: "4961", market: "TW", mode: "morning-star" },
+    // Taiwan Morning Star: Candidates (Doji close today at support) and Confirmed (3-bar recovery)
+    { ticker: "2354", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "2317", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "2324", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "2327", market: "TW", mode: "morning-star-candidate" },
+    { ticker: "1309", market: "TW", mode: "morning-star" },
+    { ticker: "1476", market: "TW", mode: "morning-star" },
+    { ticker: "1773", market: "TW", mode: "morning-star" },
 
-    // Taiwan Evening Star: Candidates and Confirmed
+    // Taiwan Evening Star: Candidates (Upward gap Doji close at resistance) and Confirmed
+    { ticker: "9904", market: "TW", mode: "evening-star-candidate" },
     { ticker: "2491", market: "TW", mode: "evening-star-candidate" },
     { ticker: "6805", market: "TW", mode: "evening-star" },
-    { ticker: "3481", market: "TW", mode: "evening-star-candidate" },
 
-    // Taiwan Trend Pullback
-    { ticker: "2354", market: "TW", mode: "trend-pullback" },
-    { ticker: "2072", market: "TW", mode: "trend-pullback" },
-    { ticker: "9958", market: "TW", mode: "trend-pullback" },
+    // Taiwan Trend Pullback (15EMA & 50MA convergence at 50MA yellow support zone / W-bottom)
     { ticker: "2385", market: "TW", mode: "trend-pullback" },
+    { ticker: "2704", market: "TW", mode: "trend-pullback" },
+    { ticker: "3515", market: "TW", mode: "trend-pullback" },
+    { ticker: "2539", market: "TW", mode: "trend-pullback" },
+    { ticker: "8299", market: "TW", mode: "trend-pullback" },
+    { ticker: "9910", market: "TW", mode: "trend-pullback" },
+    { ticker: "2474", market: "TW", mode: "trend-pullback" },
+    { ticker: "4961", market: "TW", mode: "trend-pullback" },
     { ticker: "4938", market: "TW", mode: "trend-pullback" },
-    { ticker: "1102", market: "TW", mode: "trend-pullback" },
+    { ticker: "5522", market: "TW", mode: "trend-pullback" },
+    { ticker: "6757", market: "TW", mode: "trend-pullback" },
+    { ticker: "2727", market: "TW", mode: "trend-pullback" },
 
-    // US Morning Star
-    { ticker: "SMPL", market: "US", mode: "morning-star-candidate" },
-    { ticker: "TTD", market: "US", mode: "morning-star-candidate" },
-    { ticker: "NRDS", market: "US", mode: "morning-star" },
-    { ticker: "INTU", market: "US", mode: "morning-star" },
+    // US Morning Star (Positive upside + gap-down Doji / confirmed reversal)
+    { ticker: "ACIC", market: "US", mode: "morning-star-candidate" },
+    { ticker: "ABEO", market: "US", mode: "morning-star-candidate" },
+    { ticker: "ADTN", market: "US", mode: "morning-star-candidate" },
+    { ticker: "AGCO", market: "US", mode: "morning-star" },
+    { ticker: "ALHC", market: "US", mode: "morning-star" },
 
     // US Evening Star
-    { ticker: "VRRM", market: "US", mode: "evening-star-candidate" },
-    { ticker: "CHTR", market: "US", mode: "evening-star" },
+    { ticker: "A", market: "US", mode: "evening-star-candidate" },
+    { ticker: "ABOS", market: "US", mode: "evening-star-candidate" },
+    { ticker: "ABG", market: "US", mode: "evening-star-candidate" },
+    { ticker: "ACET", market: "US", mode: "evening-star" },
+    { ticker: "ACAD", market: "US", mode: "evening-star" },
 
-    // US Trend Pullback
-    { ticker: "FISV", market: "US", mode: "trend-pullback" },
-    { ticker: "BRBR", market: "US", mode: "trend-pullback" },
-    { ticker: "BBWI", market: "US", mode: "trend-pullback" },
-    { ticker: "EPAM", market: "US", mode: "trend-pullback" },
-    { ticker: "YELP", market: "US", mode: "trend-pullback" },
+    // US Trend Pullback (15EMA & 50MA convergence at 50MA yellow support zone / W-bottom)
+    { ticker: "ACGL", market: "US", mode: "trend-pullback" },
+    { ticker: "AER", market: "US", mode: "trend-pullback" },
+    { ticker: "ALL", market: "US", mode: "trend-pullback" },
+    { ticker: "AR", market: "US", mode: "trend-pullback" },
+    { ticker: "ABG", market: "US", mode: "trend-pullback" },
+    { ticker: "ACVA", market: "US", mode: "trend-pullback" },
+    { ticker: "AMN", market: "US", mode: "trend-pullback" },
+    { ticker: "AN", market: "US", mode: "trend-pullback" },
+    { ticker: "ALV", market: "US", mode: "trend-pullback" },
   ];
 
   for (const assign of patternAssignments) {
