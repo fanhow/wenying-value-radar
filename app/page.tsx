@@ -503,14 +503,18 @@ export default function Home() {
     return [...scanInputs.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
       .map((stock) => calculateStock(stock, formatNumber));
   }, [marketCandidates, overvaluedCandidates, stockInputs]);
-  const allRankingStocks = useMemo(
-    () => marketCandidates.map((stock) => calculateStock(stock, formatNumber)),
-    [marketCandidates],
-  );
-  const allOvervaluedRankingStocks = useMemo(
-    () => overvaluedCandidates.map((stock) => calculateStock(stock, formatNumber)),
-    [overvaluedCandidates],
-  );
+  const allRankingStocks = useMemo(() => {
+    const stockInputsByTicker = new Map(stockInputs.map((stock) => [stock.ticker, stock]));
+    return marketCandidates
+      .map((stock) => stockInputsByTicker.get(stock.ticker) ?? stock)
+      .map((stock) => calculateStock(stock, formatNumber));
+  }, [marketCandidates, stockInputs]);
+  const allOvervaluedRankingStocks = useMemo(() => {
+    const stockInputsByTicker = new Map(stockInputs.map((stock) => [stock.ticker, stock]));
+    return overvaluedCandidates
+      .map((stock) => stockInputsByTicker.get(stock.ticker) ?? stock)
+      .map((stock) => calculateStock(stock, formatNumber));
+  }, [overvaluedCandidates, stockInputs]);
 
   const totalTwUndervalued = useMemo(
     () => allRankingStocks.filter((s) => s.market === "TW").length,
