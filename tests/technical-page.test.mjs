@@ -98,12 +98,18 @@ test("buildTechnicalSnapshot produces calibrated candidates for all 5 strategies
   }
 });
 
-test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, and 2385 群光 & 8299 群聯 are rejected by Trend Pullback", () => {
+test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, 2385 群光 & 8299 群聯 are rejected by Trend Pullback, and 5522 遠雄 & 4961 天鈺 & 2072 世紀風電 & 9958 世紀鋼 are rejected due to death cross", () => {
   const snapshot = buildTechnicalSnapshot();
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "1537"), "1537 must NOT be a Morning Star candidate (no prior downtrend / illiquid)");
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "2354"), "2354 must NOT be a Morning Star candidate (neckline retest with lower candles to the left)");
   assert.ok(!snapshot.trendPullback.some((c) => c.ticker === "2385"), "2385 must NOT be in Trend Pullback (SMA50 sloping down in death-cross breakdown)");
   assert.ok(!snapshot.trendPullback.some((c) => c.ticker === "8299"), "8299 must NOT be in Trend Pullback (15EMA < 50SMA death-cross & hasn't retested prior low)");
+  assert.ok(!snapshot.valueTrend.some((c) => c.ticker === "5522"), "5522 遠雄 must NOT be in Value-Trend (15EMA < 50SMA death-cross)");
+  assert.ok(!snapshot.valueTrend.some((c) => c.ticker === "4961"), "4961 天鈺 must NOT be in Value-Trend (15EMA < 50SMA death-cross)");
+  assert.ok(!snapshot.stage2Breakout.some((c) => c.ticker === "2072"), "2072 世紀風電 must NOT be in Stage 2 Breakout (15EMA < 50SMA death-cross)");
+  assert.ok(!snapshot.stage2Breakout.some((c) => c.ticker === "9958"), "9958 世紀鋼 must NOT be in Stage 2 Breakout (15EMA < 50SMA death-cross)");
+  assert.ok(!snapshot.stage2Breakout.some((c) => c.ticker === "6757"), "6757 台灣虎航 must NOT be in Stage 2 Breakout (15EMA < 50SMA death-cross)");
+  assert.ok(!snapshot.stage2Breakout.some((c) => c.ticker === "2727"), "2727 王品 must NOT be in Stage 2 Breakout (15EMA < 50SMA death-cross)");
 });
 
 test("8299 群聯 historical Morning Star candidate (2026-07-30) is recognized at weekly support 1460", async () => {
@@ -309,4 +315,16 @@ test("detects Stage 2 Breakout setup clearing base ceiling with expanded volume"
   assert.equal(result.status, "confirmed");
   assert.ok(result.breakoutPrice >= 102);
   assert.ok(result.signalReasonZh.includes("Stage 2"));
+});
+
+test("detectValueTrendResonance strictly rejects stocks in death cross (15EMA < 50SMA)", () => {
+  // Simulate downtrend where EMA15 is below SMA50
+  const candles = [];
+  for (let i = 0; i < 50; i++) {
+    const p = 100 - i * 0.5;
+    candles.push({ date: `2026-06-${String((i % 28) + 1).padStart(2, "0")}`, open: p + 0.2, high: p + 0.5, low: p - 0.5, close: p, volume: 1000000 });
+  }
+
+  const result = detectValueTrendResonance(candles, 0.40);
+  assert.equal(result, null, "Must return null when 15EMA < 50SMA death-cross is present");
 });

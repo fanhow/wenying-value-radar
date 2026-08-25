@@ -849,10 +849,10 @@ export function detectValueTrendResonance(
   const latestSma50 = sma50Series[latestIndex];
 
   if (!latestEma15 || !latestSma50) return null;
-  // 1. Technical Right-Side: 15EMA >= 50SMA (Golden cross) and price >= 50SMA * 0.98
-  if (latestEma15 < latestSma50 * 0.995 || latest.close < latestSma50 * 0.97) return null;
+  // 1. Technical Right-Side: 15EMA >= 50SMA (Strict Golden Cross, NO death-cross allowed!)
+  if (latestEma15 < latestSma50 || latest.close < latestSma50 * 0.98) return null;
   const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
-  if (sma50Lookback && latestSma50 < sma50Lookback * 0.985) return null;
+  if (sma50Lookback && latestSma50 < sma50Lookback * 0.99) return null;
 
   // 2. Fundamental Safety Margin: Fair value upside >= 10%
   const upside = fairValueUpside ?? 0.20;
