@@ -74,12 +74,27 @@ test("buildTechnicalSnapshot produces calibrated candidates for all 5 strategies
     assert.ok(candidate.candles.length >= 20, `${candidate.ticker} should have candle history`);
   }
 
-  // Verify Trend Pullback rules: EMA15/SMA50 convergence + support zone
+  // Verify Trend Pullback rules: EMA15/SMA50 convergence + support zone + candidate stages
   for (const candidate of snapshot.trendPullback) {
     assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
     assert.equal(candidate.category, "trend-pullback");
     assert.ok(candidate.supportZoneLow !== null && candidate.supportZoneHigh !== null, `${candidate.ticker} should have support buy zone`);
     assert.ok(candidate.supportZoneLow <= candidate.supportZoneHigh, `${candidate.ticker} supportZoneLow <= supportZoneHigh`);
+  }
+
+  // Verify advance positioning (candidate stage) exists across strategies
+  const allCandidates = [
+    ...snapshot.trendPullback,
+    ...snapshot.valueTrend,
+    ...snapshot.stage2Breakout,
+  ];
+  const earlyEntries = allCandidates.filter((c) => c.stage === "candidate");
+  assert.ok(earlyEntries.length >= 3, "should provide early entry candidates across strategies");
+  for (const early of earlyEntries) {
+    assert.ok(
+      early.actionGuideZh.includes("明日開盤") || early.actionGuideZh.includes("隔日開盤") || early.actionGuideZh.includes("卡位"),
+      `${early.ticker} action guide should instruct user on early positioning for next-day open`,
+    );
   }
 });
 

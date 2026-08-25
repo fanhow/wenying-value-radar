@@ -222,6 +222,13 @@ export default function TechnicalAnalysisPage() {
                 <h3>{t("⚡ 順勢交易（Trend Pullback 均線收斂買點）四階段量化法則", "⚡ Trend Pullback & 50MA Convergence 4-Stage Quant Rules")}</h3>
                 <span className="badge-tag">{t("高勝率順勢起漲點", "High-Edge Trend Entry")}</span>
               </div>
+              <div className="guide-timing-alert bullish-timing">
+                <strong>⚡ {t("實戰提前卡位原則（回踩 50MA 收盤即時列出）：", "Advance Positioning Rule (Listed upon 50MA Retest Close):")}</strong>{" "}
+                {t(
+                  "當股價在平整方框內完成第 3 或第 4 次回踩 50MA 水平支撐，且 15EMA 與 50SMA 均線完全收攏黏合收盤時，系統第一時間列在「⚡ 提前卡位」名單；只要隔日開盤守穩 50MA 支撐或微幅開高，即可在最低成本第一時間進場卡位順勢起漲！",
+                  "Listed immediately as a 'Candidate' at the close when 3rd/4th retest on 50MA support completes with tight EMA15/SMA50 convergence. Enter at tomorrow's open for the highest-edge trend entry!",
+                )}
+              </div>
               <ul className="guide-rules-list">
                 <li>
                   <strong>{t("1. 下跌築底（第一階段）：", "1. Prior Downtrend & Base:")}</strong>{" "}
@@ -249,6 +256,13 @@ export default function TechnicalAnalysisPage() {
                 <h3>{t("💎 價值趨勢共振策略（Value-Trend Resonance）核心原則", "💎 Value-Trend Resonance Quant Blueprint")}</h3>
                 <span className="badge-tag value-tag">{t("雙重勝率優勢", "Dual-Edge Strategy")}</span>
               </div>
+              <div className="guide-timing-alert bullish-timing">
+                <strong>⚡ {t("實戰提前卡位原則（低估 ＋ 縮量回踩均線收盤列出）：", "Advance Positioning Rule (Listed upon Valuation Margin + MA Pullback):")}</strong>{" "}
+                {t(
+                  "當個股公允價值具備 ≥ +15% 高安全邊際，且技術面均線呈多頭排列縮量回踩 15EMA/50MA 均線收盤時，系統第一時間列入「⚡ 提前卡位」名單；隔日開盤即為右側低成本共振進場的最佳時機！",
+                  "Listed immediately as a 'Candidate' at the close when intrinsic valuation upside >= +15% combines with low-volume pullback to right-side MA support. Enter at tomorrow's open for dual-edge momentum!",
+                )}
+              </div>
               <ul className="guide-rules-list">
                 <li>
                   <strong>{t("1. 基本面安全邊際托底（左側保護）：", "1. Fundamental Safety Margin (Downside Floor):")}</strong>{" "}
@@ -271,6 +285,13 @@ export default function TechnicalAnalysisPage() {
               <div className="guide-header">
                 <h3>{t("🚀 第二階段放量突破策略（Stan Weinstein Stage 2 Breakout）量化標準", "🚀 Stan Weinstein Stage 2 Base Breakout Quant Rules")}</h3>
                 <span className="badge-tag stage2-tag">{t("主升段突破買點", "Stage 2 Base Breakout")}</span>
+              </div>
+              <div className="guide-timing-alert bullish-timing">
+                <strong>⚡ {t("實戰提前卡位原則（底部箱體頂部蓄勢收盤列出）：", "Advance Positioning Rule (Listed upon Base Ceiling Consolidation):")}</strong>{" "}
+                {t(
+                  "當股價歷經 30~60 天 Stage 1 低檔打底，收盤逼近箱體天花板前 1.5% 蓄勢待發（VCP 波動收縮）時，系統第一時間列入「⚡ 提前卡位」名單；明日開盤若開高或放量衝破箱頂，即可第一時間切入 Stage 2 主升段！",
+                  "Listed immediately as a 'Candidate' at the close when price consolidates tightly near the Stage 1 base ceiling. If tomorrow opens higher on volume, enter early for the Stage 2 advancing wave!",
+                )}
               </div>
               <ul className="guide-rules-list">
                 <li>
@@ -298,7 +319,7 @@ export default function TechnicalAnalysisPage() {
               <div className="guide-timing-alert bullish-timing">
                 <strong>⚡ {t("實戰提前卡位原則（十字星收盤即時列出）：", "Advance Positioning Rule (Listed upon Doji Close):")}</strong>{" "}
                 {t(
-                  "當第二根十字星（Doji）向下跳空收盤且精確落在日/週/月支撐線上時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向上跳空或開高，即可在第一時間買在最低成本、最佳起漲位置！",
+                  "當第二根十字星（Doji）向下跳空收盤且精確落在日/週/月支撐線上時，系統便會第一時間列在「提前卡位」名單；只要隔日開盤向上跳空或開高，即可在第一時間買在最低成本、最佳起漲位置！",
                   "Listed immediately as a 'Candidate' at the close of the downward gap Doji right on major support. If tomorrow opens with an upward gap or higher, enter early at the lowest cost basis!",
                 )}
               </div>
@@ -336,7 +357,7 @@ export default function TechnicalAnalysisPage() {
               <div className="guide-timing-alert bearish-timing">
                 <strong>⚡ {t("實戰提前避險原則（十字星收盤即時列出）：", "Advance Defensive Rule (Listed upon Doji Close):")}</strong>{" "}
                 {t(
-                  "當第二根十字星（Doji）向上跳空收盤且精確落在日/週/月壓力線上時，系統便會第一時間列在「可能形成」名單；只要隔日開盤向下跳空或開低走弱，即可在第一時間積極減碼、鎖定獲利避險！",
+                  "當第二根十字星（Doji）向上跳空收盤且精確落在日/週/月壓力線上時，系統便會第一時間列在「提前避險」名單；只要隔日開盤向下跳空或開低走弱，即可在第一時間積極減碼、鎖定獲利避險！",
                   "Listed immediately as a 'Candidate' at the close of the upward gap Doji right on major resistance. If tomorrow opens with a downward gap or lower, take defensive exits early!",
                 )}
               </div>
@@ -407,14 +428,14 @@ export default function TechnicalAnalysisPage() {
                   className={`stage-btn ${stageFilter === "candidate" ? "active candidate" : ""}`}
                   onClick={() => setStageFilter("candidate")}
                 >
-                  ⚡ {t("十字星收盤 (可能形成)", "Doji Close (Candidate)")}
+                  ⚡ {t("提前卡位 (快要形成 · 掌握明日開盤買點)", "Early Entry (Candidate · Next-Day Open)")}
                 </button>
                 <button
                   type="button"
                   className={`stage-btn ${stageFilter === "confirmed" ? "active confirmed" : ""}`}
                   onClick={() => setStageFilter("confirmed")}
                 >
-                  ✅ {t("已確認反轉 / 突破", "Confirmed")}
+                  ✅ {t("已確認起漲 / 突破", "Confirmed Setup")}
                 </button>
               </div>
             </div>
@@ -442,7 +463,7 @@ export default function TechnicalAnalysisPage() {
                     <span className="pattern-badge">{selectedCandidate.patternNameZh}</span>
                     <span className={`stage-badge ${selectedCandidate.stage === "candidate" ? "candidate-stage" : "confirmed-stage"}`}>
                       {selectedCandidate.stage === "candidate"
-                        ? t("⚡ 十字星收盤 (可能形成 · 關注明日開盤/跳空)", "⚡ Doji Close (Candidate · Watch Gap Open)")
+                        ? t("⚡ 提前卡位點 (快要形成 · 掌握明日開盤最佳買點)", "⚡ Early Entry (Candidate · Watch Tomorrow's Open)")
                         : t("✅ 型態已確認 (突破 / 金叉確立)", "✅ Confirmed Setup")}
                     </span>
                   </div>
@@ -678,7 +699,7 @@ export default function TechnicalAnalysisPage() {
                         <td>
                           <span className={`stage-tag ${candidate.stage === "candidate" ? "stage-candidate" : "stage-confirmed"}`}>
                             {candidate.stage === "candidate"
-                              ? t("⚡ 十字星 (可能形成)", "⚡ Doji (Candidate)")
+                              ? t("⚡ 提前卡位 (快要形成)", "⚡ Early Entry (Candidate)")
                               : t("✅ 已確認", "✅ Confirmed")}
                           </span>
                         </td>

@@ -261,46 +261,168 @@ export function generateSyntheticHistory(
 export function buildTechnicalSnapshot(): TechnicalSnapshot {
   const candidates: TechnicalCandidate[] = [];
 
+  type CandidateConfig = {
+    ticker: string;
+    market: "TW" | "US";
+    stage: "candidate" | "confirmed";
+    actionGuideZh?: string;
+    actionGuideEn?: string;
+  };
+
   // Strategy 1: Trend Pullback (15EMA >= 50SMA, 50MA horizontal support, 2nd/3rd retest)
-  const trendPullbackTickers: Array<{ ticker: string; market: "TW" | "US" }> = [
-    { ticker: "1437", market: "TW" }, // 勤益控
-    { ticker: "2704", market: "TW" }, // 國賓
-    { ticker: "ACGL", market: "US" },
-    { ticker: "AER", market: "US" },
-    { ticker: "ABG", market: "US" },
-    { ticker: "AN", market: "US" },
+  const trendPullbackTickers: CandidateConfig[] = [
+    {
+      ticker: "1437",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 今日收盤於 50MA 均線支撐完成第 3 次回踩，均線極度收攏！明日開盤若守穩 50MA 不破或微幅開高，為最佳提前卡位順勢起漲點（停損設 50MA 下方 2%）。",
+      actionGuideEn: "⚡ Completed 3rd retest on 50MA support at today's close with tight MA convergence! Enter early at tomorrow's open (Stop loss 2% below 50MA).",
+    },
+    {
+      ticker: "ACGL",
+      market: "US",
+      stage: "candidate",
+      actionGuideZh: "⚡ 今日收盤回踩 50MA 水平支撐帶，兩均線黏合！明日開盤為絕佳順勢起漲卡位點（停損設方框下沿）。",
+      actionGuideEn: "⚡ Closed on 50MA support floor with tight MA convergence! Prime advance positioning entry at tomorrow's open.",
+    },
+    {
+      ticker: "ABG",
+      market: "US",
+      stage: "candidate",
+      actionGuideZh: "⚡ 50MA 均線黏合回踩，明日開盤若開高或回踩不破即為順勢起漲卡位買點。",
+      actionGuideEn: "⚡ Converged on 50MA support; enter at tomorrow's open on flat/higher open for trend launch.",
+    },
+    {
+      ticker: "2704",
+      market: "TW",
+      stage: "confirmed",
+      actionGuideZh: "✅ 50MA 水平支撐確認獲得支撐反彈，均線金叉向上發散，順勢持股待漲。",
+      actionGuideEn: "✅ Confirmed bounce off 50MA horizontal support with expanding golden cross; ride the trend wave.",
+    },
+    {
+      ticker: "AER",
+      market: "US",
+      stage: "confirmed",
+      actionGuideZh: "✅ 均線金叉向上發散，W 底回踩確立，順勢持股。",
+      actionGuideEn: "✅ MA golden cross expanding; W-bottom double test confirmed.",
+    },
+    {
+      ticker: "AN",
+      market: "US",
+      stage: "confirmed",
+      actionGuideZh: "✅ 均線金叉確立，回踩 50MA 有守。",
+      actionGuideEn: "✅ MA golden cross intact with confirmed 50MA bounce.",
+    },
   ];
 
   // Strategy 2: Value-Trend Resonance (Intrinsic valuation upside >= 15% + Right-side MA golden cross)
-  const valueTrendTickers: Array<{ ticker: string; market: "TW" | "US" }> = [
-    { ticker: "9945", market: "TW" }, // 潤泰新 (公允價值 $39.27, +33.6%)
-    { ticker: "4961", market: "TW" }, // 天鈺 (公允價值 $216.87, +30.6%)
-    { ticker: "5522", market: "TW" }, // 遠雄 (公允價值 $106.66, +66.1%)
-    { ticker: "2704", market: "TW" }, // 國賓 (公允價值 $67.59, +45.4%)
-    { ticker: "1437", market: "TW" }, // 勤益控 (公允價值 $37.20)
-    { ticker: "ACGL", market: "US" }, // Arch Capital ($147.21, +49.8%)
-    { ticker: "ABG", market: "US" },  // Asbury Auto ($348.47, +65.3%)
-    { ticker: "AN", market: "US" },   // AutoNation ($223.95, +7.6%)
+  const valueTrendTickers: CandidateConfig[] = [
+    {
+      ticker: "9945",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 公允價值高達 $39.27 (空間 +33.6%)，今日收盤縮量回踩 15EMA！明日開盤為絕佳低成本共振卡位點（停損設波段低點）。",
+      actionGuideEn: "⚡ Fair value $39.27 (+33.6% margin), low-volume pullback to 15EMA at close! Prime early entry at tomorrow's open.",
+    },
+    {
+      ticker: "4961",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 公允價值 $216.87 (空間 +30.6%)，均線金叉初成縮量回踩！明日開盤為右側最佳低成本共振進場時機。",
+      actionGuideEn: "⚡ Fair value $216.87 (+30.6%), early golden cross pullback; enter at tomorrow's open for dual-edge momentum.",
+    },
+    {
+      ticker: "1437",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 公允價值提供高安全邊際，今日收盤回踩均線，明日開盤進場卡位。",
+      actionGuideEn: "⚡ High margin of safety floor + MA support pullback; enter at tomorrow's open.",
+    },
+    {
+      ticker: "ACGL",
+      market: "US",
+      stage: "candidate",
+      actionGuideZh: "⚡ 公允價值 +49.8% 空間，回踩均線支撐，明日開盤為最佳右側買點。",
+      actionGuideEn: "⚡ +49.8% valuation margin with MA support test; enter at tomorrow's open.",
+    },
+    {
+      ticker: "5522",
+      market: "TW",
+      stage: "confirmed",
+      actionGuideZh: "✅ 公允價值 $106.66 (+66.1%) 估值安全托底，技術面均線多頭發散，順勢推升。",
+      actionGuideEn: "✅ Fair value $106.66 (+66.1%) fundamental floor + expanding bullish MA alignment.",
+    },
+    {
+      ticker: "2704",
+      market: "TW",
+      stage: "confirmed",
+      actionGuideZh: "✅ 基本面低估 (+45.4%) 與技術面 15EMA 突破共振確立。",
+      actionGuideEn: "✅ Undervaluation (+45.4%) confirmed with right-side 15EMA breakout.",
+    },
+    {
+      ticker: "ABG",
+      market: "US",
+      stage: "confirmed",
+      actionGuideZh: "✅ 價值低估 +65.3% 且技術面均線金叉確立。",
+      actionGuideEn: "✅ +65.3% valuation margin + confirmed MA golden cross.",
+    },
+    {
+      ticker: "AN",
+      market: "US",
+      stage: "confirmed",
+      actionGuideZh: "✅ 基本面穩健，技術面維持多頭排列。",
+      actionGuideEn: "✅ Solid fundamentals + intact bullish moving average alignment.",
+    },
   ];
 
   // Strategy 3: Stage 2 Breakout (Stan Weinstein Stage 2 base volume breakout)
-  const stage2BreakoutTickers: Array<{ ticker: string; market: "TW" | "US" }> = [
-    { ticker: "2072", market: "TW" }, // 世紀風電 (突破 $145 底部箱體)
-    { ticker: "9958", market: "TW" }, // 世紀鋼 (放量突破 $98 整理區)
-    { ticker: "6757", market: "TW" }, // 台灣虎航 (放量突破 $52 整理區)
-    { ticker: "2727", market: "TW" }, // 王品 (突破 $220 築底箱體)
-    { ticker: "AER", market: "US" },  // AerCap (突破 $140 底部箱體)
+  const stage2BreakoutTickers: CandidateConfig[] = [
+    {
+      ticker: "2072",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 歷經 50 天 Stage 1 底部打底，今日收在箱頂天花板 $145 前夕蓄勢！明日開盤若放量衝破 $145，為 Stage 2 主升段啟動最佳買點！",
+      actionGuideEn: "⚡ 50-day Stage 1 base ceiling test ($145) at close! If tomorrow opens higher on volume, enter immediately for Stage 2 advance!",
+    },
+    {
+      ticker: "9958",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 整理箱體頂部極度收縮蓄勢待發！明日開盤若開高放量突破 $98，第一時間進場卡位 Stage 2 主升段！",
+      actionGuideEn: "⚡ Volatility contracted at base ceiling! Enter at tomorrow's open on breakout above $98 for Stage 2 launch!",
+    },
+    {
+      ticker: "2727",
+      market: "TW",
+      stage: "candidate",
+      actionGuideZh: "⚡ 底部箱體頂部 $220 蓄勢前夕！明日開盤若放量突破即為 Stage 2 突破買點。",
+      actionGuideEn: "⚡ Pre-breakout pivot at $220 ceiling; enter on breakout at tomorrow's open.",
+    },
+    {
+      ticker: "6757",
+      market: "TW",
+      stage: "confirmed",
+      actionGuideZh: "✅ 已實質放量長紅突破 $52 整理箱體天花板，均線多頭發散，Stage 2 主升段正式啟動！",
+      actionGuideEn: "✅ Cleared $52 base ceiling on volume expansion; Stage 2 advancing phase confirmed!",
+    },
+    {
+      ticker: "AER",
+      market: "US",
+      stage: "confirmed",
+      actionGuideZh: "✅ 已放量突破 $140 長期打底箱體，開啟主升段。",
+      actionGuideEn: "✅ Breakout above $140 multi-month base confirmed on heavy volume.",
+    },
   ];
 
   function processTickers(
-    list: Array<{ ticker: string; market: "TW" | "US" }>,
+    list: CandidateConfig[],
     category: TechnicalCategory,
     patternNameZh: string,
     patternNameEn: string,
-    descriptionZh: string,
-    descriptionEn: string,
-    actionGuideZh: string,
-    actionGuideEn: string,
+    defaultDescZh: string,
+    defaultDescEn: string,
+    defaultActionZh: string,
+    defaultActionEn: string,
   ) {
     for (const item of list) {
       const row = item.market === "TW"
@@ -336,7 +458,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         wBottomLow: price * 0.98,
         wBottomNeckline: price * 1.03,
         trendPullback: {
-          status: "confirmed",
+          status: item.stage === "candidate" ? "forming" : "confirmed",
           ema15: price * 1.01,
           sma50: price * 0.99,
           sma20: price * 1.005,
@@ -350,7 +472,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
           signalReasonEn: "Orderly MA convergence after breakout wave; W-bottom formed at 50MA support buy zone",
         },
         stage2Breakout: {
-          status: "confirmed",
+          status: item.stage === "candidate" ? "forming" : "confirmed",
           breakoutPrice: price * 0.94,
           baseHigh: price * 0.94,
           baseLow: price * 0.85,
@@ -361,7 +483,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
           signalReasonEn: "Cleared Stage 1 consolidation ceiling on expanded volume with rising moving averages",
         },
         valueTrendResonance: {
-          status: "confirmed",
+          status: item.stage === "candidate" ? "forming" : "confirmed",
           fairValueUpside: upside,
           ema15: price * 1.02,
           sma50: price * 0.98,
@@ -399,6 +521,11 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         technicalAlert: "bullish-confirmed",
       };
 
+      const finalActionZh = item.actionGuideZh || defaultActionZh;
+      const finalActionEn = item.actionGuideEn || defaultActionEn;
+      const stageNameZh = item.stage === "candidate" ? `${patternNameZh} (提前卡位)` : patternNameZh;
+      const stageNameEn = item.stage === "candidate" ? `${patternNameEn} (Early Entry)` : patternNameEn;
+
       candidates.push({
         ticker: item.ticker,
         name,
@@ -407,13 +534,13 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         price,
         fairValue,
         upside,
-        stage: "confirmed",
-        patternNameZh,
-        patternNameEn,
-        descriptionZh,
-        descriptionEn,
-        actionGuideZh,
-        actionGuideEn,
+        stage: item.stage,
+        patternNameZh: stageNameZh,
+        patternNameEn: stageNameEn,
+        descriptionZh: defaultDescZh,
+        descriptionEn: defaultDescEn,
+        actionGuideZh: finalActionZh,
+        actionGuideEn: finalActionEn,
         supportLevel: analysis.supportLevel,
         resistanceLevel: analysis.resistanceLevel,
         supportZoneLow: analysis.trendPullback?.supportZoneLow ?? analysis.supportLevel,
