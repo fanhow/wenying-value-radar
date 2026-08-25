@@ -45,6 +45,28 @@ export type TrendPullbackSetup = {
   signalReasonEn: string;
 };
 
+export type Stage2BreakoutSetup = {
+  status: "confirmed" | "forming";
+  breakoutPrice: number;
+  baseHigh: number;
+  baseLow: number;
+  volumeRatio: number;
+  ema15: number | null;
+  sma50: number | null;
+  signalReasonZh: string;
+  signalReasonEn: string;
+};
+
+export type ValueTrendResonanceSetup = {
+  status: "confirmed" | "forming";
+  fairValueUpside: number | null;
+  ema15: number | null;
+  sma50: number | null;
+  trendStatus: "bullish" | "improving";
+  signalReasonZh: string;
+  signalReasonEn: string;
+};
+
 export type TechnicalAnalysis = {
   asOf: string;
   close: number;
@@ -60,6 +82,8 @@ export type TechnicalAnalysis = {
   wBottomLow: number | null;
   wBottomNeckline: number | null;
   trendPullback: TrendPullbackSetup | null;
+  stage2Breakout: Stage2BreakoutSetup | null;
+  valueTrendResonance: ValueTrendResonanceSetup | null;
   weeklyRangePosition: number | null;
   monthlyRangePosition: number | null;
   volumeRatio20: number | null;
@@ -756,7 +780,98 @@ function detectTrendPullback(
   return null;
 }
 
-export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis | null {
+export function detectStage2Breakout(
+  candles: DailyCandle[],
+  keyLevels: TechnicalLevel[],
+  volumeRatio20: number | null,
+): Stage2BreakoutSetup | null {
+  if (candles.length < 45) return null;
+  const ema15Series = exponentialMovingAverageSeries(candles, 15);
+  const sma50Series = movingAverageSeries(candles, 50);
+  const latestIndex = candles.length - 1;
+  const latest = candles[latestIndex];
+  const latestEma15 = ema15Series[latestIndex];
+  const latestSma50 = sma50Series[latestIndex];
+
+  if (!latestEma15 || !latestSma50) return null;
+  // 1. Must be in Golden Cross (15EMA >= 50SMA) and 50SMA must be flat or rising
+  if (latestEma15 < latestSma50) return null;
+  const sma50Lookback = sma50Series[Math.max(0, latestIndex - 20)];
+  if (sma50Lookback && latestSma50 < sma50Lookback * 0.985) return null;
+
+  // 2. Stage 1 Base Window (lookback 20 to 60 bars prior to recent breakout)
+  const baseStart = Math.max(0, latestIndex - 60);
+  const baseEnd = Math.max(baseStart + 15, latestIndex - 4);
+  const baseCandles = candles.slice(baseStart, baseEnd);
+  if (baseCandles.length < 15) return null;
+
+  const baseHigh = Math.max(...baseCandles.map((c) => c.high));
+  const baseLow = Math.min(...baseCandles.map((c) => c.low));
+  const baseHeightRatio = (baseHigh - baseLow) / (baseLow || 1);
+  if (baseHeightRatio > 0.32) return null; // Base must be reasonably formed
+
+  // 3. Breakout verification (in recent 1~4 bars, price closed above baseHigh and volume expanded)
+  const recentBars = candles.slice(Math.max(0, latestIndex - 4), latestIndex + 1);
+  const highestRecentClose = Math.max(...recentBars.map((c) => c.close));
+
+  const isBreakingOut = highestRecentClose >= baseHigh * 0.995 && latest.close >= baseHigh * 0.985;
+  if (!isBreakingOut) return null;
+
+  // Volume confirmation or strong price momentum
+  const hasVolumeClimax = (volumeRatio20 !== null && volumeRatio20 >= 1.25) || (latest.volume > 0 && latest.close > latest.open);
+  if (!hasVolumeClimax) return null;
+
+  const isConfirmed = latest.close > baseHigh * 1.01 && (volumeRatio20 === null || volumeRatio20 >= 1.3);
+
+  return {
+    status: isConfirmed ? "confirmed" : "forming",
+    breakoutPrice: baseHigh,
+    baseHigh,
+    baseLow,
+    volumeRatio: volumeRatio20 ?? 1.3,
+    ema15: latestEma15,
+    sma50: latestSma50,
+    signalReasonZh: `經歷 ${baseCandles.length} 日低檔打底後，放量突破長期整理箱體頂部（${baseHigh.toFixed(2)}），均線金叉昂揚向上，開啟 Stage 2 主升段`,
+    signalReasonEn: `Cleared ${baseCandles.length}-day Stage 1 consolidation ceiling (${baseHigh.toFixed(2)}) on expanded volume with rising EMA15/SMA50 moving averages`,
+  };
+}
+
+export function detectValueTrendResonance(
+  candles: DailyCandle[],
+  fairValueUpside?: number | null,
+): ValueTrendResonanceSetup | null {
+  if (candles.length < 30) return null;
+  const ema15Series = exponentialMovingAverageSeries(candles, 15);
+  const sma50Series = movingAverageSeries(candles, 50);
+  const latestIndex = candles.length - 1;
+  const latest = candles[latestIndex];
+  const latestEma15 = ema15Series[latestIndex];
+  const latestSma50 = sma50Series[latestIndex];
+
+  if (!latestEma15 || !latestSma50) return null;
+  // 1. Technical Right-Side: 15EMA >= 50SMA (Golden cross) and price >= 50SMA * 0.98
+  if (latestEma15 < latestSma50 * 0.995 || latest.close < latestSma50 * 0.97) return null;
+  const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
+  if (sma50Lookback && latestSma50 < sma50Lookback * 0.985) return null;
+
+  // 2. Fundamental Safety Margin: Fair value upside >= 10%
+  const upside = fairValueUpside ?? 0.20;
+  if (upside < 0.08) return null;
+
+  const isStrongTrend = latestEma15 >= latestSma50 && latest.close >= latestEma15;
+
+  return {
+    status: (upside >= 0.15 && isStrongTrend) ? "confirmed" : "forming",
+    fairValueUpside: upside,
+    ema15: latestEma15,
+    sma50: latestSma50,
+    trendStatus: isStrongTrend ? "bullish" : "improving",
+    signalReasonZh: `基本面公允價值具備 +${(upside * 100).toFixed(1)}% 安全邊際，技術面 15EMA ≥ 50SMA 黃金交叉處於右側上升軌道，具備雙重勝率優勢`,
+    signalReasonEn: `Fundamental fair value provides +${(upside * 100).toFixed(1)}% margin of safety combined with right-side EMA15 >= SMA50 golden cross uptrend`,
+  };
+}
+
+export function analyzeTechnicalSetup(candles: DailyCandle[], fairValueUpside?: number | null): TechnicalAnalysis | null {
   const valid = candles.filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
   if (valid.length < 20) return null;
   const latest = valid[valid.length - 1];
@@ -803,6 +918,8 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
   const levels = detectKeyLevels(valid, aggregateCandles(valid, "week"), aggregateCandles(valid, "month"), atr14);
   const rawCandlestick = detectCandlestickPattern(valid, atr14);
   const trendPullback = detectTrendPullback(valid, wBottom, levels.keyLevels);
+  const stage2Breakout = detectStage2Breakout(valid, levels.keyLevels, volumeRatio20);
+  const valueTrendResonance = detectValueTrendResonance(valid, fairValueUpside);
 
   // Strict Rule: Morning Star / Bullish reversal patterns MUST form on a Day/Week/Month support line.
   // Evening Star / Bearish reversal patterns MUST form on a Day/Week/Month resistance line.
@@ -862,6 +979,8 @@ export function analyzeTechnicalSetup(candles: DailyCandle[]): TechnicalAnalysis
     wBottomLow: wBottom.low,
     wBottomNeckline: wBottom.neckline,
     trendPullback,
+    stage2Breakout,
+    valueTrendResonance,
     weeklyRangePosition: rangePosition(weekly),
     monthlyRangePosition: rangePosition(monthly),
     volumeRatio20,

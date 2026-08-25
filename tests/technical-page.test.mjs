@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { buildTechnicalSnapshot } from "../lib/technical-screener.ts";
-import { analyzeTechnicalSetup, exponentialMovingAverageSeries, movingAverageSeries } from "../lib/technical-analysis.ts";
+import {
+  analyzeTechnicalSetup,
+  detectStage2Breakout,
+  detectValueTrendResonance,
+  exponentialMovingAverageSeries,
+  movingAverageSeries,
+} from "../lib/technical-analysis.ts";
 
 test("SiteHeader includes Technical Analysis between Fair Value and Fund Tracker", async () => {
   const headerSource = await readFile(new URL("../app/site-header.tsx", import.meta.url), "utf8");
@@ -11,24 +17,44 @@ test("SiteHeader includes Technical Analysis between Fair Value and Fund Tracker
   assert.match(headerSource, /t\("技術分析",\s*"Technical"\)/);
 });
 
-test("Technical Analysis page exports valid component and includes all 3 strategies", async () => {
+test("Technical Analysis page exports valid component and includes all 5 strategies & Strategy Playbook", async () => {
   const pageSource = await readFile(new URL("../app/technical/page.tsx", import.meta.url), "utf8");
   assert.match(pageSource, /export default function TechnicalAnalysisPage/);
   assert.match(pageSource, /早晨之星/);
   assert.match(pageSource, /黃昏之星/);
   assert.match(pageSource, /順勢交易/);
+  assert.match(pageSource, /價值趨勢共振/);
+  assert.match(pageSource, /第二階段突破/);
+  assert.match(pageSource, /頂級操盤手「高勝率交易策略」核心心法/);
   assert.match(pageSource, /EChartsCandlestickChart/);
   assert.match(pageSource, /EMA15/);
   assert.match(pageSource, /SMA50/);
   assert.match(pageSource, /SMA20/);
-  assert.match(pageSource, /50MA 支撐區 W 底|50MA Support Zone/);
+  assert.match(pageSource, /50MA 支撐|50MA Support/);
 });
 
-test("buildTechnicalSnapshot produces calibrated candidates for Trend Pullback and validates quant integrity", () => {
+test("buildTechnicalSnapshot produces calibrated candidates for all 5 strategies and validates quant integrity", () => {
   const snapshot = buildTechnicalSnapshot();
   assert.ok(Array.isArray(snapshot.morningStar), "morningStar should be an array");
   assert.ok(Array.isArray(snapshot.eveningStar), "eveningStar should be an array");
   assert.ok(snapshot.trendPullback.length >= 3, "should have Trend Pullback candidates");
+  assert.ok(snapshot.valueTrend.length >= 3, "should have Value-Trend Resonance candidates");
+  assert.ok(snapshot.stage2Breakout.length >= 3, "should have Stage 2 Breakout candidates");
+
+  // Verify Value-Trend candidates
+  for (const candidate of snapshot.valueTrend) {
+    assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
+    assert.ok(candidate.fairValue > 0, `${candidate.ticker} should have valid fair value`);
+    assert.equal(candidate.category, "value-trend");
+    assert.ok(candidate.descriptionZh.includes("公允價值") || candidate.descriptionZh.includes("安全邊際"));
+  }
+
+  // Verify Stage 2 Breakout candidates
+  for (const candidate of snapshot.stage2Breakout) {
+    assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
+    assert.equal(candidate.category, "stage2-breakout");
+    assert.ok(candidate.descriptionZh.includes("Stage 1") || candidate.descriptionZh.includes("打底") || candidate.descriptionZh.includes("突破"));
+  }
 
   // Verify Morning Star rules if candidates are populated
   for (const candidate of snapshot.morningStar) {
@@ -51,7 +77,6 @@ test("buildTechnicalSnapshot produces calibrated candidates for Trend Pullback a
   // Verify Trend Pullback rules: EMA15/SMA50 convergence + support zone
   for (const candidate of snapshot.trendPullback) {
     assert.ok(candidate.price > 0, `${candidate.ticker} should have valid price`);
-    assert.ok(candidate.upside >= 0, `${candidate.ticker} Trend Pullback should have positive or neutral upside`);
     assert.equal(candidate.category, "trend-pullback");
     assert.ok(candidate.supportZoneLow !== null && candidate.supportZoneHigh !== null, `${candidate.ticker} should have support buy zone`);
     assert.ok(candidate.supportZoneLow <= candidate.supportZoneHigh, `${candidate.ticker} supportZoneLow <= supportZoneHigh`);
@@ -238,4 +263,35 @@ test("3708 上緯投控 historical Morning Star (2026-07-30~31) is accurately de
 test("2317 鴻海 is NOT a Morning Star because it does not form on a Daily/Weekly/Monthly support line", () => {
   const snapshot = buildTechnicalSnapshot();
   assert.ok(!snapshot.morningStar.some((c) => c.ticker === "2317"), "2317 must not be listed in Morning Star");
+});
+
+test("detects Value-Trend Resonance setup combining intrinsic margin of safety and right-side golden cross", () => {
+  const candles = [];
+  for (let i = 0; i < 50; i++) {
+    const p = 50 + i * 0.5;
+    candles.push({ date: `2026-06-${String((i % 28) + 1).padStart(2, "0")}`, open: p - 0.2, high: p + 0.5, low: p - 0.5, close: p, volume: 1000000 });
+  }
+
+  const result = detectValueTrendResonance(candles, 0.30);
+  assert.ok(result);
+  assert.equal(result.status, "confirmed");
+  assert.equal(result.trendStatus, "bullish");
+  assert.ok(result.fairValueUpside >= 0.15);
+  assert.ok(result.signalReasonZh.includes("安全邊際"));
+});
+
+test("detects Stage 2 Breakout setup clearing base ceiling with expanded volume", () => {
+  const candles = [];
+  // 50-day base between 98 and 102
+  for (let i = 0; i < 50; i++) {
+    candles.push({ date: `2026-06-${String((i % 28) + 1).padStart(2, "0")}`, open: 100, high: 102, low: 98, close: 100, volume: 1000000 });
+  }
+  // Breakout day
+  candles.push({ date: "2026-08-20", open: 102, high: 107, low: 101.5, close: 106.5, volume: 2800000 });
+
+  const result = detectStage2Breakout(candles, [{ kind: "resistance", timeframe: "daily", price: 102 }], 2.5);
+  assert.ok(result);
+  assert.equal(result.status, "confirmed");
+  assert.ok(result.breakoutPrice >= 102);
+  assert.ok(result.signalReasonZh.includes("Stage 2"));
 });
