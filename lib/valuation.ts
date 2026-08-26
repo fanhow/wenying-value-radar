@@ -3,7 +3,9 @@ import type { FundBusinessPeProfile, FundPortfolioPeSummary, FundSectorPeProfile
 import type { ComparableMultiples } from "./market-comparables.ts";
 import { classifyFinancialFreshness, financialAgeDays, type FinancialFreshness } from "./data-freshness.ts";
 import { calibrateFairValue, type CalibrationMetadata } from "./valuation-calibration.ts";
+import type { UsEarningsReport } from "./us-earnings.ts";
 
+export type { UsEarningsReport };
 export type Market = "TW" | "US";
 export type TaiwanListingBoard = "TWSE" | "TPEx";
 export type RiskLevel = "低" | "中" | "高";
@@ -126,6 +128,8 @@ export type StockInput = {
   comparableMultiples?: ComparableMultiples;
   /** Public annual/LTM EPS observations used only for historical normalization. */
   epsHistory?: EarningsHistoryPoint[];
+  /** Optional US earnings calendar, alerts, and market expectation details. */
+  earningsReport?: UsEarningsReport;
 };
 
 export type ValuationModel = {

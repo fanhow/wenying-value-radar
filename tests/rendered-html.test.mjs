@@ -48,10 +48,13 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.08\.25\.4/);
+  assert.match(html, /Rev\. 2026\.08\.26\.1/);
   assert.doesNotMatch(html, /InvestingPro/i);
   assert.match(source, /className="table-extend-bar"/);
+  assert.match(source, /<UsEarningsPanel/);
   assert.match(styles, /\.table-extend-bar \{ display: flex; flex-wrap: wrap;/);
+  assert.match(styles, /\.earnings-panel \{/);
+  assert.match(styles, /\.earnings-alert-banner\.imminent \{/);
   assert.match(await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8"), /timeframeLabel\(analysis\.supportTimeframe/);
   const candlestickSource = await readFile(new URL("../app/daily-candlestick-chart.tsx", import.meta.url), "utf8");
   const echartsSource = await readFile(new URL("../app/echarts-candlestick-chart.tsx", import.meta.url), "utf8");

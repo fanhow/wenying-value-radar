@@ -31,6 +31,7 @@ import {
   type LatestMarketQuote,
   type YahooChartPayload,
 } from "../../../lib/price-history";
+import { loadUsEarningsReport } from "../../../lib/us-earnings";
 
 type Market = "TW" | "US";
 
@@ -889,12 +890,14 @@ export async function POST(request: NextRequest) {
     const fundBusinessPe = market === "US"
       ? fundBusinessPeProfiles.find((profile) => profile.tickers.includes(stock.ticker.toUpperCase()))
       : undefined;
+    const earningsReport = market === "US" ? await loadUsEarningsReport(stock.ticker) : undefined;
     const enrichedStock: StockInput = {
         ...stock,
         ...(institutionalSignal ? { institutionalSignal } : {}),
         ...(fundPortfolioPe ? { fundPortfolioPe } : {}),
         ...(fundSectorPe ? { fundSectorPe } : {}),
         ...(fundBusinessPe ? { fundBusinessPe } : {}),
+        ...(earningsReport ? { earningsReport } : {}),
     };
     if (!numeric(body.capturedPrice) && !numeric(body.capturedNav) && !body.capturedName?.trim()) {
       await saveValuationQueryCache(enrichedStock);

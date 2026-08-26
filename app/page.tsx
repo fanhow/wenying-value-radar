@@ -10,6 +10,7 @@ import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
 import { SiteFooter } from "./site-footer";
+import { UsEarningsPanel } from "./us-earnings-panel";
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
 type SortKey = "upside" | "quality" | "price";
@@ -1030,6 +1031,7 @@ export default function Home() {
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong className={selected.isLimitUp ? "limit-up-price" : ""}>{formatPrice(selected.price, selected.market)}</strong>{selected.priceChangePercent !== undefined && <small className={selected.priceChangePercent >= 0 ? "quote-up" : "quote-down"}>{selected.priceChange !== undefined ? `${selected.priceChange >= 0 ? "+" : ""}${formatNumber(selected.priceChange)} ` : ""}({formatSignedPercent(selected.priceChangePercent)}){selected.isLimitUp ? ` · ${t("漲停", "Limit up")}` : ""}</small>}{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}{selected.priceSource ? ` · ${selected.priceSource}` : ""}</small>}</div><div className={selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : modelDirectionLabel(selectedDirection, language)}</span><strong><TrendMark direction={selectedDirection} /> <span className={directionTextClass(selectedDirection)}>{formatSignedPercent(selected.calibratedUpside ?? selected.upside)}</span></strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
+              {selected.market === "US" && <UsEarningsPanel ticker={selected.ticker} initialReport={selected.earningsReport} language={language} />}
               <div className="fair-value-focus">
                 <div className="dual-fair-value-header">
                   <div><span className="focus-label">{t("多模型共識公允價值", "Multi-Model Consensus Fair Value")}</span><strong>{formatPrice(selected.calibratedFairValue ?? selected.fairValue, selected.market)}</strong></div>
