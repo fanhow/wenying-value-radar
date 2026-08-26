@@ -356,6 +356,95 @@ export default function FundsPage() {
           ))}
         </section>
 
+        <section className="fund-schedule-panel" aria-label={t("SEC 13F 官方持倉公開時程與重要提醒", "SEC 13F filing schedule and key reminder")}>
+          <div className="fund-schedule-heading">
+            <div>
+              <p className="section-kicker">FILING SCHEDULE / 02</p>
+              <h2>{t("SEC 13F 大戶持倉官方公開時程與重要提醒", "SEC 13F Institutional Filing Schedule & Critical Reminder")}</h2>
+              <p>{t("管理資產規模逾 1 億美元（$100M）之頂級機構，依 SEC 法規必須在每季結束後 45 天內強制申報持倉。", "Managers with over $100M in AUM must file Form 13F-HR with the SEC within 45 calendar days after each quarter-end.")}</p>
+            </div>
+            <span className="fund-schedule-badge">{t("季末 45 天法定申報期", "45-day statutory window")}</span>
+          </div>
+
+          <div className="fund-schedule-grid">
+            <div className="fund-schedule-card">
+              <div className="schedule-quarter-header">
+                <span className="quarter-tag">Q1 季度</span>
+                <strong>{t("第一季持倉", "Q1 Holdings")}</strong>
+              </div>
+              <p className="schedule-period">{t("截至 03/31", "As of Mar 31")}</p>
+              <div className="schedule-deadline">
+                <span>{t("官方公開日", "Disclosure Date")}</span>
+                <b>{t("5 月 15 日 前後公開", "Around May 15")}</b>
+              </div>
+              <small>{t("揭露 1~3 月多頭持股與增減變化", "Discloses Jan–Mar long positions and share changes")}</small>
+            </div>
+
+            <div className="fund-schedule-card active-recent">
+              <div className="schedule-quarter-header">
+                <span className="quarter-tag">Q2 季度</span>
+                <strong>{t("第二季持倉", "Q2 Holdings")}</strong>
+              </div>
+              <p className="schedule-period">{t("截至 06/30", "As of Jun 30")}</p>
+              <div className="schedule-deadline">
+                <span>{t("官方公開日", "Disclosure Date")}</span>
+                <b>{t("8 月 14 日 前後公開", "Around Aug 14")}</b>
+              </div>
+              <small>{t("揭露 4~6 月多頭持股與增減變化", "Discloses Apr–Jun long positions and share changes")}</small>
+            </div>
+
+            <div className="fund-schedule-card">
+              <div className="schedule-quarter-header">
+                <span className="quarter-tag">Q3 季度</span>
+                <strong>{t("第三季持倉", "Q3 Holdings")}</strong>
+              </div>
+              <p className="schedule-period">{t("截至 09/30", "As of Sep 30")}</p>
+              <div className="schedule-deadline">
+                <span>{t("官方公開日", "Disclosure Date")}</span>
+                <b>{t("11 月 14 日 前後公開", "Around Nov 14")}</b>
+              </div>
+              <small>{t("揭露 7~9 月多頭持股與增減變化", "Discloses Jul–Sep long positions and share changes")}</small>
+            </div>
+
+            <div className="fund-schedule-card">
+              <div className="schedule-quarter-header">
+                <span className="quarter-tag">Q4 季度</span>
+                <strong>{t("第四季持倉", "Q4 Holdings")}</strong>
+              </div>
+              <p className="schedule-period">{t("截至 12/31", "As of Dec 31")}</p>
+              <div className="schedule-deadline">
+                <span>{t("官方公開日", "Disclosure Date")}</span>
+                <b>{t("次年 2 月 14 日 前後公開", "Around Feb 14 (Next Year)")}</b>
+              </div>
+              <small>{t("揭露 10~12 月全年度持股與重倉調整", "Discloses Oct–Dec full-year positions and allocations")}</small>
+            </div>
+          </div>
+
+          <div className="fund-action-guide-box">
+            <div className="action-guide-item">
+              <span className="guide-icon">⏱️</span>
+              <div>
+                <strong>{t("時間滯後提醒（45～135 天）", "Time-Lag Reminder (45–135 Days)")}</strong>
+                <p>{t("13F 為季末歷史快照，非即時交易買賣；當散戶看到公開報告時，股價往往已經反映一波，甚至大戶在期間內已獲利調節。", "13F is a delayed quarter-end snapshot, not real-time execution; prices may have moved or positions trimmed before the disclosure arrives.")}</p>
+              </div>
+            </div>
+            <div className="action-guide-item">
+              <span className="guide-icon">🛡️</span>
+              <div>
+                <strong>{t("無衍生品與空頭避險披露", "No Short or Hedging Disclosure")}</strong>
+                <p>{t("13F 僅強制申報美國多頭現貨，不含看跌期權（Put）或放空對沖。散戶單純跟買現貨需承擔單邊無避險波動風險。", "13F only mandates U.S. long equities, omitting puts or short hedges. Copying long cash positions carries unhedged downside exposure.")}</p>
+              </div>
+            </div>
+            <div className="action-guide-item highlight-item">
+              <span className="guide-icon">🎯</span>
+              <div>
+                <strong>{t("大戶追蹤實戰致勝 3 步驟", "Winning 3-Step Strategy with Fund Tracker")}</strong>
+                <p>{t("① 以大戶重倉／共同加倉作優質初選 ➡️ ② 點擊個股檢視公允價值安全邊際（≥ +15%）防追高 ➡️ ③ 配合技術分析右側金叉（15EMA ≥ 50SMA）擇時進場！", "1. Screen top/crowded holdings as quality ideas -> 2. Click to verify intrinsic safety margin (>= +15%) -> 3. Enter via right-side technical golden cross (15EMA >= 50SMA)!")}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="fund-disclosure-note">
           <span>i</span>
           <p>{t(
