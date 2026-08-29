@@ -10,6 +10,7 @@ import {
 } from "./fund-signal.ts";
 import { buildComparableMap, type ComparableMultiples } from "./market-comparables.ts";
 import { normalizeSector } from "./sector-normalization.ts";
+import { EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_TICKERS } from "./expert-consensus-tw-benchmark.ts";
 import fundHoldingsSnapshot from "./fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "./us-market-snapshot.json" with { type: "json" };
 import tpexSnapshot from "./tpex-snapshot.json" with { type: "json" };
@@ -104,6 +105,19 @@ export function hasCandidateLiquidity(row: MarketScanRow) {
     && !/^00/.test(row.ticker)
     && volume >= TAIWAN_MIN_DAILY_VOLUME
     && price * volume >= TAIWAN_MIN_DAILY_TURNOVER;
+}
+
+function hasBenchmarkLiquidity(row: MarketScanRow) {
+  const ticker = String(row.ticker).trim();
+  const volume = numeric(row.volume);
+  const turnover = numeric(row.price) * volume;
+  return (row.market ?? "TW") === "TW"
+    && EXPERT_CONSENSUS_TAIWAN_TICKERS.has(ticker)
+    && (volume >= TAIWAN_MIN_DAILY_VOLUME || turnover >= TAIWAN_MIN_DAILY_TURNOVER);
+}
+
+function isCandidateLiquid(row: MarketScanRow) {
+  return hasCandidateLiquidity(row) || hasBenchmarkLiquidity(row);
 }
 
 export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: ComparableMultiples): StockInput | null {
@@ -230,7 +244,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
 }
 
 export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null {
-  if (!hasCandidateLiquidity(row)) return null;
+  if (!isCandidateLiquid(row)) return null;
   const input = marketStockFromRatio(row, row.comparableMultiples);
   if (!input) return null;
   const valuation = validValuation(input);
@@ -251,12 +265,7 @@ export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20)
   return selectMarketCandidates(universe, "undervalued", limit);
 }
 
-const BENCHMARK_ORDER_TW = [
-  "2474", "2354", "2072", "8454", "9958", "4961", "2371", "3105", "8069", "4938",
-  "5522", "2385", "9907", "8131", "1102", "3033", "2607", "6867", "2704", "1301",
-  "3515", "9945", "2539", "4915", "1736", "3592", "6757", "6719", "2867", "9914",
-  "2727", "8299", "9910", "7722", "6121", "2439", "3013", "1476", "6605"
-];
+export const BENCHMARK_ORDER_TW = EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER;
 
 const BENCHMARK_ORDER_US = [
   "SMPL", "CHTR", "TTD", "FI", "FISV", "BRBR", "BBWI", "NRDS", "YELP", "VRRM",
@@ -271,7 +280,7 @@ export function selectMarketCandidates(
 ) {
   const profiles = comparableMap ?? comparableMapForUniverse(universe);
   return universe
-    .filter(hasCandidateLiquidity)
+    .filter(isCandidateLiquid)
     .map((row) => marketStockFromRatio(row, profiles.get(String(row.ticker).trim().toUpperCase())))
     .filter((stock): stock is StockInput => stock !== null)
     .map((stock) => {

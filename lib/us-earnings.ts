@@ -33,15 +33,15 @@ export type UsEarningsReport = {
   earningsTimeLabelEn: string;
   fiscalQuarter: string; // e.g. "2026 Q2 (Jul 2026)"
   consensusEps: number | null; // e.g. 2.09
-  highEps?: number | null;
-  lowEps?: number | null;
-  analystCount?: number | null;
-  lastYearEps?: number | null; // e.g. 0.99
-  yoyEpsGrowth?: number | null; // e.g. 111.1 (%)
-  revisionsUp?: number | null;
-  revisionsDown?: number | null;
-  beatRatePercent?: number | null; // e.g. 100 (%)
-  avgSurprisePercent?: number | null; // e.g. 7.2 (%)
+  highEps: number | null;
+  lowEps: number | null;
+  analystCount: number | null;
+  lastYearEps: number | null; // e.g. 0.99
+  yoyEpsGrowth: number | null; // e.g. 111.1 (%)
+  revisionsUp: number | null;
+  revisionsDown: number | null;
+  beatRatePercent: number | null; // e.g. 100 (%)
+  avgSurprisePercent: number | null; // e.g. 7.2 (%)
   historicalQuarters: QuarterlyEarningsHistoryPoint[];
   upcomingQuarters: UpcomingQuarterEstimate[];
   fiscalYearForecast: FiscalYearEstimate[];
@@ -440,6 +440,10 @@ export async function loadUsEarningsReport(ticker: string, fetcher: typeof fetch
     const epsJson = epsRes && epsRes.ok ? await epsRes.json() : null;
     const dateJson = dateRes && dateRes.ok ? await dateRes.json() : null;
     const forecastJson = forecastRes && forecastRes.ok ? await forecastRes.json() : null;
+
+    if (!epsJson && !dateJson && !forecastJson) {
+      throw new Error("All earnings sources are unavailable");
+    }
 
     let earningsDate: string | null = null;
     let isDateConfirmed = false;

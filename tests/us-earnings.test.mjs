@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadUsEarningsReport } from "../lib/us-earnings.ts";
 
-test("loadUsEarningsReport correctly parses NVDA today earnings after-hours", async () => {
-  const report = await loadUsEarningsReport("NVDA");
+const offlineFetcher = () => Promise.reject(new Error("Deterministic offline test"));
+
+test("loadUsEarningsReport correctly parses the curated NVDA after-hours snapshot", async () => {
+  const report = await loadUsEarningsReport("NVDA", offlineFetcher);
   assert.ok(report, "NVDA earnings report should exist");
   assert.equal(report.ticker, "NVDA");
   assert.equal(report.earningsDate, "2026-08-26");
@@ -22,7 +24,7 @@ test("loadUsEarningsReport correctly parses NVDA today earnings after-hours", as
 });
 
 test("loadUsEarningsReport correctly classifies countdown for AVGO", async () => {
-  const report = await loadUsEarningsReport("AVGO");
+  const report = await loadUsEarningsReport("AVGO", offlineFetcher);
   assert.ok(report, "AVGO earnings report should exist");
   assert.equal(report.ticker, "AVGO");
   assert.equal(report.urgencyLevel, "imminent");
@@ -32,13 +34,13 @@ test("loadUsEarningsReport correctly classifies countdown for AVGO", async () =>
 });
 
 test("loadUsEarningsReport handles scheduled earnings for AAPL and TSLA", async () => {
-  const aapl = await loadUsEarningsReport("AAPL");
+  const aapl = await loadUsEarningsReport("AAPL", offlineFetcher);
   assert.ok(aapl);
   assert.equal(aapl.ticker, "AAPL");
   assert.ok(aapl.consensusEps !== null && aapl.consensusEps > 0);
   assert.ok(aapl.urgencyLevel === "scheduled" || aapl.urgencyLevel === "estimated");
 
-  const tsla = await loadUsEarningsReport("TSLA");
+  const tsla = await loadUsEarningsReport("TSLA", offlineFetcher);
   assert.ok(tsla);
   assert.equal(tsla.ticker, "TSLA");
   assert.ok(tsla.consensusEps !== null);

@@ -1,17 +1,17 @@
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
-import { SpreadsheetFile } from "../work/investingpro-training-20260817/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs";
+import { SpreadsheetFile } from "../work/expert-consensus-training-20260817/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs";
 import { calculateStock } from "../lib/valuation.ts";
 import { normalizeSector } from "../lib/sector-normalization.ts";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const excelPath = path.join(repoRoot, "outputs/investingpro-training-20260817/WenYing-InvestingPro-Training-Template-2026-08-17.xlsx");
+const excelPath = path.join(repoRoot, "outputs/expert-consensus-training-20260817/WenYing-Expert-Consensus-Training-Template-2026-08-17.xlsx");
 const usSnapshotPath = path.join(repoRoot, "lib/us-market-snapshot.json");
 const tpexSnapshotPath = path.join(repoRoot, "lib/tpex-snapshot.json");
-const outputJsonPath = path.join(repoRoot, "outputs/investingpro-benchmark-dataset.json");
+const outputJsonPath = path.join(repoRoot, "outputs/expert-consensus-benchmark-dataset.json");
 
-export async function importInvestingProTrainingData() {
+export async function importExpertConsensusTrainingData() {
   const excelBuffer = await fs.readFile(excelPath);
   const fileHash = crypto.createHash("sha256").update(excelBuffer).digest("hex");
   const wb = await SpreadsheetFile.importXlsx(excelBuffer);
@@ -45,7 +45,8 @@ export async function importInvestingProTrainingData() {
   const fundValues = getSheetValues("六大基金持股");
   const rankValues = getSheetValues("排行前40");
   const universeValues = getSheetValues("標的總表");
-  const snapshotValues = getSheetValues("InvestingPro快照");
+  const snapshotSheet = wb.worksheets.items.find((sheet) => sheet.name.endsWith("快照"));
+  const snapshotValues = snapshotSheet?.getUsedRange()?.values ?? [];
   const financialValues = getSheetValues("歷史財務資料");
   const modelValues = getSheetValues("模型輸出");
 
@@ -97,13 +98,13 @@ export async function importInvestingProTrainingData() {
     completionStatus: row[11],
   }));
 
-  // Parse InvestingPro snapshot table
+  // Parse Expert Consensus snapshot table
   const snapshots = snapshotValues.slice(1).map((row) => ({
     snapshotDate: row[0] instanceof Date ? row[0].toISOString().slice(0, 10) : row[0],
     market: row[1],
     ticker: String(row[2]),
     name: row[3],
-    investingProSymbol: row[4],
+    expertConsensusSymbol: row[4],
     currency: row[5],
     price: row[6],
     fairValue: row[7],
@@ -249,7 +250,7 @@ export async function importInvestingProTrainingData() {
       fundCount: item.fundCount,
       overallRank: item.overallRank,
       marketRank: item.marketRank,
-      investingPro: {
+      expertConsensus: {
         hasTarget: snap?.fairValue !== null && snap?.fairValue !== undefined && Number(snap.fairValue) > 0,
         fairValue: snap?.fairValue ? Number(snap.fairValue) : null,
         spreadLow: snap?.spreadLow ? Number(snap.spreadLow) : null,
@@ -293,7 +294,7 @@ export async function importInvestingProTrainingData() {
   const dataset = {
     metadata: {
       generatedAt: new Date().toISOString(),
-      sourceFile: "WenYing-InvestingPro-Training-Template-2026-08-17.xlsx",
+      sourceFile: "WenYing-Expert Consensus-Training-Template-2026-08-17.xlsx",
       sourceFileSha256: fileHash,
       universeCount: universeList.length,
       fundRowCount: fundHoldings.length,
@@ -313,7 +314,7 @@ export async function importInvestingProTrainingData() {
   await fs.writeFile(outputJsonPath, JSON.stringify(dataset, null, 2), "utf8");
 
   const datasetHash = crypto.createHash("sha256").update(JSON.stringify(dataset)).digest("hex");
-  console.log(`[Import] Successfully imported InvestingPro training workbook.`);
+  console.log(`[Import] Successfully imported Expert Consensus training workbook.`);
   console.log(`[Import] Source Excel Hash: ${fileHash}`);
   console.log(`[Import] Output Dataset Path: ${outputJsonPath}`);
   console.log(`[Import] Dataset Hash: ${datasetHash}`);
@@ -322,8 +323,8 @@ export async function importInvestingProTrainingData() {
   return { dataset, fileHash, datasetHash };
 }
 
-if (process.argv[1] && process.argv[1].endsWith("import-investingpro-training-data.mjs")) {
-  importInvestingProTrainingData().catch((err) => {
+if (process.argv[1] && process.argv[1].endsWith("import-expert-consensus-training-data.mjs")) {
+  importExpertConsensusTrainingData().catch((err) => {
     console.error("Import failed:", err);
     process.exit(1);
   });

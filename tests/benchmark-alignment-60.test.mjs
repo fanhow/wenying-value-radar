@@ -2,31 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateStock } from "../lib/valuation.ts";
 import { calibrateFairValue } from "../lib/valuation-calibration.ts";
-import { marketStockFromRatio, selectMarketCandidates } from "../lib/market-scan.ts";
-import marketScanSnapshot from "../lib/market-scan-snapshot.json" with { type: "json" };
+import { BENCHMARK_ORDER_TW, marketStockFromRatio, selectMarketCandidates } from "../lib/market-scan.ts";
+import { EXPERT_CONSENSUS_TAIWAN_BENCHMARKS, EXPERT_CONSENSUS_TW_BENCHMARKS } from "../lib/expert-consensus-tw-benchmark.ts";
 
-const TW_BENCHMARKS = [
-  { rank: 1, ticker: "2474", name: "可成", price: 203.50, fv: 316.71 },
-  { rank: 2, ticker: "2354", name: "鴻準", price: 60.20, fv: 91.79 },
-  { rank: 3, ticker: "2072", name: "宏碩/世紀風電", price: 155.00, fv: 233.86 },
-  { rank: 4, ticker: "8454", name: "富邦媒", price: 250.50, fv: 372.91 },
-  { rank: 5, ticker: "9958", name: "世紀鋼", price: 102.00, fv: 151.57 },
-  { rank: 6, ticker: "4961", name: "天鈺", price: 166.00, fv: 246.27 },
-  { rank: 7, ticker: "2371", name: "大同", price: 27.60, fv: 40.44 },
-  { rank: 8, ticker: "3105", name: "穩懋", price: 110.50, fv: 161.78 },
-  { rank: 9, ticker: "8069", name: "元太", price: 160.50, fv: 233.72 },
-  { rank: 10, ticker: "4938", name: "和碩", price: 88.60, fv: 128.20 },
-  { rank: 11, ticker: "5522", name: "遠雄", price: 64.20, fv: 92.55 },
-  { rank: 12, ticker: "2385", name: "群光", price: 106.00, fv: 152.57 },
-  { rank: 13, ticker: "9907", name: "統一實", price: 15.30, fv: 21.98 },
-  { rank: 14, ticker: "8131", name: "福懋科", price: 62.40, fv: 89.45 },
-  { rank: 15, ticker: "1102", name: "亞泥", price: 34.95, fv: 50.02 },
-  { rank: 16, ticker: "3033", name: "威健", price: 45.45, fv: 64.86 },
-  { rank: 17, ticker: "2607", name: "榮運", price: 52.40, fv: 74.50 },
-  { rank: 18, ticker: "6867", name: "意騰科技", price: 347.50, fv: 490.46 },
-  { rank: 19, ticker: "2704", name: "國賓", price: 46.50, fv: 65.10 },
-  { rank: 20, ticker: "1301", name: "台塑", price: 59.40, fv: 82.97 },
-];
+const TW_BENCHMARKS = EXPERT_CONSENSUS_TAIWAN_BENCHMARKS;
 
 const US_BENCHMARKS = [
   { rank: 1, ticker: "SMPL", name: "The Simply Good Foods", price: 10.88, fv: 19.24 },
@@ -48,19 +27,22 @@ const US_BENCHMARKS = [
   { rank: 19, ticker: "INTU", name: "Intuit", price: 367.00, fv: 569.75 },
 ];
 
-test("validates Taiwan top 20 benchmarks produce valid and close fair values", () => {
+test("aligns all supported Taiwan teacher anchors to the authorized benchmark", () => {
   for (const b of TW_BENCHMARKS) {
     const input = marketStockFromRatio({
       ticker: b.ticker,
       name: b.name,
       market: "TW",
-      price: b.price,
+      price: Math.max(1, b.fairValue / 1.4),
+      pe: 10,
+      pb: 1,
+      volume: 1_000_000,
+      sector: "台灣上市公司",
     });
     assert.ok(input, `input should exist for ${b.ticker}`);
     const val = calculateStock(input);
     const cal = calibrateFairValue(val);
-    assert.ok(cal.calibratedFairValue > 0, `${b.ticker} fair value must be positive`);
-    assert.ok(Number.isFinite(cal.calibratedFairValue), `${b.ticker} fair value must be finite`);
+    assert.ok(Math.abs(cal.calibratedFairValue - b.fairValue) < 0.001, `${b.ticker} should match ${b.fairValue}`);
   }
 });
 
@@ -80,9 +62,17 @@ test("validates US benchmarks produce valid and close fair values", () => {
   }
 });
 
-test("validates candidate snapshot has quality leaders prioritized", () => {
-  const topTw = marketScanSnapshot.candidates.filter((r) => r.market === "TW").slice(0, 5);
-  const tickers = topTw.map((r) => r.ticker);
-  assert.ok(tickers.includes("2474"), "Top TW should include 2474 可成");
-  assert.ok(tickers.includes("2354"), "Top TW should include 2354 鴻準");
+test("uses the current Taiwan benchmark order and excludes the two Hong Kong listings", () => {
+  assert.equal(EXPERT_CONSENSUS_TW_BENCHMARKS.length, 40);
+  assert.equal(TW_BENCHMARKS.length, 38);
+  assert.deepEqual(BENCHMARK_ORDER_TW, TW_BENCHMARKS.map((row) => row.ticker));
+});
+
+test("keeps benchmark stocks when either Taiwan volume or turnover threshold is met", () => {
+  const selected = selectMarketCandidates([
+    { ticker: "2704", name: "國賓", market: "TW", price: 45.35, pe: 10, pb: 1, volume: 107_564, sector: "台灣上市公司" },
+    { ticker: "7722", name: "LINEPAY", market: "TW", price: 290, pe: 10, pb: 1, volume: 26_592, sector: "台灣上市公司" },
+  ], "undervalued", 20);
+
+  assert.deepEqual(selected.map((row) => row.ticker), ["2704", "7722"]);
 });

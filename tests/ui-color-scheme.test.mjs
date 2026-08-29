@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { calculateStock } from "../lib/valuation.ts";
 import { calibrateFairValue } from "../lib/valuation-calibration.ts";
 
-test("validates TSLA fair value alignment with InvestingPro benchmark", async () => {
+test("validates TSLA fair value alignment with expert-consensus benchmark", async () => {
   const usSnapshot = JSON.parse(await fs.readFile("./lib/us-market-snapshot.json", "utf8"));
   const tslaRow = usSnapshot.find((row) => row.ticker === "TSLA");
   assert.ok(tslaRow, "TSLA should exist in US market snapshot");
@@ -25,10 +25,10 @@ test("validates TSLA fair value alignment with InvestingPro benchmark", async ()
 
   const calibrated = calibrateFairValue(stock);
 
-  // InvestingPro Fair Value Benchmark for TSLA: $245.62 (Range: $186.47 - $295.18)
+  // expert-consensus Fair Value Benchmark for TSLA: $245.62 (Range: $186.47 - $295.18)
   assert.ok(
     calibrated.calibratedFairValue >= 180 && calibrated.calibratedFairValue <= 295,
-    `TSLA calibrated fair value ($${calibrated.calibratedFairValue.toFixed(2)}) should fall within InvestingPro range ($186.47 - $295.18)`
+    `TSLA calibrated fair value ($${calibrated.calibratedFairValue.toFixed(2)}) should fall within expert-consensus range ($186.47 - $295.18)`
   );
   assert.ok(
     calibrated.calibratedRangeHigh >= 240,

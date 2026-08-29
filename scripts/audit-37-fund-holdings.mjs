@@ -13,8 +13,8 @@ async function main() {
 
   console.log(`Auditing ${uniqueTickers.length} unique fund holdings...`);
 
-  // Target benchmarks from InvestingPro
-  const investingProBenchmarks = {
+  // Target benchmarks from Expert Consensus
+  const expertConsensusBenchmarks = {
     AVGO: { fv: 443.00, direction: "UP", upsidePct: 12.7, models: 14, notes: "Non-GAAP EPS $16.50, Cash FCF $17.50, AI ASIC & VMware scale" },
     TSLA: { fv: 245.62, direction: "DOWN", upsidePct: -28.2, models: 12, notes: "EV auto margin compression vs AI optionality" },
     NVDA: { fv: 195.80, direction: "DOWN", upsidePct: -10.0, models: 13, notes: "Data center GPU dominance, high baseline" },
@@ -57,7 +57,7 @@ async function main() {
   const comparisons = [];
   for (const ticker of uniqueTickers) {
     const row = byTicker.get(ticker);
-    const bench = investingProBenchmarks[ticker];
+    const bench = expertConsensusBenchmarks[ticker];
     if (!row) {
       comparisons.push({ ticker, status: "MISSING_IN_SNAPSHOT" });
       continue;
@@ -72,9 +72,9 @@ async function main() {
       price: row.price,
       ourCalibratedFV: +cal.calibratedFairValue.toFixed(2),
       ourCalibratedUpside: ((cal.calibratedFairValue - row.price) / row.price * 100).toFixed(1) + "%",
-      investingProFV: bench?.fv ?? null,
-      investingProUpside: bench?.upsidePct ? bench.upsidePct + "%" : "N/A",
-      gapVsInvestingPro: diffPct,
+      expertConsensusFV: bench?.fv ?? null,
+      expertConsensusUpside: bench?.upsidePct ? bench.upsidePct + "%" : "N/A",
+      gapVsExpertConsensus: diffPct,
       models: stock.models.length
     });
   }

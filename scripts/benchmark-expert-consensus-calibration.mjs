@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { calculateStock } from "../lib/valuation.ts";
-import { importInvestingProTrainingData } from "./import-investingpro-training-data.mjs";
+import { importExpertConsensusTrainingData } from "./import-expert-consensus-training-data.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const benchmarkOutputPath = path.join(repoRoot, "docs/valuation-benchmark.md");
@@ -110,15 +110,15 @@ function evaluatePredictions(records) {
 // Generate cross-validation / benchmark splits and run all methods
 export async function runValuationBenchmark() {
   console.log("===============================================================");
-  console.log("   WENYING VALUE RADAR × INVESTINGPRO VALUATION BENCHMARK LAB   ");
+  console.log("   WENYING VALUE RADAR × EXPERT CONSENSUS VALUATION BENCHMARK LAB   ");
   console.log("===============================================================");
 
-  const { dataset, fileHash, datasetHash } = await importInvestingProTrainingData();
+  const { dataset, fileHash, datasetHash } = await importExpertConsensusTrainingData();
   const universe = dataset.universe;
   const usSnapshot = JSON.parse(await fs.readFile(path.join(repoRoot, "lib/us-market-snapshot.json"), "utf8"));
 
   // Build a comprehensive benchmark evaluation sample
-  // We use the 77 universe stocks + extended benchmark stocks with known financials and InvestingPro model targets
+  // We use the 77 universe stocks + extended benchmark stocks with known financials and Expert Consensus model targets
   const sampleItems = [];
 
   for (const item of universe) {
@@ -137,7 +137,7 @@ export async function runValuationBenchmark() {
       revenueGrowth: item.financials.revenueGrowth ?? 10,
       roe: item.financials.roe ?? 15,
       debtRatio: item.financials.debtRatio ?? 40,
-      uncertainty: item.investingPro.uncertainty === "LOW" ? 0.15 : item.investingPro.uncertainty === "HIGH" ? 0.45 : 0.25,
+      uncertainty: item.expertConsensus.uncertainty === "LOW" ? 0.15 : item.expertConsensus.uncertainty === "HIGH" ? 0.45 : 0.25,
       dividendPerShare: item.financials.dividendPerShare,
       revenuePerShare: item.financials.revenuePerShare,
       ebitdaPerShare: item.financials.ebitdaPerShare,
@@ -147,14 +147,14 @@ export async function runValuationBenchmark() {
     });
 
     // Determine target (ground truth)
-    // If exact snapshot target exists, use it. Otherwise use proxy teacher target from verified multi-model InvestingPro baseline
-    let target = item.investingPro.fairValue;
+    // If exact snapshot target exists, use it. Otherwise use proxy teacher target from verified multi-model Expert Consensus baseline
+    let target = item.expertConsensus.fairValue;
     if (!target || target <= 0) {
-      // High-precision InvestingPro Multi-Model Consensus Proxy:
-      // InvestingPro is documented as an average of valid models (growth exit DCF, EBITDA exit DCF, peer multiples, EPV, etc.)
+      // High-precision Expert Consensus Multi-Model Consensus Proxy:
+      // Expert Consensus is documented as an average of valid models (growth exit DCF, EBITDA exit DCF, peer multiples, EPV, etc.)
       const validModels = stock.models.filter((m) => m.value > 0);
       if (validModels.length > 0) {
-        // InvestingPro average of valid models with model-specific weighting
+        // Expert Consensus average of valid models with model-specific weighting
         target = mean(validModels.map((m) => m.value));
       } else {
         target = stock.fairValue;
@@ -171,7 +171,7 @@ export async function runValuationBenchmark() {
       target,
       models: stock.models,
       financials: item.financials,
-      isRealTarget: Boolean(item.investingPro.fairValue),
+      isRealTarget: Boolean(item.expertConsensus.fairValue),
     });
   }
 
@@ -526,7 +526,7 @@ export async function runValuationBenchmark() {
       id: "P",
       name: "Method P: Two-Stage Model Filter + Calibrated Aggregation",
       predict: (item) => {
-        // Stage 1: Filter models by InvestingPro eligibility rules
+        // Stage 1: Filter models by Expert Consensus eligibility rules
         const sector = (item.sector || "").toLowerCase();
         const growth = item.financials?.revenueGrowth ?? 10;
         let stage1 = item.models.filter((m) => m.value > 0);
@@ -678,7 +678,7 @@ async function generateBenchmarkMarkdown(data) {
 
 ## 摘要與核心結論 (Executive Summary)
 
-本研究針對 WenYing Value Radar 估值引擎進行了全面性的量化校準實驗（涵蓋 Method A 到 Method P 共 16 種架構），旨在使公允價值在跨產業、跨市場（台股與美股）及未見過的 Holdout 測試集上，最大程度逼近 **InvestingPro Fair Value**，同時嚴格維護估值架構的數學穩定性、可解釋性與防禦性。
+本研究針對 WenYing Value Radar 估值引擎進行了全面性的量化校準實驗（涵蓋 Method A 到 Method P 共 16 種架構），旨在使公允價值在跨產業、跨市場（台股與美股）及未見過的 Holdout 測試集上，最大程度逼近 **Expert Consensus Fair Value**，同時嚴格維護估值架構的數學穩定性、可解釋性與防禦性。
 
 ### 核心量化指標改善對比 (Key Results Summary)
 - **Holdout MdAPE（中位數絕對百分比誤差）**：從 Native 基線的 **${(holdoutResults[0].mdape * 100).toFixed(2)}%** 大幅下降至 Method O（多特徵強健校準層）的 **${(holdoutResults.find((r) => r.id === "O").mdape * 100).toFixed(2)}%**（改善幅度達 **${(((holdoutResults[0].mdape - holdoutResults.find((r) => r.id === "O").mdape) / holdoutResults[0].mdape) * 100).toFixed(1)}%**）。
@@ -693,7 +693,7 @@ async function generateBenchmarkMarkdown(data) {
 
 | 項目 | 數值 / 說明 |
 |---|---|
-| **來源活頁簿** | \`outputs/investingpro-training-20260817/WenYing-InvestingPro-Training-Template-2026-08-17.xlsx\` |
+| **來源活頁簿** | \`outputs/expert-consensus-training-20260817/WenYing-Expert-Consensus-Training-Template-2026-08-17.xlsx\` |
 | **來源檔 SHA-256** | \`${fileHash}\` |
 | **生成 Benchmark Dataset Hash** | \`${datasetHash}\` |
 | **評估樣本總數** | ${sampleCount} 檔股票 (台股 + 美股大型/中型/成長/防禦/金融/REIT 全光譜) |
@@ -719,7 +719,7 @@ ${holdoutResults
 ## 三、價格特徵消融實驗 (Price Feature Ablation)
 
 > [!NOTE]
-> **消融實驗目的**：驗證「納入當前股價」是否會帶來循環依賴（Circularity），以及在「完全不使用當前股價」的情況下，系統能否依然高度逼近 InvestingPro Fair Value。
+> **消融實驗目的**：驗證「納入當前股價」是否會帶來循環依賴（Circularity），以及在「完全不使用當前股價」的情況下，系統能否依然高度逼近 Expert Consensus Fair Value。
 
 | 實驗組別 | 代表方法 | 使用特徵 | Holdout MdAPE | Holdout MAPE | 系統循環依賴風險 | 推薦等級 |
 |---|---|---|:---:|:---:|:---:|:---:|
@@ -760,7 +760,7 @@ ${holdoutResults
   await fs.writeFile(benchmarkOutputPath, content, "utf8");
 }
 
-if (process.argv[1] && process.argv[1].endsWith("benchmark-investingpro-calibration.mjs")) {
+if (process.argv[1] && process.argv[1].endsWith("benchmark-expert-consensus-calibration.mjs")) {
   runValuationBenchmark().catch((err) => {
     console.error("Benchmark failed:", err);
     process.exit(1);

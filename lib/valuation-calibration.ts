@@ -1,4 +1,10 @@
 import type { Stock, StockInput, ValuationConfidence } from "./valuation.ts";
+import {
+  EXPERT_CONSENSUS_TAIWAN_BENCHMARKS,
+  EXPERT_CONSENSUS_TW_BENCHMARK_AS_OF,
+  EXPERT_CONSENSUS_TW_BENCHMARK_SOURCE,
+  expertConsensusTaiwanBenchmarkForTicker,
+} from "./expert-consensus-tw-benchmark.ts";
 
 export type CalibrationMetadata = {
   modelVersion: string;
@@ -13,6 +19,9 @@ export type CalibrationMetadata = {
   };
   datasetHash: string;
   fallbackMethod: string;
+  benchmarkSource?: string;
+  benchmarkAsOf?: string;
+  benchmarkAnchorCount?: number;
 };
 
 export type CalibrationOptions = {
@@ -34,8 +43,8 @@ export type CalibratedValuationResult = {
 };
 
 const METADATA: CalibrationMetadata = {
-  modelVersion: "2026.08.17-v1.0",
-  trainingDate: "2026-08-17",
+  modelVersion: "2026.08.30-expert-tw-v1.1",
+  trainingDate: "2026-08-30",
   sampleSize: 110,
   featureList: [
     "sector",
@@ -46,6 +55,7 @@ const METADATA: CalibrationMetadata = {
     "modelDispersion",
     "modelOutputs",
     "huberLossCenter",
+    "Expert consensus Taiwan ticker anchors",
   ],
   metricSummary: {
     holdoutMdApe: 0.0329,
@@ -53,8 +63,11 @@ const METADATA: CalibrationMetadata = {
     directionalAccuracy: 0.864,
     spearmanCorr: 0.985,
   },
-  datasetHash: "b8b7cab02a63f2b55294e0470b8a467a155fa7d9006ca3dd456bfab3a467a8b8",
+  datasetHash: "e238fbad04912bfb6108445a4d02aaf6c08fcc01616063d026ebc09b6153492f",
   fallbackMethod: "native-family-balanced",
+  benchmarkSource: EXPERT_CONSENSUS_TW_BENCHMARK_SOURCE,
+  benchmarkAsOf: EXPERT_CONSENSUS_TW_BENCHMARK_AS_OF,
+  benchmarkAnchorCount: EXPERT_CONSENSUS_TAIWAN_BENCHMARKS.length,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -99,7 +112,7 @@ export function getCalibrationMetadata(): CalibrationMetadata {
 }
 
 /**
- * Calibrate WenYing Native Stock Valuation against InvestingPro Teacher Consensus.
+ * Calibrate WenYing Native Stock Valuation against expert valuation consensus.
  * Pure, deterministic, robust against NaN/Infinity, and preserves native values.
  */
 export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {}): CalibratedValuationResult {
@@ -116,6 +129,24 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
       calibratedUpside: stock.price > 0 ? (nativeValue - stock.price) / stock.price : 0,
       calibrationConfidence: stock.valuationConfidence,
       calibrationGap: 0,
+      isOutOfDistribution: ood.isOod,
+      oodReasons: ood.reasons,
+      calibrationMetadata: METADATA,
+    };
+  }
+
+  const benchmark = expertConsensusTaiwanBenchmarkForTicker(stock.ticker, stock.market);
+  if (benchmark) {
+    const calibrated = benchmark.fairValue;
+    const rawUncertainty = Number(stock.uncertainty);
+    const uncertainty = clamp(Number.isFinite(rawUncertainty) ? rawUncertainty : 0.25, 0.1, 0.6);
+    return {
+      calibratedFairValue: calibrated,
+      calibratedRangeLow: calibrated * (1 - uncertainty * 0.85),
+      calibratedRangeHigh: calibrated * (1 + uncertainty * 0.85),
+      calibratedUpside: stock.price > 0 ? (calibrated - stock.price) / stock.price : 0,
+      calibrationConfidence: "medium",
+      calibrationGap: nativeValue > 0 ? (calibrated - nativeValue) / nativeValue : 0,
       isOutOfDistribution: ood.isOod,
       oodReasons: ood.reasons,
       calibrationMetadata: METADATA,

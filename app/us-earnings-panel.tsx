@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UsEarningsReport } from "../lib/us-earnings";
-import { useLanguage, type Language } from "./language-context";
+import type { Language } from "./language-context";
 
 type UsEarningsPanelProps = {
   ticker: string;
@@ -11,28 +11,22 @@ type UsEarningsPanelProps = {
 };
 
 export function UsEarningsPanel({ ticker, initialReport, language }: UsEarningsPanelProps) {
-  const [report, setReport] = useState<UsEarningsReport | null>(initialReport ?? null);
-  const [isLoading, setIsLoading] = useState(!initialReport);
+  const [fetched, setFetched] = useState<{ ticker: string; report: UsEarningsReport | null } | null>(null);
+  const initial = initialReport?.ticker === ticker ? initialReport : null;
+  const report = initial ?? (fetched?.ticker === ticker ? fetched.report : null);
+  const isLoading = !initial && fetched?.ticker !== ticker;
 
   useEffect(() => {
-    if (initialReport && initialReport.ticker === ticker) {
-      setReport(initialReport);
-      setIsLoading(false);
-      return;
-    }
+    if (initialReport?.ticker === ticker) return;
 
     let isMounted = true;
-    setIsLoading(true);
     fetch(`/api/earnings?ticker=${encodeURIComponent(ticker)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: UsEarningsReport | null) => {
-        if (isMounted) {
-          setReport(data);
-          setIsLoading(false);
-        }
+        if (isMounted) setFetched({ ticker, report: data });
       })
       .catch(() => {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) setFetched({ ticker, report: null });
       });
 
     return () => {

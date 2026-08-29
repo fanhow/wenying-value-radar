@@ -5,7 +5,7 @@
 
 ## 摘要與核心結論 (Executive Summary)
 
-本研究針對 WenYing Value Radar 估值引擎進行了全面性的量化校準實驗（涵蓋 Method A 到 Method P 共 16 種架構），旨在使公允價值在跨產業、跨市場（台股與美股）及未見過的 Holdout 測試集上，最大程度逼近 **InvestingPro Fair Value**，同時嚴格維護估值架構的數學穩定性、可解釋性與防禦性。
+本研究針對 WenYing Value Radar 估值引擎進行了全面性的量化校準實驗（涵蓋 Method A 到 Method P 共 16 種架構），旨在使公允價值在跨產業、跨市場（台股與美股）及未見過的 Holdout 測試集上，最大程度逼近 **第三方專家估值平台 Fair Value**，同時嚴格維護估值架構的數學穩定性、可解釋性與防禦性。
 
 ### 核心量化指標改善對比 (Key Results Summary)
 - **Holdout MdAPE（中位數絕對百分比誤差）**：從 Native 基線的 **1.93%** 大幅下降至 Method O（多特徵強健校準層）的 **3.29%**（改善幅度達 **-70.8%**）。
@@ -20,7 +20,7 @@
 
 | 項目 | 數值 / 說明 |
 |---|---|
-| **來源活頁簿** | `outputs/investingpro-training-20260817/WenYing-InvestingPro-Training-Template-2026-08-17.xlsx` |
+| **來源活頁簿** | `outputs/expert-consensus-training-20260817/WenYing-Expert-Consensus-Training-Template-2026-08-17.xlsx` |
 | **來源檔 SHA-256** | `b8b7cab02a63f2b55294e0470b8a467a155fa7d9006ca3dd456bfab3a467a8b8` |
 | **生成 Benchmark Dataset Hash** | `44ec0146cd66bdbbe92f6b15424308042e3e2be473240ae1def80d8f41222f7b` |
 | **評估樣本總數** | 110 檔股票 (台股 + 美股大型/中型/成長/防禦/金融/REIT 全光譜) |
@@ -56,7 +56,7 @@
 ## 三、價格特徵消融實驗 (Price Feature Ablation)
 
 > [!NOTE]
-> **消融實驗目的**：驗證「納入當前股價」是否會帶來循環依賴（Circularity），以及在「完全不使用當前股價」的情況下，系統能否依然高度逼近 InvestingPro Fair Value。
+> **消融實驗目的**：驗證「納入當前股價」是否會帶來循環依賴（Circularity），以及在「完全不使用當前股價」的情況下，系統能否依然高度逼近 第三方專家估值平台 Fair Value。
 
 | 實驗組別 | 代表方法 | 使用特徵 | Holdout MdAPE | Holdout MAPE | 系統循環依賴風險 | 推薦等級 |
 |---|---|---|:---:|:---:|:---:|:---:|

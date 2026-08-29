@@ -524,7 +524,7 @@ export function residualIncomePerShare(
 /**
  * Discounted operating-metric exit model.
  *
- * InvestingPro exposes EBITDA- and revenue-exit DCF variants.  We can
+ * Commercial expert-valuation platforms expose EBITDA- and revenue-exit DCF variants. We can
  * reproduce the observable structure without analyst forecasts by using the
  * latest public operating metric, fading historical growth, an independently
  * observed peer EV multiple for the terminal value, and an FCFF proxy.  The
