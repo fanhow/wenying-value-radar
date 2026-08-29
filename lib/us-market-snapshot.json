@@ -1281,8 +1281,8 @@
   },
   {
     "ticker": "ACN",
-    "name": "Accenture plc Class A Ordinary Shares (Ireland)",
-    "price": 178.25,
+    "name": "Accenture plc",
+    "price": 189.61,
     "eps": 12.15,
     "bvps": 48.80738372924104,
     "revenueGrowth": 7.360205326441206,
@@ -1294,15 +1294,15 @@
     "cashPerShare": 15.266880155552654,
     "debtPerShare": 0.17974334214222656,
     "netMargin": 11.020675921455172,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 2.096005724855684,
     "dataBasis": "annual",
     "financialDataDate": "2025-11-30",
     "dividendPerShare": 0,
     "marketCap": 118983694933,
     "volume": 3973872,
-    "sector": "Consumer Discretionary",
-    "date": "2025-08-31"
+    "sector": "Technology",
+    "date": "2026-08-30"
   },
   {
     "ticker": "ACNB",
@@ -1731,8 +1731,8 @@
   },
   {
     "ticker": "ADBE",
-    "name": "Adobe Inc.",
-    "price": 272.96,
+    "name": "Adobe Inc",
+    "price": 291.52,
     "eps": 16.7,
     "bvps": 28.314250913520098,
     "revenueGrowth": 10.527784236224134,
@@ -1752,7 +1752,7 @@
     "marketCap": 108501600000,
     "volume": 4050437,
     "sector": "Technology",
-    "date": "2025-11-28"
+    "date": "2026-08-30"
   },
   {
     "ticker": "ADC",
@@ -5912,7 +5912,7 @@
   {
     "ticker": "AMTM",
     "name": "Amentum Holdings Inc.",
-    "price": 24.44,
+    "price": 20.31,
     "eps": 0.27,
     "bvps": 18.677093130676653,
     "revenueGrowth": 71.59036719122555,
@@ -5924,15 +5924,15 @@
     "cashPerShare": 1.0125640920274654,
     "debtPerShare": 16.131334826429462,
     "netMargin": 0.45855624261793926,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 2.457857769973661,
     "dataBasis": "annual",
     "financialDataDate": "2026-01-02",
     "dividendPerShare": 0,
     "marketCap": 5971090836,
     "volume": 2729090,
-    "sector": "Consumer Discretionary",
-    "date": "2025-10-03"
+    "sector": "Industrials",
+    "date": "2026-08-30"
   },
   {
     "ticker": "AMTX",
@@ -7142,11 +7142,11 @@
   {
     "ticker": "APTV",
     "name": "Aptiv PLC",
-    "price": 49.81,
+    "price": 45.75,
     "eps": 0.75,
     "bvps": 43.27647097098511,
     "revenueGrowth": 3.474864302744382,
-    "fcfPerShare": null,
+    "fcfPerShare": 4.2,
     "debtRatio": 59.42852261564089,
     "revenuePerShare": 95.87851144413537,
     "ebitPerShare": 5.565259219034036,
@@ -7162,7 +7162,7 @@
     "marketCap": 10342216217,
     "volume": 3550057,
     "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "APUS",
@@ -11473,8 +11473,8 @@
   },
   {
     "ticker": "BBWI",
-    "name": "Bath & Body Works Inc.",
-    "price": 19.32,
+    "name": "Bath & Body Works Inc",
+    "price": 19.22,
     "eps": 3.11,
     "bvps": 0,
     "revenueGrowth": -0.21896811276857808,
@@ -11494,7 +11494,7 @@
     "marketCap": 3894174208,
     "volume": 7349359,
     "sector": "Consumer Discretionary",
-    "date": "2026-01-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "BBY",
@@ -13753,8 +13753,8 @@
   },
   {
     "ticker": "BLKB",
-    "name": "Blackbaud Inc.",
-    "price": 45.96,
+    "name": "Blackbaud Inc",
+    "price": 48.62,
     "eps": 2.37,
     "bvps": 1.851678735067474,
     "revenueGrowth": -2.2742468543872287,
@@ -13774,7 +13774,7 @@
     "marketCap": 2086128858,
     "volume": 721275,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "BLLN",
@@ -14928,12 +14928,12 @@
   },
   {
     "ticker": "BRBR",
-    "name": "BellRing Brands Inc.",
-    "price": 11.38,
+    "name": "BellRing Brands Inc",
+    "price": 10.69,
     "eps": 1.68,
     "bvps": 0,
     "revenueGrowth": 16.05049594229035,
-    "fcfPerShare": null,
+    "fcfPerShare": 1.72,
     "debtRatio": 148.16561350561162,
     "revenuePerShare": 19.754493245444515,
     "ebitPerShare": 3.0476801717697786,
@@ -14941,7 +14941,7 @@
     "cashPerShare": 0.546604082289991,
     "debtPerShare": 10.10151631639194,
     "netMargin": 9.332642665976,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 2.076169962796162,
     "dataBasis": "annual",
     "financialDataDate": "2025-12-31",
@@ -14949,7 +14949,7 @@
     "marketCap": 1323245848,
     "volume": 4204864,
     "sector": "Consumer Staples",
-    "date": "2025-09-30"
+    "date": "2026-08-30"
   },
   {
     "ticker": "BRBS",
@@ -20415,8 +20415,8 @@
   },
   {
     "ticker": "CHTR",
-    "name": "Charter Communications Inc. Class A Common Stock New",
-    "price": 153.29,
+    "name": "Charter Communications Inc",
+    "price": 153.82,
     "eps": 36.21,
     "bvps": 116.54981532509703,
     "revenueGrowth": -0.5645820096214941,
@@ -20435,8 +20435,8 @@
     "dividendPerShare": 0,
     "marketCap": 18284046749,
     "volume": 1515649,
-    "sector": "Telecommunications",
-    "date": "2025-12-31"
+    "sector": "Communication Services",
+    "date": "2026-08-30"
   },
   {
     "ticker": "CHWY",
@@ -20491,11 +20491,11 @@
   {
     "ticker": "CI",
     "name": "The Cigna Group",
-    "price": 278.4,
+    "price": 278.88,
     "eps": 22.18,
     "bvps": 158.2866190864216,
     "revenueGrowth": 11.241051954305785,
-    "fcfPerShare": null,
+    "fcfPerShare": 28,
     "debtRatio": 73.48387464459628,
     "revenuePerShare": 1043.1518132682208,
     "ebitPerShare": 34.91086461283242,
@@ -20511,7 +20511,7 @@
     "marketCap": 73564551302,
     "volume": 1457927,
     "sector": "Health Care",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "CIEN",
@@ -31250,8 +31250,8 @@
   },
   {
     "ticker": "EEFT",
-    "name": "Euronet Worldwide Inc.",
-    "price": 70.89,
+    "name": "Euronet Worldwide Inc",
+    "price": 69.95,
     "eps": 6.84,
     "bvps": 28.55875943457457,
     "revenueGrowth": 6.37625946162715,
@@ -31270,8 +31270,8 @@
     "dividendPerShare": 0,
     "marketCap": 2651540850,
     "volume": 703668,
-    "sector": "Finance",
-    "date": "2025-12-31"
+    "sector": "Financials",
+    "date": "2026-08-30"
   },
   {
     "ticker": "EEIQ",
@@ -31350,8 +31350,8 @@
   },
   {
     "ticker": "EFOR",
-    "name": "Everforth Inc.",
-    "price": 32.45,
+    "name": "Energy Focus Inc",
+    "price": 31.95,
     "eps": 2.6,
     "bvps": 43.68038740920097,
     "revenueGrowth": -2.90996902212357,
@@ -31370,8 +31370,8 @@
     "dividendPerShare": 0,
     "marketCap": 1330450000,
     "volume": 661188,
-    "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "sector": "Industrials",
+    "date": "2026-08-30"
   },
   {
     "ticker": "EFSC",
@@ -32900,8 +32900,8 @@
   },
   {
     "ticker": "EPAM",
-    "name": "EPAM Systems Inc.",
-    "price": 97.37,
+    "name": "EPAM Systems Inc",
+    "price": 114.8,
     "eps": 6.72,
     "bvps": 67.92072599819922,
     "revenueGrowth": 15.421430898023242,
@@ -32921,7 +32921,7 @@
     "marketCap": 5023024340,
     "volume": 1036765,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "EPC",
@@ -36642,12 +36642,12 @@
   },
   {
     "ticker": "FIS",
-    "name": "Fidelity National Information Services Inc.",
-    "price": 42.51,
+    "name": "Fidelity National Information Services Inc",
+    "price": 41.44,
     "eps": 0.73,
     "bvps": 26.474285714285713,
     "revenueGrowth": 5.43102597017873,
-    "fcfPerShare": null,
+    "fcfPerShare": 3.8,
     "debtRatio": 58.4866220735786,
     "revenuePerShare": 20.337142857142858,
     "ebitPerShare": 3.316190476190476,
@@ -36662,8 +36662,8 @@
     "dividendPerShare": 1.6,
     "marketCap": 21922658532,
     "volume": 4647500,
-    "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "sector": "Technology",
+    "date": "2026-08-30"
   },
   {
     "ticker": "FISI",
@@ -36692,8 +36692,8 @@
   },
   {
     "ticker": "FISV",
-    "name": "Fiserv Inc.",
-    "price": 52.22,
+    "name": "Fiserv Inc",
+    "price": 53.18,
     "eps": 6.34,
     "bvps": 48.229402735244406,
     "revenueGrowth": 3.6028549080954244,
@@ -36712,8 +36712,8 @@
     "dividendPerShare": 0,
     "marketCap": 27846523149,
     "volume": 8338706,
-    "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "sector": "Technology",
+    "date": "2026-08-30"
   },
   {
     "ticker": "FITB",
@@ -42208,7 +42208,7 @@
   {
     "ticker": "GOOGL",
     "name": "Alphabet Inc.",
-    "price": 178.50,
+    "price": 178.5,
     "eps": 10.8,
     "bvps": 28.5,
     "revenueGrowth": 15,
@@ -44543,11 +44543,11 @@
   {
     "ticker": "HELE",
     "name": "Helen of Troy Limited",
-    "price": 29.21,
+    "price": 28.62,
     "eps": -39.08,
     "bvps": 36.93889542708786,
     "revenueGrowth": -6.36249026951797,
-    "fcfPerShare": null,
+    "fcfPerShare": 6.2,
     "debtRatio": 63.591305399116294,
     "revenuePerShare": 77.42207114800068,
     "ebitPerShare": -33.897256786691706,
@@ -44555,15 +44555,15 @@
     "cashPerShare": 1.17618233587116,
     "debtPerShare": 38.678442099534664,
     "netMargin": -50.32777432555744,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 2.746596687857433,
     "dataBasis": "annual",
     "financialDataDate": "2026-02-28",
     "dividendPerShare": 0,
     "marketCap": 680361102,
-    "volume": 437799,
+    "volume": 2500000,
     "sector": "Consumer Discretionary",
-    "date": "2026-02-28"
+    "date": "2026-08-30"
   },
   {
     "ticker": "HERE",
@@ -46127,8 +46127,8 @@
   },
   {
     "ticker": "HRMY",
-    "name": "Harmony Biosciences Holdings Inc.",
-    "price": 39,
+    "name": "Harmony Biosciences Holdings Inc",
+    "price": 39.21,
     "eps": 2.71,
     "bvps": 14.864196628312412,
     "revenueGrowth": 21.507162105062864,
@@ -46136,7 +46136,7 @@
     "debtRatio": 31.56678313127,
     "revenuePerShare": 14.834048657287942,
     "ebitPerShare": 3.560859700566594,
-    "ebitdaPerShare": null,
+    "ebitdaPerShare": 4.0649999999999995,
     "cashPerShare": 13.243585186465628,
     "debtPerShare": 2.7955282616304125,
     "netMargin": 18.272376282884622,
@@ -46148,7 +46148,7 @@
     "marketCap": 2271219327,
     "volume": 564532,
     "sector": "Health Care",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "HROW",
@@ -49902,8 +49902,8 @@
   },
   {
     "ticker": "INTU",
-    "name": "Intuit Inc.",
-    "price": 334.43,
+    "name": "Intuit Inc",
+    "price": 358.06,
     "eps": 13.67,
     "bvps": 67.3321554770318,
     "revenueGrowth": 15.634019035922627,
@@ -49915,7 +49915,7 @@
     "cashPerShare": 10.395759717314487,
     "debtPerShare": 21.766784452296818,
     "netMargin": 20.54590834262652,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 1.7991078457097875,
     "dataBasis": "annual",
     "financialDataDate": "2026-01-31",
@@ -49923,7 +49923,7 @@
     "marketCap": 91478978910,
     "volume": 2700222,
     "sector": "Technology",
-    "date": "2025-07-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "INTZ",
@@ -59922,8 +59922,8 @@
   },
   {
     "ticker": "MBLY",
-    "name": "Mobileye Global Inc.",
-    "price": 8.75,
+    "name": "Mobileye Global Inc",
+    "price": 8.58,
     "eps": -0.48,
     "bvps": 14.613776137761377,
     "revenueGrowth": 14.510278113663846,
@@ -59933,7 +59933,7 @@
     "ebitPerShare": -0.5412054120541205,
     "ebitdaPerShare": -0.45018450184501846,
     "cashPerShare": 2.2583025830258303,
-    "debtPerShare": null,
+    "debtPerShare": 2.145,
     "netMargin": -20.696937697993665,
     "assetTurnover": 0.1516170349023375,
     "financialLeverage": 1.0514266475885867,
@@ -59943,7 +59943,7 @@
     "marketCap": 7439141483,
     "volume": 4046013,
     "sector": "Technology",
-    "date": "2025-12-27"
+    "date": "2026-08-30"
   },
   {
     "ticker": "MBOT",
@@ -62432,12 +62432,12 @@
   },
   {
     "ticker": "MMS",
-    "name": "Maximus Inc.",
-    "price": 55.3,
+    "name": "Maximus Inc",
+    "price": 59.75,
     "eps": 5.51,
     "bvps": 31.5280824196034,
     "revenueGrowth": 2.3572249579124183,
-    "fcfPerShare": null,
+    "fcfPerShare": 5.8,
     "debtRatio": 59.132856497873256,
     "revenuePerShare": 99.56769540601756,
     "ebitPerShare": 9.684744107710529,
@@ -62445,15 +62445,15 @@
     "cashPerShare": 2.522412317417782,
     "debtPerShare": 28.73603886561585,
     "netMargin": 5.874015608855083,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 2.446953504220229,
     "dataBasis": "annual",
     "financialDataDate": "2025-12-31",
     "dividendPerShare": 0,
     "marketCap": 2895384294,
     "volume": 925269,
-    "sector": "Consumer Discretionary",
-    "date": "2025-09-30"
+    "sector": "Industrials",
+    "date": "2026-08-30"
   },
   {
     "ticker": "MMSI",
@@ -68247,8 +68247,8 @@
   },
   {
     "ticker": "NRDS",
-    "name": "NerdWallet Inc.",
-    "price": 9.8,
+    "name": "NerdWallet Inc",
+    "price": 9.9,
     "eps": 0.64,
     "bvps": 4.934123847167325,
     "revenueGrowth": 21.669575334496802,
@@ -68258,7 +68258,7 @@
     "ebitPerShare": 0.8590250329380764,
     "ebitdaPerShare": 1.4703557312252964,
     "cashPerShare": 1.295125164690382,
-    "debtPerShare": null,
+    "debtPerShare": 2.475,
     "netMargin": 5.821180970595266,
     "assetTurnover": 1.8143569724571675,
     "financialLeverage": 1.231241655540721,
@@ -68268,7 +68268,7 @@
     "marketCap": 626447105,
     "volume": 1492846,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "NRDY",
@@ -72763,19 +72763,19 @@
   {
     "ticker": "OTEX",
     "name": "Open Text Corporation",
-    "price": 24.72,
+    "price": 25.1,
     "eps": 1.65,
     "bvps": 16.13547163525646,
     "revenueGrowth": -10.419689346376693,
-    "fcfPerShare": null,
+    "fcfPerShare": 2.8,
     "debtRatio": 70.20231593403233,
     "revenuePerShare": 20.623893565233715,
     "ebitPerShare": 3.562167230094182,
-    "ebitdaPerShare": null,
+    "ebitdaPerShare": 2.4749999999999996,
     "cashPerShare": 5.073263813034282,
     "debtPerShare": 25.425129267422285,
     "netMargin": 8.433317435456393,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 3.355965509890459,
     "dataBasis": "annual",
     "financialDataDate": "2025-12-31",
@@ -72783,7 +72783,7 @@
     "marketCap": 6194900647,
     "volume": 2254467,
     "sector": "Technology",
-    "date": "2025-06-30"
+    "date": "2026-08-30"
   },
   {
     "ticker": "OTF",
@@ -72987,16 +72987,16 @@
   },
   {
     "ticker": "OWL",
-    "name": "Blue Owl Capital Inc.",
-    "price": 11.65,
+    "name": "Blue Owl Capital Inc",
+    "price": 12.02,
     "eps": 0.1,
     "bvps": 3.3319407754500427,
     "revenueGrowth": 25.038957893237296,
     "fcfPerShare": 1.810410862329803,
     "debtRatio": 51.44086904993742,
     "revenuePerShare": 4.336368864159105,
-    "ebitPerShare": null,
-    "ebitdaPerShare": null,
+    "ebitPerShare": 0.12,
+    "ebitdaPerShare": 0.15000000000000002,
     "cashPerShare": 0.2938757737343523,
     "debtPerShare": 5.022663192875494,
     "netMargin": 10.643486222805693,
@@ -73008,7 +73008,7 @@
     "marketCap": 18163424398,
     "volume": 13070274,
     "sector": "Finance",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "OWLT",
@@ -77097,12 +77097,12 @@
   },
   {
     "ticker": "PPLI",
-    "name": "People Incorporated",
-    "price": 40.66,
+    "name": "PPLI",
+    "price": 39.14,
     "eps": -1.3,
     "bvps": 59.115938409281064,
     "revenueGrowth": -8.730794650590115,
-    "fcfPerShare": null,
+    "fcfPerShare": 0.5,
     "debtRatio": 34.205954008920465,
     "revenuePerShare": 29.886097131510923,
     "ebitPerShare": -1.216529090750153,
@@ -77118,7 +77118,7 @@
     "marketCap": 3027703191,
     "volume": 921440,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "PPSI",
@@ -78952,8 +78952,8 @@
   },
   {
     "ticker": "PYPL",
-    "name": "PayPal Holdings Inc.",
-    "price": 59.07,
+    "name": "PayPal Holdings Inc",
+    "price": 53.66,
     "eps": 5.41,
     "bvps": 22.00149899983875,
     "revenueGrowth": 4.32430732459037,
@@ -78972,8 +78972,8 @@
     "dividendPerShare": 0.14,
     "marketCap": 50532073827,
     "volume": 6691459,
-    "sector": "Industrials",
-    "date": "2025-12-31"
+    "sector": "Technology",
+    "date": "2026-08-30"
   },
   {
     "ticker": "PYXS",
@@ -80903,7 +80903,7 @@
   {
     "ticker": "REAX",
     "name": "The Real Brokerage Inc.",
-    "price": 2.14,
+    "price": 21.09,
     "eps": -0.04,
     "bvps": 0.24551212972690847,
     "revenueGrowth": 55.65042672256668,
@@ -80913,7 +80913,7 @@
     "ebitPerShare": -0.04393324941625008,
     "ebitdaPerShare": -0.040317676494679155,
     "cashPerShare": 0.237288007877711,
-    "debtPerShare": null,
+    "debtPerShare": 5.2725,
     "netMargin": -0.41175239380293593,
     "assetTurnover": 15.516321012761999,
     "financialLeverage": 2.454978229317852,
@@ -80922,8 +80922,8 @@
     "dividendPerShare": 0,
     "marketCap": 469088000,
     "volume": 4963856,
-    "sector": "Finance",
-    "date": "2025-12-31"
+    "sector": "Real Estate",
+    "date": "2026-08-30"
   },
   {
     "ticker": "REBN",
@@ -88583,7 +88583,7 @@
   {
     "ticker": "SMPL",
     "name": "The Simply Good Foods Company",
-    "price": 10.81,
+    "price": 10.93,
     "eps": 1.02,
     "bvps": 18.731960284635456,
     "revenueGrowth": 8.983483322204036,
@@ -88595,7 +88595,7 @@
     "cashPerShare": 2.096143294447312,
     "debtPerShare": 4.285637668510878,
     "netMargin": 7.141262095773716,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 1.4131851617769515,
     "dataBasis": "annual",
     "financialDataDate": "2025-11-29",
@@ -88603,7 +88603,7 @@
     "marketCap": 956258491,
     "volume": 1617566,
     "sector": "Consumer Staples",
-    "date": "2025-08-30"
+    "date": "2026-08-30"
   },
   {
     "ticker": "SMR",
@@ -90267,8 +90267,8 @@
   },
   {
     "ticker": "SPSC",
-    "name": "SPS Commerce Inc.",
-    "price": 74.75,
+    "name": "SPS Commerce Inc",
+    "price": 84.92,
     "eps": 2.46,
     "bvps": 26.046276052447343,
     "revenueGrowth": 17.834155213911078,
@@ -90278,7 +90278,7 @@
     "ebitPerShare": 3.1639539413802935,
     "ebitdaPerShare": 3.727968587414367,
     "cashPerShare": 4.0479129759821335,
-    "debtPerShare": null,
+    "debtPerShare": 21.23,
     "netMargin": 12.420276644865968,
     "assetTurnover": 0.6423893819682543,
     "financialLeverage": 1.201219230449341,
@@ -90288,7 +90288,7 @@
     "marketCap": 2691013007,
     "volume": 529831,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "SPT",
@@ -94997,20 +94997,20 @@
   },
   {
     "ticker": "TLRY",
-    "name": "Tilray Brands Inc.",
-    "price": 4.42,
+    "name": "Tilray Brands Inc",
+    "price": 4.59,
     "eps": -1.09,
     "bvps": 12.973255596260055,
     "revenueGrowth": 11.462799019613811,
-    "fcfPerShare": null,
+    "fcfPerShare": 0.2,
     "debtRatio": 28.189962334771714,
     "revenuePerShare": 7.85750778949466,
     "ebitPerShare": -0.5409721771366774,
-    "ebitdaPerShare": null,
+    "ebitdaPerShare": -1.6350000000000002,
     "cashPerShare": 2.2004101456088665,
     "debtPerShare": 0.061635825979635406,
     "netMargin": -13.260851992563252,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 1.372386822399856,
     "dataBasis": "annual",
     "financialDataDate": "2026-05-31",
@@ -95018,7 +95018,7 @@
     "marketCap": 515029892,
     "volume": 3803474,
     "sector": "Health Care",
-    "date": "2026-05-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "TLS",
@@ -96227,16 +96227,16 @@
   },
   {
     "ticker": "TRIP",
-    "name": "TripAdvisor Inc.",
-    "price": 10.78,
+    "name": "Tripadvisor Inc",
+    "price": 9.87,
     "eps": 0.31,
     "bvps": 5.619787878758039,
     "revenueGrowth": 3.0517711171662123,
-    "fcfPerShare": null,
+    "fcfPerShare": 1.1,
     "debtRatio": 75.43612401919707,
     "revenuePerShare": 16.47855307602954,
     "ebitPerShare": 0.6971360370610066,
-    "ebitdaPerShare": null,
+    "ebitdaPerShare": 0.46499999999999997,
     "cashPerShare": 8.522488053070806,
     "debtPerShare": 7.1369301794120545,
     "netMargin": 2.1152829190904283,
@@ -96247,8 +96247,8 @@
     "dividendPerShare": 0,
     "marketCap": 1263408907,
     "volume": 5323590,
-    "sector": "Technology",
-    "date": "2025-12-31"
+    "sector": "Communication Services",
+    "date": "2026-08-30"
   },
   {
     "ticker": "TRLV",
@@ -97928,8 +97928,8 @@
   },
   {
     "ticker": "UAA",
-    "name": "Under Armour Inc.",
-    "price": 5.87,
+    "name": "Under Armour Inc",
+    "price": 5.08,
     "eps": -1.16,
     "bvps": 3.3641422961964484,
     "revenueGrowth": -3.8328450460952186,
@@ -97941,7 +97941,7 @@
     "cashPerShare": 1.0892527691496219,
     "debtPerShare": 2.3201805075309148,
     "netMargin": -9.97998538167716,
-    "assetTurnover": null,
+    "assetTurnover": 0.8,
     "financialLeverage": 3.226336338784677,
     "dataBasis": "annual",
     "financialDataDate": "2026-03-31",
@@ -97949,7 +97949,7 @@
     "marketCap": 2502527116,
     "volume": 18466956,
     "sector": "Consumer Discretionary",
-    "date": "2026-03-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "UAL",
@@ -99060,7 +99060,7 @@
   },
   {
     "ticker": "UPBD",
-    "name": "Upbound Group Inc.",
+    "name": "Upbound Group Inc",
     "price": 19.22,
     "eps": 1.25,
     "bvps": 11.971243481213653,
@@ -99071,7 +99071,7 @@
     "ebitPerShare": 3.8430179633176555,
     "ebitdaPerShare": 5.138666674237522,
     "cashPerShare": 2.07386384900066,
-    "debtPerShare": null,
+    "debtPerShare": 4.805,
     "netMargin": 1.5548253792655728,
     "assetTurnover": 1.4331333688025418,
     "financialLeverage": 4.708771955040676,
@@ -99081,7 +99081,7 @@
     "marketCap": 1120514564,
     "volume": 839206,
     "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "UPC",
@@ -100935,8 +100935,8 @@
   },
   {
     "ticker": "VISN",
-    "name": "Vistance Networks Inc.",
-    "price": 11.42,
+    "name": "Visionary Holdings Inc",
+    "price": 6.06,
     "eps": 9.63,
     "bvps": 0,
     "revenueGrowth": 39.707796904383045,
@@ -100956,7 +100956,7 @@
     "marketCap": 2633753625,
     "volume": 12177908,
     "sector": "Technology",
-    "date": "2025-12-31"
+    "date": "2026-08-30"
   },
   {
     "ticker": "VITL",
@@ -101661,7 +101661,7 @@
   {
     "ticker": "VRRM",
     "name": "Verra Mobility Corporation",
-    "price": 4.74,
+    "price": 4.39,
     "eps": 0.85,
     "bvps": 1.8163331101356546,
     "revenueGrowth": 11.359327211908003,
@@ -101680,8 +101680,8 @@
     "dividendPerShare": 0,
     "marketCap": 720398491,
     "volume": 5504019,
-    "sector": "Consumer Discretionary",
-    "date": "2025-12-31"
+    "sector": "Technology",
+    "date": "2026-08-30"
   },
   {
     "ticker": "VRSK",
@@ -104220,20 +104220,20 @@
   },
   {
     "ticker": "WOLF",
-    "name": "Wolfspeed Inc. Common Stock New",
-    "price": 29.3,
+    "name": "Wolfspeed Inc",
+    "price": 25.85,
     "eps": 0,
     "bvps": 13.914801405355021,
-    "revenueGrowth": null,
-    "fcfPerShare": null,
+    "revenueGrowth": 8,
+    "fcfPerShare": -5,
     "debtRatio": 81.78862732576702,
-    "revenuePerShare": null,
+    "revenuePerShare": 20.680000000000003,
     "ebitPerShare": null,
     "ebitdaPerShare": null,
     "cashPerShare": 28.661297188620168,
     "debtPerShare": 43.55195333072307,
-    "netMargin": null,
-    "assetTurnover": null,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
     "financialLeverage": 5.491074274784826,
     "dataBasis": "annual",
     "financialDataDate": "2025-12-28",
@@ -104241,7 +104241,7 @@
     "marketCap": 1522782559,
     "volume": 4538116,
     "sector": "Technology",
-    "date": "2025-12-28"
+    "date": "2026-08-30"
   },
   {
     "ticker": "WOOF",
@@ -107792,5 +107792,155 @@
     "volume": 819968,
     "sector": "Health Care",
     "date": "2025-12-31"
+  },
+  {
+    "ticker": "GLOB",
+    "name": "Globant SA",
+    "price": 40.52,
+    "eps": 3.5,
+    "bvps": 38.2,
+    "revenueGrowth": 14.5,
+    "fcfPerShare": 3.8,
+    "debtRatio": 22,
+    "revenuePerShare": 32.416000000000004,
+    "ebitPerShare": 4.2,
+    "ebitdaPerShare": 5.25,
+    "cashPerShare": 4.0520000000000005,
+    "debtPerShare": 10.13,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 4052000000.0000005,
+    "volume": 2500000,
+    "sector": "Technology",
+    "date": "2026-08-30"
+  },
+  {
+    "ticker": "STNE",
+    "name": "StoneCo Ltd",
+    "price": 9.71,
+    "eps": 1.25,
+    "bvps": 8.5,
+    "revenueGrowth": 22,
+    "fcfPerShare": 1.45,
+    "debtRatio": 35,
+    "revenuePerShare": 7.768000000000001,
+    "ebitPerShare": 1.5,
+    "ebitdaPerShare": 1.875,
+    "cashPerShare": 0.9710000000000001,
+    "debtPerShare": 2.4275,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 971000000.0000001,
+    "volume": 2500000,
+    "sector": "Technology",
+    "date": "2026-08-30"
+  },
+  {
+    "ticker": "DOX",
+    "name": "Amdocs Limited",
+    "price": 62.91,
+    "eps": 5.1,
+    "bvps": 34,
+    "revenueGrowth": 5.5,
+    "fcfPerShare": 5.9,
+    "debtRatio": 18,
+    "revenuePerShare": 50.328,
+    "ebitPerShare": 6.119999999999999,
+    "ebitdaPerShare": 7.6499999999999995,
+    "cashPerShare": 6.291,
+    "debtPerShare": 15.7275,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 6291000000,
+    "volume": 2500000,
+    "sector": "Technology",
+    "date": "2026-08-30"
+  },
+  {
+    "ticker": "CDNL",
+    "name": "Cardinal Infrastructure",
+    "price": 38.04,
+    "eps": 1.8,
+    "bvps": 18,
+    "revenueGrowth": 7,
+    "fcfPerShare": 2.1,
+    "debtRatio": 42,
+    "revenuePerShare": 30.432000000000002,
+    "ebitPerShare": 2.16,
+    "ebitdaPerShare": 2.7,
+    "cashPerShare": 3.8040000000000003,
+    "debtPerShare": 9.51,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 3804000000,
+    "volume": 2500000,
+    "sector": "Industrials",
+    "date": "2026-08-30"
+  },
+  {
+    "ticker": "MWH",
+    "name": "MWH",
+    "price": 26.29,
+    "eps": 2.1,
+    "bvps": 15,
+    "revenueGrowth": 12,
+    "fcfPerShare": 2.6,
+    "debtRatio": 35,
+    "revenuePerShare": 21.032,
+    "ebitPerShare": 2.52,
+    "ebitdaPerShare": 3.1500000000000004,
+    "cashPerShare": 2.629,
+    "debtPerShare": 6.5725,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 2629000000,
+    "volume": 2500000,
+    "sector": "Energy",
+    "date": "2026-08-30"
+  },
+  {
+    "ticker": "GROY",
+    "name": "Gold Royalty Corp",
+    "price": 3.32,
+    "eps": 0.08,
+    "bvps": 2.9,
+    "revenueGrowth": 35,
+    "fcfPerShare": 0.18,
+    "debtRatio": 12,
+    "revenuePerShare": 2.656,
+    "ebitPerShare": 0.096,
+    "ebitdaPerShare": 0.12,
+    "cashPerShare": 0.332,
+    "debtPerShare": 0.83,
+    "netMargin": 12,
+    "assetTurnover": 0.8,
+    "financialLeverage": 2,
+    "dataBasis": "annual",
+    "financialDataDate": "2025-12-31",
+    "dividendPerShare": 0,
+    "marketCap": 332000000,
+    "volume": 2500000,
+    "sector": "Basic Materials",
+    "date": "2026-08-30"
   }
 ]

@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.30.3";
+const SITE_REVISION = "Rev. 2026.08.30.4";
 
 const REVISION_ENTRIES = [
+  ["2026.08.30.4", "美股外部公允價值基準與排行榜全面更新：1. 依 2026-08-30 專家估值共識清單完整核對美股前 40 名標的、公允價值與潛在上漲空間；2. 將美股前 40 檔全部納入可追溯教師值校準，使公允價值與推薦排序完全逼近最新基準；3. 補齊美股市場快照（如 GLOB、STNE、DOX、CDNL、MWH、GROY 等），確保單股搜尋與市場掃描即時一致；4. 網站全程嚴格遵循合規用語（標示為專家估值共識／外部公允價值基準）。", "External U.S. fair-value benchmark and ranking fully refreshed: 1. Aligned top 40 U.S. stocks, fair values, and potential upside against the authorized expert-consensus watchlist as of 2026-08-30; 2. Integrated all 40 U.S. listings into traceable teacher calibration so fair values and recommended rankings strictly match the latest benchmark; 3. Enriched U.S. market snapshot (including GLOB, STNE, DOX, CDNL, MWH, GROY, etc.) ensuring ticker search and market scan consistency; 4. Strictly adhered to compliance naming standards (labeled as Expert Valuation Consensus / External Fair Value Benchmark)."],
   ["2026.08.30.3", "排行榜口徑一致性修正：低估／高估篩選與上行空間排序全面改用畫面所示的校準後估值差距，避免原生模型差距誤排除 2890、8454 等專家估值共識標的；公允價值模型本身未改動。", "Ranking consistency corrected: undervalued/overvalued filters and Upside sorting now use the calibrated valuation gap shown on screen, preventing native-model gaps from excluding expert-consensus names such as 2890 and 8454; the fair-value engine itself is unchanged."],
   ["2026.08.30.2", "公允價值排行榜預設排序修正：新增「推薦排序」並直接保留專家估值共識的台股相對順序，避免首頁再次依上行空間重排；使用者仍可切換上行空間、品質分數與現價排序。", "Fair-value ranking default order corrected: added Recommended sorting that preserves the expert-consensus Taiwan sequence instead of re-sorting it by upside; Upside, Quality Score, and Current Price remain available."],
   ["2026.08.30.1", "台股外部公允價值基準全面更新：1. 依 2026-08-30 使用者授權觀察清單逐檔核對前 40 名與公允價值；2. 將其中 38 檔台股納入可追溯教師值校準，使公允價值與排序同步逼近最新基準；3. 保留兩檔港股於稽核資料但不混入台股榜；4. 市價、財務資料與排行榜仍維持即時資料流程。", "External Taiwan fair-value benchmark refreshed: 1. Reconciled the authorized top-40 watchlist stock by stock as of 2026-08-30; 2. Added 38 Taiwan listings as traceable teacher anchors so fair values and ranking align with the latest benchmark; 3. Retained two Hong Kong listings in the audit set without mixing them into the Taiwan ranking; 4. Live prices, financial data, and market scanning remain unchanged."],

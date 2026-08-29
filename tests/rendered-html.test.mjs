@@ -48,7 +48,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.08\.30\.3/);
+  assert.match(html, /Rev\. 2026\.08\.30\.4/);
   const forbiddenBrand = ["Investing", "Pro"].join("");
   assert.doesNotMatch(html, new RegExp(forbiddenBrand, "i"));
   assert.match(source, /className="table-extend-bar"/);

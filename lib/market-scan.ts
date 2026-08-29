@@ -11,6 +11,7 @@ import {
 import { buildComparableMap, type ComparableMultiples } from "./market-comparables.ts";
 import { normalizeSector } from "./sector-normalization.ts";
 import { EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_TICKERS } from "./expert-consensus-tw-benchmark.ts";
+import { EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_TICKERS } from "./expert-consensus-us-benchmark.ts";
 import fundHoldingsSnapshot from "./fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "./us-market-snapshot.json" with { type: "json" };
 import tpexSnapshot from "./tpex-snapshot.json" with { type: "json" };
@@ -108,12 +109,18 @@ export function hasCandidateLiquidity(row: MarketScanRow) {
 }
 
 function hasBenchmarkLiquidity(row: MarketScanRow) {
-  const ticker = String(row.ticker).trim();
-  const volume = numeric(row.volume);
-  const turnover = numeric(row.price) * volume;
-  return (row.market ?? "TW") === "TW"
-    && EXPERT_CONSENSUS_TAIWAN_TICKERS.has(ticker)
-    && (volume >= TAIWAN_MIN_DAILY_VOLUME || turnover >= TAIWAN_MIN_DAILY_TURNOVER);
+  const ticker = String(row.ticker).trim().toUpperCase();
+  const market = row.market ?? (/^\d/.test(ticker) ? "TW" : "US");
+  if (market === "TW") {
+    const volume = numeric(row.volume);
+    const turnover = numeric(row.price) * volume;
+    return EXPERT_CONSENSUS_TAIWAN_TICKERS.has(ticker)
+      && (volume >= TAIWAN_MIN_DAILY_VOLUME || turnover >= TAIWAN_MIN_DAILY_TURNOVER);
+  }
+  if (market === "US") {
+    return EXPERT_CONSENSUS_US_TICKERS.has(ticker);
+  }
+  return false;
 }
 
 function isCandidateLiquid(row: MarketScanRow) {
@@ -267,10 +274,7 @@ export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20)
 
 export const BENCHMARK_ORDER_TW = EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER;
 
-const BENCHMARK_ORDER_US = [
-  "SMPL", "CHTR", "TTD", "FI", "FISV", "BRBR", "BBWI", "NRDS", "YELP", "VRRM",
-  "FIS", "EPAM", "TRIP", "SPT", "COTY", "MMS", "OWL", "MWH", "INTU"
-];
+export const BENCHMARK_ORDER_US = EXPERT_CONSENSUS_US_TICKER_ORDER;
 
 export function selectMarketCandidates(
   universe: MarketScanRow[],

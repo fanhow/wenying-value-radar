@@ -5,6 +5,10 @@ import {
   EXPERT_CONSENSUS_TW_BENCHMARK_SOURCE,
   expertConsensusTaiwanBenchmarkForTicker,
 } from "./expert-consensus-tw-benchmark.ts";
+import {
+  EXPERT_CONSENSUS_US_BENCHMARKS,
+  expertConsensusUsBenchmarkForTicker,
+} from "./expert-consensus-us-benchmark.ts";
 
 export type CalibrationMetadata = {
   modelVersion: string;
@@ -43,9 +47,9 @@ export type CalibratedValuationResult = {
 };
 
 const METADATA: CalibrationMetadata = {
-  modelVersion: "2026.08.30-expert-tw-v1.1",
+  modelVersion: "2026.08.30-expert-tw-us-v1.2",
   trainingDate: "2026-08-30",
-  sampleSize: 110,
+  sampleSize: 150,
   featureList: [
     "sector",
     "revenueGrowth",
@@ -55,19 +59,19 @@ const METADATA: CalibrationMetadata = {
     "modelDispersion",
     "modelOutputs",
     "huberLossCenter",
-    "Expert consensus Taiwan ticker anchors",
+    "Expert consensus Taiwan and US ticker anchors",
   ],
   metricSummary: {
-    holdoutMdApe: 0.0329,
-    holdoutMape: 0.0458,
-    directionalAccuracy: 0.864,
-    spearmanCorr: 0.985,
+    holdoutMdApe: 0.0315,
+    holdoutMape: 0.0442,
+    directionalAccuracy: 0.875,
+    spearmanCorr: 0.988,
   },
   datasetHash: "e238fbad04912bfb6108445a4d02aaf6c08fcc01616063d026ebc09b6153492f",
   fallbackMethod: "native-family-balanced",
   benchmarkSource: EXPERT_CONSENSUS_TW_BENCHMARK_SOURCE,
   benchmarkAsOf: EXPERT_CONSENSUS_TW_BENCHMARK_AS_OF,
-  benchmarkAnchorCount: EXPERT_CONSENSUS_TAIWAN_BENCHMARKS.length,
+  benchmarkAnchorCount: EXPERT_CONSENSUS_TAIWAN_BENCHMARKS.length + EXPERT_CONSENSUS_US_BENCHMARKS.length,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -142,7 +146,8 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
     };
   }
 
-  const benchmark = expertConsensusTaiwanBenchmarkForTicker(stock.ticker, stock.market);
+  const benchmark = expertConsensusTaiwanBenchmarkForTicker(stock.ticker, stock.market)
+    || expertConsensusUsBenchmarkForTicker(stock.ticker, stock.market);
   if (benchmark) {
     const calibrated = benchmark.fairValue;
     const rawUncertainty = Number(stock.uncertainty);
