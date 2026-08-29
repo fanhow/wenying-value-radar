@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.08.30.2";
+const SITE_REVISION = "Rev. 2026.08.30.3";
 
 const REVISION_ENTRIES = [
+  ["2026.08.30.3", "排行榜口徑一致性修正：低估／高估篩選與上行空間排序全面改用畫面所示的校準後估值差距，避免原生模型差距誤排除 2890、8454 等專家估值共識標的；公允價值模型本身未改動。", "Ranking consistency corrected: undervalued/overvalued filters and Upside sorting now use the calibrated valuation gap shown on screen, preventing native-model gaps from excluding expert-consensus names such as 2890 and 8454; the fair-value engine itself is unchanged."],
   ["2026.08.30.2", "公允價值排行榜預設排序修正：新增「推薦排序」並直接保留專家估值共識的台股相對順序，避免首頁再次依上行空間重排；使用者仍可切換上行空間、品質分數與現價排序。", "Fair-value ranking default order corrected: added Recommended sorting that preserves the expert-consensus Taiwan sequence instead of re-sorting it by upside; Upside, Quality Score, and Current Price remain available."],
   ["2026.08.30.1", "台股外部公允價值基準全面更新：1. 依 2026-08-30 使用者授權觀察清單逐檔核對前 40 名與公允價值；2. 將其中 38 檔台股納入可追溯教師值校準，使公允價值與排序同步逼近最新基準；3. 保留兩檔港股於稽核資料但不混入台股榜；4. 市價、財務資料與排行榜仍維持即時資料流程。", "External Taiwan fair-value benchmark refreshed: 1. Reconciled the authorized top-40 watchlist stock by stock as of 2026-08-30; 2. Added 38 Taiwan listings as traceable teacher anchors so fair values and ranking align with the latest benchmark; 3. Retained two Hong Kong listings in the audit set without mixing them into the Taiwan ranking; 4. Live prices, financial data, and market scanning remain unchanged."],
   ["2026.08.26.2", "大戶追蹤頁面新增「SEC 13F 官方持倉公開時程與重要提醒」專屬模組：1. 完整標註全年度四大季度申報與公開時程（Q1 截至 3/31 於 5/15 前後公開、Q2 截至 6/30 於 8/14 前後公開、Q3 截至 9/30 於 11/14 前後公開、Q4 截至 12/31 於次年 2/14 前後公開）；2. 加入防盲跟重要提醒，解析 45～135 天時間滯後與無衍生品避險部位之盲點；3. 提供『大戶重倉初選 ➡️ 公允價值定錨 ➡️ 技術分析右側進場』實戰致勝 3 步驟指引。", "Fund Tracker upgraded with dedicated 'SEC Form 13F Filing Schedule & Action Guide' module: 1. Full quarterly disclosure schedule clearly marked (Q1 Mar 31 around May 15, Q2 Jun 30 around Aug 14, Q3 Sep 30 around Nov 14, Q4 Dec 31 around Feb 14 next year); 2. Added critical reminder highlighting 45–135 day time lag and unhedged long-only exposure; 3. Codified 3-step practical action guide (Idea Screening -> Fair Value Margin Check -> Right-Side Technical Entry)."],

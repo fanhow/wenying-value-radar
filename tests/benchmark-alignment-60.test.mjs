@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateStock } from "../lib/valuation.ts";
-import { calibrateFairValue } from "../lib/valuation-calibration.ts";
+import { calibrateFairValue, effectiveValuationUpside } from "../lib/valuation-calibration.ts";
 import { BENCHMARK_ORDER_TW, marketStockFromRatio, selectMarketCandidates } from "../lib/market-scan.ts";
 import { EXPERT_CONSENSUS_TAIWAN_BENCHMARKS, EXPERT_CONSENSUS_TW_BENCHMARKS } from "../lib/expert-consensus-tw-benchmark.ts";
 
@@ -75,4 +75,9 @@ test("keeps benchmark stocks when either Taiwan volume or turnover threshold is 
   ], "undervalued", 20);
 
   assert.deepEqual(selected.map((row) => row.ticker), ["2704", "7722"]);
+});
+
+test("uses calibrated upside for ranking filters and falls back to native upside", () => {
+  assert.equal(effectiveValuationUpside({ upside: -0.167, calibratedUpside: 0.991 }), 0.991);
+  assert.equal(effectiveValuationUpside({ upside: 0.125 }), 0.125);
 });

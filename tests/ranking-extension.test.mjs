@@ -24,4 +24,7 @@ test("fair-value ranking provides deep candidate pools and extension controls", 
   assert.match(source, /useState<SortKey>\("recommended"\)/);
   assert.match(source, /sortKey === "recommended"\) return filtered/);
   assert.match(source, /<option value="recommended">/);
+  assert.match(source, /const effectiveUpside = effectiveValuationUpside\(stock\)/);
+  assert.match(source, /filter === "undervalued" && effectiveUpside >= 0\.1/);
+  assert.match(source, /const leftUpside = effectiveValuationUpside\(a\)/);
 });

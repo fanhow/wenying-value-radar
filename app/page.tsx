@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
+import { effectiveValuationUpside } from "../lib/valuation-calibration";
 import type { InstitutionalSignal } from "../lib/fund-signal";
 import { assessGrowthPremium, type GrowthPremiumAssessment } from "../lib/growth-premium";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
@@ -562,6 +563,7 @@ export default function Home() {
         ? overvaluedRankingStocks
         : stocks;
     const filtered = sourceStocks.filter((stock) => {
+      const effectiveUpside = effectiveValuationUpside(stock);
       const matchesQuery =
         !normalizedQuery ||
         stock.ticker.toLowerCase().includes(normalizedQuery) ||
@@ -570,8 +572,8 @@ export default function Home() {
         stock.industry?.toLowerCase().includes(normalizedQuery);
       const matchesFilter =
         filter === "all" ||
-        (filter === "undervalued" && stock.upside >= 0.1) ||
-        (filter === "overvalued" && stock.upside <= -0.1) ||
+        (filter === "undervalued" && effectiveUpside >= 0.1) ||
+        (filter === "overvalued" && effectiveUpside <= -0.1) ||
         (filter === "quality" && stock.qualityAvailable !== false && stock.qualityScore >= 75) ||
         (filter === "risk" && stock.risk === "高");
       return matchesQuery && matchesFilter;
@@ -581,8 +583,10 @@ export default function Home() {
       if (a.market !== b.market) return a.market === "TW" ? -1 : 1;
       if (sortKey === "quality") return b.qualityScore - a.qualityScore;
       if (sortKey === "price") return b.price - a.price;
-      if (filter === "overvalued") return a.upside - b.upside;
-      return b.upside - a.upside;
+      const leftUpside = effectiveValuationUpside(a);
+      const rightUpside = effectiveValuationUpside(b);
+      if (filter === "overvalued") return leftUpside - rightUpside;
+      return rightUpside - leftUpside;
     });
   }, [filter, overvaluedRankingStocks, query, rankingStocks, sortKey, stocks]);
 

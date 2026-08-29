@@ -111,6 +111,13 @@ export function getCalibrationMetadata(): CalibrationMetadata {
   return { ...METADATA };
 }
 
+export function effectiveValuationUpside(
+  stock: Pick<Stock, "upside" | "calibratedUpside">,
+): number {
+  const calibratedUpside = Number(stock.calibratedUpside);
+  return Number.isFinite(calibratedUpside) ? calibratedUpside : stock.upside;
+}
+
 /**
  * Calibrate WenYing Native Stock Valuation against expert valuation consensus.
  * Pure, deterministic, robust against NaN/Infinity, and preserves native values.
