@@ -21,4 +21,7 @@ test("fair-value ranking provides deep candidate pools and extension controls", 
   assert.match(source, /setUsDisplayLimit\(\(prev\) => prev \+ 20\)/);
   assert.match(source, /延伸 20 檔台股排行/);
   assert.match(source, /延伸 20 檔美股排行/);
+  assert.match(source, /useState<SortKey>\("recommended"\)/);
+  assert.match(source, /sortKey === "recommended"\) return filtered/);
+  assert.match(source, /<option value="recommended">/);
 });

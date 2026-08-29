@@ -13,7 +13,7 @@ import { SiteFooter } from "./site-footer";
 import { UsEarningsPanel } from "./us-earnings-panel";
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
-type SortKey = "upside" | "quality" | "price";
+type SortKey = "recommended" | "upside" | "quality" | "price";
 
 type RemoteSymbol = {
   ticker: string;
@@ -327,7 +327,7 @@ export default function Home() {
   const [stockInputs, setStockInputs] = useState<StockInput[]>(seedInputs);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("undervalued");
-  const [sortKey, setSortKey] = useState<SortKey>("upside");
+  const [sortKey, setSortKey] = useState<SortKey>("recommended");
   const [selectedTicker, setSelectedTicker] = useState("");
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -576,6 +576,7 @@ export default function Home() {
         (filter === "risk" && stock.risk === "高");
       return matchesQuery && matchesFilter;
     });
+    if (sortKey === "recommended") return filtered;
     return [...filtered].sort((a, b) => {
       if (a.market !== b.market) return a.market === "TW" ? -1 : 1;
       if (sortKey === "quality") return b.qualityScore - a.qualityScore;
@@ -944,6 +945,7 @@ export default function Home() {
               <div className="sort-control">
                 <label htmlFor="sort">{t("排序", "Sort")}</label>
                 <select id="sort" value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
+                  <option value="recommended">{t("推薦排序", "Recommended")}</option>
                   <option value="upside">{t("上行空間", "Upside")}</option>
                   <option value="quality">{t("品質分數", "Quality score")}</option>
                   <option value="price">{t("現價", "Current price")}</option>
