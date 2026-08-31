@@ -764,7 +764,7 @@ export default function Home() {
     lookupRequest.current?.abort();
     const controller = new AbortController();
     lookupRequest.current = controller;
-    const timeout = window.setTimeout(() => controller.abort(), 12_000);
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
     try {
       const stock = await requestValuation({ ticker, market: /^\d/.test(ticker) ? "TW" : "US", refresh: forceRefresh }, controller.signal);
       setStockInputs((current) => [...current.filter((item) => item.ticker !== stock.ticker), stock]);

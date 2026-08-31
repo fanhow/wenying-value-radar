@@ -229,6 +229,24 @@ async function yahooTaiwanMarketQuote(ticker: string, exchange: string | undefin
   }
 }
 
+async function yahooUsMarketQuote(ticker: string, forceRefresh = false): Promise<LatestMarketQuote | null> {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d&events=div%2Csplits`,
+      {
+        headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; WenYingValueRadar/1.0)" },
+        ...(forceRefresh ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
+        signal: AbortSignal.timeout(3_000),
+      },
+    );
+    if (!response.ok) return null;
+    const payload = await response.json() as YahooChartPayload;
+    return latestMarketQuoteFromCandles(parseYahooDailyCandles(payload, 5), "US");
+  } catch {
+    return null;
+  }
+}
+
 async function secTickerMap() {
   secTickerMapPromise ??= fetchJson<Record<string, SecTickerRow>>(
     "https://www.sec.gov/files/company_tickers.json",
@@ -345,20 +363,67 @@ function valueUsSnapshot(
 }
 
 async function valueUsStock(body: ValuationRequest, ticker: string) {
-  const map = await secTickerMap();
-  const company = Object.values(map).find((row) => row.ticker.toUpperCase() === ticker);
-  if (!company) throw new Error("SEC 公司名錄中找不到這個美股代碼");
-
   const snapshot = findArkUsSnapshot(ticker);
-  if (!company.cik_str && snapshot) return valueUsSnapshot(body, ticker, snapshot);
 
-  const cik = String(company.cik_str).padStart(10, "0");
+  // Fast path: If snapshot exists and not a forced refresh, return snapshot with live Yahoo quote (~150ms)
+  if (snapshot && !body.refresh) {
+    const liveQuote = await yahooUsMarketQuote(ticker, false);
+    const stock = valueUsSnapshot(body, ticker, snapshot);
+    if (liveQuote && liveQuote.price > 0) {
+      return {
+        ...stock,
+        price: liveQuote.price,
+        priceChange: liveQuote.change,
+        priceChangePercent: liveQuote.changePercent,
+        previousClose: liveQuote.previousClose,
+        priceSource: "Yahoo Finance",
+      };
+    }
+    return stock;
+  }
+
+  const [map, liveQuote] = await Promise.all([
+    secTickerMap(),
+    yahooUsMarketQuote(ticker, Boolean(body.refresh)),
+  ]);
+  const company = Object.values(map).find((row) => row.ticker.toUpperCase() === ticker);
+  if (!company && !snapshot) throw new Error("SEC 公司名錄中找不到這個美股代碼");
+
+  if (!company?.cik_str && snapshot) {
+    const stock = valueUsSnapshot(body, ticker, snapshot);
+    if (liveQuote && liveQuote.price > 0) {
+      return {
+        ...stock,
+        price: liveQuote.price,
+        priceChange: liveQuote.change,
+        priceChangePercent: liveQuote.changePercent,
+        previousClose: liveQuote.previousClose,
+        priceSource: "Yahoo Finance",
+      };
+    }
+    return stock;
+  }
+
+  const cik = company ? String(company.cik_str).padStart(10, "0") : "";
   const [facts, submissions] = await Promise.all([
-    fetchOptionalValue<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS),
-    fetchOptionalValue<SecSubmissions>(`https://data.sec.gov/submissions/CIK${cik}.json`, SEC_HEADERS),
+    cik ? fetchOptionalValue<SecCompanyFacts>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, SEC_HEADERS) : null,
+    cik ? fetchOptionalValue<SecSubmissions>(`https://data.sec.gov/submissions/CIK${cik}.json`, SEC_HEADERS) : null,
   ]);
   if (!facts) {
-    if (snapshot) return valueUsSnapshot(body, ticker, snapshot);
+    if (snapshot) {
+      const stock = valueUsSnapshot(body, ticker, snapshot);
+      if (liveQuote && liveQuote.price > 0) {
+        return {
+          ...stock,
+          price: liveQuote.price,
+          priceChange: liveQuote.change,
+          priceChangePercent: liveQuote.changePercent,
+          previousClose: liveQuote.previousClose,
+          priceSource: "Yahoo Finance",
+        };
+      }
+      return stock;
+    }
     throw new Error("SEC 公開財務資料暫時無法連線，且此代碼尚無內建財務快照");
   }
   const taxonomy = facts.facts?.["us-gaap"] ? "us-gaap" : "ifrs-full";
@@ -536,8 +601,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     throw new Error("公開申報資料不足，暫時無法建立可靠估值");
   }
 
-  const marketQuote = await nasdaqMarketPrice(ticker);
-  const price = preferCapturedPrice(body.capturedPrice, marketQuote.price);
+  const resolvedLivePrice = liveQuote?.price && liveQuote.price > 0
+    ? liveQuote.price
+    : (await nasdaqMarketPrice(ticker)).price;
+  const price = preferCapturedPrice(body.capturedPrice, resolvedLivePrice);
 
   const revenueGrowth = revenueGrowthMetric ? revenueGrowthMetric.rate * 100 : 0;
   const roeSourcesAligned = Boolean(
@@ -619,6 +686,12 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     assetType: "EQUITY" as const,
     sector: normalizeSector(ticker, facts.entityName || marketQuote.name || company.title, submissions?.sicDescription || "美股公開發行公司"),
     price,
+    ...(liveQuote && liveQuote.price > 0 ? {
+      priceChange: liveQuote.change,
+      priceChangePercent: liveQuote.changePercent,
+      previousClose: liveQuote.previousClose,
+      priceSource: "Yahoo Finance",
+    } : {}),
     eps,
     epsHistory,
     bvps,
