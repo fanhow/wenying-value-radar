@@ -601,9 +601,12 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     throw new Error("公開申報資料不足，暫時無法建立可靠估值");
   }
 
+  const nasdaqQuote = liveQuote?.price && liveQuote.price > 0
+    ? null
+    : await nasdaqMarketPrice(ticker);
   const resolvedLivePrice = liveQuote?.price && liveQuote.price > 0
     ? liveQuote.price
-    : (await nasdaqMarketPrice(ticker)).price;
+    : numeric(nasdaqQuote?.price);
   const price = preferCapturedPrice(body.capturedPrice, resolvedLivePrice);
 
   const revenueGrowth = revenueGrowthMetric ? revenueGrowthMetric.rate * 100 : 0;
@@ -681,10 +684,10 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
   const targets = valuationTargets(revenueGrowth, roe, debtRatio);
   return {
     ticker,
-    name: body.capturedName?.trim() || facts.entityName || marketQuote.name || company.title,
+    name: body.capturedName?.trim() || facts.entityName || nasdaqQuote?.name || company?.title || ticker,
     market: "US" as const,
     assetType: "EQUITY" as const,
-    sector: normalizeSector(ticker, facts.entityName || marketQuote.name || company.title, submissions?.sicDescription || "美股公開發行公司"),
+    sector: normalizeSector(ticker, facts.entityName || nasdaqQuote?.name || company?.title || ticker, submissions?.sicDescription || "美股公開發行公司"),
     price,
     ...(liveQuote && liveQuote.price > 0 ? {
       priceChange: liveQuote.change,
@@ -732,9 +735,9 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     dataCompleteness: dataHasHistoricalDepth ? "historical" as const : "limited" as const,
     dataBasis,
     financialDataDate,
-    updatedAt: marketQuote.updatedAt || financialDataDate || new Date().toISOString().slice(0, 10),
+    updatedAt: liveQuote?.date || nasdaqQuote?.updatedAt || financialDataDate || new Date().toISOString().slice(0, 10),
     source: "自動資料" as const,
-    sourceNote: `財務數據取自 SEC EDGAR 公開申報，期間基礎為${dataBasisLabel}；價格${numeric(body.capturedPrice) && price === numeric(body.capturedPrice) ? "採用方舟截圖" : "採用 Nasdaq 市場資訊"}。模型只使用公開申報、價格與透明假設；若資料期間、欄位完整度或模型一致性不足，會降低信心，不把結果當成確定的高低估判斷`,
+    sourceNote: `財務數據取自 SEC EDGAR 公開申報，期間基礎為${dataBasisLabel}；價格${numeric(body.capturedPrice) && price === numeric(body.capturedPrice) ? "採用方舟截圖" : liveQuote?.price && liveQuote.price > 0 ? "採用 Yahoo Finance 市場資訊" : "採用 Nasdaq 市場資訊"}。模型只使用公開申報、價格與透明假設；若資料期間、欄位完整度或模型一致性不足，會降低信心，不把結果當成確定的高低估判斷`,
   };
 }
 
