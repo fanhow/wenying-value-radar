@@ -1,0 +1,73 @@
+{
+  "id": "avgo_h1_failed_m_top_reversal_001",
+  "setup_id": "failed_m_top",
+  "symbol": "AVGO",
+  "market": "US",
+  "execution_timeframe": "H1",
+  "higher_timeframe": null,
+  "trade_date": null,
+  "direction": "long",
+  "context": {
+    "zh": "成熟 M 頂與頸線區存在，價格快速下跌至重要支撐後，交易者尋找類晨星反轉結構。",
+    "en": "A mature M-top and neckline existed. After aggressive downside movement reached important support, the trader looked for a Morning-Star-like reversal structure."
+  },
+  "trade_thesis": {
+    "zh": "理想模型是在支撐區出現 H1 晨星／十字星拒絕並以次一時段向上跳空提早試單；真實交易因需出海無法監控，實際較晚在 H1 EMA15 附近進場。",
+    "en": "The ideal model is an early probe after an H1 Morning Doji Star rejection at support and a next-session bullish gap. In the real trade, offshore work prevented monitoring, so entry occurred later around H1 EMA15."
+  },
+  "entry": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "原偏好在 H1 反轉確認後進場；實際因出海無法監控，延後至 H1 EMA15 附近才進場。",
+      "en": "The preferred entry was after H1 reversal confirmation; the actual entry was delayed until the H1 EMA15 area because offshore work prevented monitoring."
+    }
+  },
+  "initial_stop": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "依相關 H1 結構低點保護；精確停損價格尚未可靠還原。",
+      "en": "Protected beneath the relevant H1 structural low; the exact stop price has not been reliably recovered."
+    }
+  },
+  "trailing_method": {
+    "zh": "停損依 H1 已確認市場結構低點逐步上移。",
+    "en": "The stop was progressively raised behind confirmed H1 market-structure lows."
+  },
+  "trailing_stops": [
+    { "price": null, "candle_index": null, "reason": { "zh": "第一個確認 H1 Higher Low 後上移。", "en": "Raised after the first confirmed H1 higher low." } },
+    { "price": null, "candle_index": null, "reason": { "zh": "第二個確認 H1 Higher Low 後上移。", "en": "Raised after the second confirmed H1 higher low." } },
+    { "price": null, "candle_index": null, "reason": { "zh": "第三個確認 H1 Higher Low 後上移。", "en": "Raised after the third confirmed H1 higher low." } }
+  ],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "最終觸及 H1 結構移動停損出場，交易已知獲利，但精確數字尚未驗證。",
+      "en": "The position eventually exited on the H1 structural trailing stop. The trade is known to have closed profitably, but exact figures are not validated."
+    }
+  },
+  "adr": { "period": null, "completed_at_entry_percent": null, "high": null, "low": null, "target": null },
+  "ema": {
+    "ema15": null,
+    "ema50": null,
+    "higher_timeframe_ema15": null,
+    "ema15_context": { "zh": "實際進場約在 H1 EMA15 區域；精確均線值未知。", "en": "Actual entry occurred around H1 EMA15; the exact moving-average value is unknown." },
+    "ema50_context": { "zh": "H1 EMA50 的精確位置與數值尚未還原。", "en": "The exact H1 EMA50 location and value have not been recovered." }
+  },
+  "higher_timeframe_context": { "zh": "未取得足夠資料以可靠描述較高週期背景。", "en": "Insufficient evidence is available to describe the higher-timeframe context reliably." },
+  "performance": { "risk_amount": null, "result_amount": null, "result_percent": null, "result_r": null },
+  "outcome_summary": { "zh": "已知獲利；精確 R、百分比與成交價格均待原始紀錄驗證。", "en": "Known profitable; exact R, percentage, and execution prices await validation from original records." },
+  "notes": [
+    { "zh": "真實案例保留較晚進場的不完美，不能反過來修改 Phase 1 的理想早期跳空進場模型。", "en": "The real case preserves the imperfect late entry and must not reshape the approved Phase 1 early-gap ideal model." }
+  ],
+  "lessons": {
+    "what_worked": { "zh": "下跌後等待重要支撐的反轉結構，並以 H1 結構低點管理停損。", "en": "The trader waited for a reversal structure at important support and managed risk behind H1 structural lows." },
+    "what_was_imperfect": { "zh": "因出海無法監控而錯過原偏好確認點，實際進場較晚且靠近 H1 EMA15。", "en": "Offshore work prevented monitoring, so the preferred confirmation entry was missed and actual entry occurred later near H1 EMA15." },
+    "invalidation": { "zh": "支撐反轉失敗並有效跌破結構低點，或向上跳空沒有延續。", "en": "Failure of the support reversal with a valid break of the structural low, or no follow-through after the bullish gap." },
+    "a_plus": { "zh": "M 頂跌破後抵達主要支撐、晨星十字星拒絕、次一時段向上跳空並可用緊停損。", "en": "M-top breakdown into major support, Morning Doji Star rejection, next-session bullish gap, and a tight defensible stop." },
+    "downgrade": { "zh": "晚追至壓力區、停損過寬、沒有明確支撐或反轉後缺乏延續。", "en": "Late entry into resistance, an overly wide stop, no clear support, or weak follow-through after reversal." }
+  },
+  "images": { "original": null, "annotated": null, "annotation_file": "data/real_cases/annotations/avgo_reversal.json" }
+}
