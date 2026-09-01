@@ -1,0 +1,132 @@
+{
+  "cases": [
+    {
+      "id": "eurusd_false_break_20260105",
+      "setup_id": "false_break_reclaim",
+      "file": "eurusd_false_break_20260105.json"
+    },
+    {
+      "id": "cadchf_false_break_20260227",
+      "setup_id": "false_break_reclaim",
+      "file": "cadchf_false_break_20260227.json"
+    },
+    {
+      "id": "cadchf_false_break_20260112",
+      "setup_id": "false_break_reclaim",
+      "file": "cadchf_false_break_20260112.json"
+    },
+    {
+      "id": "usdjpy_flat_pb_20260306",
+      "setup_id": "flat_pullback",
+      "file": "usdjpy_flat_pb_20260306.json"
+    },
+    {
+      "id": "gbpjpy_flat_pb_20260824",
+      "setup_id": "flat_pullback",
+      "file": "gbpjpy_flat_pb_20260824.json"
+    },
+    {
+      "id": "audusd_flat_pb_20260225",
+      "setup_id": "flat_pullback",
+      "file": "audusd_flat_pb_20260225.json"
+    },
+    {
+      "id": "audnzd_first_pb_20260210",
+      "setup_id": "first_pullback",
+      "file": "audnzd_first_pb_20260210.json"
+    },
+    {
+      "id": "eurusd_first_pb_20260201",
+      "setup_id": "first_pullback",
+      "file": "eurusd_first_pb_20260201.json"
+    },
+    {
+      "id": "eurjpy_first_pb_20251211",
+      "setup_id": "first_pullback",
+      "file": "eurjpy_first_pb_20251211.json"
+    },
+    {
+      "id": "usdchf_failed_mtop_20260215",
+      "setup_id": "failed_m_top",
+      "file": "usdchf_failed_mtop_20260215.json"
+    },
+    {
+      "id": "gbpusd_failed_mtop_20251102",
+      "setup_id": "failed_m_top",
+      "file": "gbpusd_failed_mtop_20251102.json"
+    },
+    {
+      "id": "eurjpy_failed_mtop_20260809",
+      "setup_id": "failed_m_top",
+      "file": "eurjpy_failed_mtop_20260809.json"
+    },
+    {
+      "id": "usdjpy_failed_wbot_20260730",
+      "setup_id": "failed_w_bottom",
+      "file": "usdjpy_failed_wbot_20260730.json"
+    },
+    {
+      "id": "usdjpy_failed_wbot_20260125",
+      "setup_id": "failed_w_bottom",
+      "file": "usdjpy_failed_wbot_20260125.json"
+    },
+    {
+      "id": "audnzd_failed_wbot_20260709",
+      "setup_id": "failed_w_bottom",
+      "file": "audnzd_failed_wbot_20260709.json"
+    },
+    {
+      "id": "usdchf_exhaust_20251114",
+      "setup_id": "exhaustion_reversal",
+      "file": "usdchf_exhaust_20251114.json"
+    },
+    {
+      "id": "cadchf_exhaust_20251114",
+      "setup_id": "exhaustion_reversal",
+      "file": "cadchf_exhaust_20251114.json"
+    },
+    {
+      "id": "gbpjpy_exhaust_20260129",
+      "setup_id": "exhaustion_reversal",
+      "file": "gbpjpy_exhaust_20260129.json"
+    },
+    {
+      "id": "cadchf_lw_adr_20260415_0800",
+      "setup_id": "lower_wick_adr",
+      "file": "cadchf_lw_adr_20260415_0800.json"
+    },
+    {
+      "id": "eurgbp_lw_adr_20260710_0700",
+      "setup_id": "lower_wick_adr",
+      "file": "eurgbp_lw_adr_20260710_0700.json"
+    },
+    {
+      "id": "usdchf_lw_adr_20260415_0800",
+      "setup_id": "lower_wick_adr",
+      "file": "usdchf_lw_adr_20260415_0800.json"
+    },
+    {
+      "id": "audnzd_mstar_20260601",
+      "setup_id": "morning_star_support",
+      "file": "audnzd_mstar_20260601.json"
+    },
+    {
+      "id": "eurusd_mtop_rt_20260531",
+      "setup_id": "mtop_break_retest",
+      "file": "eurusd_mtop_rt_20260531.json"
+    },
+    {
+      "id": "eurusd_mtop_rt_20260605",
+      "setup_id": "mtop_break_retest",
+      "file": "eurusd_mtop_rt_20260605.json"
+    },
+    {
+      "id": "gbpusd_mtop_rt_20260605",
+      "setup_id": "mtop_break_retest",
+      "file": "gbpusd_mtop_rt_20260605.json"
+    }
+  ],
+  "no_case_patterns": [
+    "compression_expansion"
+  ]
+}

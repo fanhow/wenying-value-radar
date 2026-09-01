@@ -1,0 +1,131 @@
+{
+  "id": "gbpjpy_compress_20250501",
+  "setup_id": "compression_expansion",
+  "case_type": "historical_pattern",
+  "symbol": "GBPJPY",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-05-01",
+  "direction": "long",
+  "context": {
+    "zh": "GBPJPY 2025-05-01：5-bar compression (range 1.73800), avg candle range 1.38100 < ADR 1.75110. Breakout 84.4% above ceiling 191.71300.",
+    "en": "GBPJPY 2025-05-01: 5-bar compression (range 1.73800), avg candle range 1.38100 < ADR 1.75110. Breakout 84.4% above ceiling 191.71300."
+  },
+  "trade_thesis": {
+    "zh": "D1 波動收縮轉擴張 setup 形成，H1 進場觸發：H1 continuation above D1 breakout high 193.45300",
+    "en": "D1 Compression to Expansion setup formed, H1 entry trigger: H1 continuation above D1 breakout high 193.45300"
+  },
+  "entry": {
+    "price": 203.585,
+    "candle_index": 1,
+    "reason": {
+      "zh": "規則式觀察進場：H1 continuation above D1 breakout high 193.45300，進場價 203.585",
+      "en": "Rule-based observation entry: H1 continuation above D1 breakout high 193.45300, entry at 203.585"
+    }
+  },
+  "initial_stop": {
+    "price": 189.831429,
+    "candle_index": 0,
+    "reason": {
+      "zh": "規則式停損 189.831429，距離 13.753571",
+      "en": "Rule-based stop at 189.831429, distance 13.753571"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.047R，MAE -0.220R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.047R, MAE -0.220R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": null,
+    "ema50": null,
+    "higher_timeframe_ema15": 190.485506,
+    "ema15_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 190.485506，D1 支撐 None",
+    "en": "D1 EMA15 at 190.485506, D1 support None"
+  },
+  "performance": {
+    "risk_amount": 13.753571,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -0.038
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.047R，MAE -0.220R，結果 R -0.038。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.047R, MAE -0.220R, achieved R -0.038. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-23T08:00:00",
+    "confirmation_time": "2025-10-23T08:00:00",
+    "entry_time": "2025-10-23T08:00:00",
+    "h1_source_sha256": "51ea93fec8abe36cac1e30261d523c5ba4baed06b78ce3e3f78faa13873f7f00",
+    "d1_source_sha256": "239796daa73aeb7fadcb75bee6470bec37161d39e8bfac80ae053afc78d52d9e",
+    "h1_rows": 5208,
+    "d1_rows": 1644,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.047,
+    "next_48h_mae_r": -0.22
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 GBPJPY D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from GBPJPY D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "波動收縮轉擴張 型態條件滿足",
+      "en": "Compression to Expansion pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 波動收縮轉擴張 條件清晰滿足 + R:R >= 2",
+      "en": "All Compression to Expansion conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/gbpjpy_compress_20250501_original.png",
+    "annotated": "/real-cases/gbpjpy_compress_20250501_annotated.png",
+    "annotation_file": null
+  }
+}

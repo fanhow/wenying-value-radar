@@ -1,0 +1,131 @@
+{
+  "id": "eurchf_mtop_rt_20250407",
+  "setup_id": "mtop_break_retest",
+  "case_type": "historical_pattern",
+  "symbol": "EURCHF",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-04-07",
+  "direction": "short",
+  "context": {
+    "zh": "EURCHF 2025-04-07：M-top peaks 0.96617/0.96349, neckline 0.94901. Broke 2025-04-04. Retest high 0.95010 failed to reclaim, closed 0.93833.",
+    "en": "EURCHF 2025-04-07: M-top peaks 0.96617/0.96349, neckline 0.94901. Broke 2025-04-04. Retest high 0.95010 failed to reclaim, closed 0.93833."
+  },
+  "trade_thesis": {
+    "zh": "D1 M 頂破頸線回測後續跌 setup 形成，H1 進場觸發：H1 break below retest low 0.93116",
+    "en": "D1 M-Top Neckline Break, Retest, Short setup formed, H1 entry trigger: H1 break below retest low 0.93116"
+  },
+  "entry": {
+    "price": 0.92515,
+    "candle_index": 1,
+    "reason": {
+      "zh": "規則式觀察進場：H1 break below retest low 0.93116，進場價 0.92515",
+      "en": "Rule-based observation entry: H1 break below retest low 0.93116, entry at 0.92515"
+    }
+  },
+  "initial_stop": {
+    "price": 0.949603,
+    "candle_index": 0,
+    "reason": {
+      "zh": "規則式停損 0.949603，距離 0.024453",
+      "en": "Rule-based stop at 0.949603, distance 0.024453"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.173R，MAE -0.089R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.173R, MAE -0.089R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": null,
+    "ema50": null,
+    "higher_timeframe_ema15": 0.952365,
+    "ema15_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 0.952365，D1 支撐 None",
+    "en": "D1 EMA15 at 0.952365, D1 support None"
+  },
+  "performance": {
+    "risk_amount": 0.024453,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -0.031
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.173R，MAE -0.089R，結果 R -0.031。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.173R, MAE -0.089R, achieved R -0.031. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-20T04:00:00",
+    "confirmation_time": "2025-10-20T04:00:00",
+    "entry_time": "2025-10-20T04:00:00",
+    "h1_source_sha256": "79592ca52145d991962f1cf09e6eb1a5ab2c5f956b5567030fd1a107471fcfc4",
+    "d1_source_sha256": "109c63e652ee2464679db1638cfad4f7042c582adcc777be8da7840e580dc95f",
+    "h1_rows": 5203,
+    "d1_rows": 5272,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.173,
+    "next_48h_mae_r": -0.089
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 EURCHF D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from EURCHF D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "M 頂破頸線回測後續跌 型態條件滿足",
+      "en": "M-Top Neckline Break, Retest, Short pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 M 頂破頸線回測後續跌 條件清晰滿足 + R:R >= 2",
+      "en": "All M-Top Neckline Break, Retest, Short conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurchf_mtop_rt_20250407_original.png",
+    "annotated": "/real-cases/eurchf_mtop_rt_20250407_annotated.png",
+    "annotation_file": null
+  }
+}

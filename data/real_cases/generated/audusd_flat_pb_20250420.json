@@ -1,0 +1,131 @@
+{
+  "id": "audusd_flat_pb_20250420",
+  "setup_id": "flat_pullback",
+  "case_type": "historical_pattern",
+  "symbol": "AUDUSD",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-04-20",
+  "direction": "long",
+  "context": {
+    "zh": "AUDUSD 2025-04-20：EMA15 0.62926 > EMA50 0.62746, both rising. Prior 8.0% advance, then tight consolidation 0.02129. Breakout above 0.63936.",
+    "en": "AUDUSD 2025-04-20: EMA15 0.62926 > EMA50 0.62746, both rising. Prior 8.0% advance, then tight consolidation 0.02129. Breakout above 0.63936."
+  },
+  "trade_thesis": {
+    "zh": "D1 平台回調與趨勢延續 setup 形成，H1 進場觸發：H1 breakout above consolidation ceiling 0.63936",
+    "en": "D1 Flat Pullback + Trend Continuation setup formed, H1 entry trigger: H1 breakout above consolidation ceiling 0.63936"
+  },
+  "entry": {
+    "price": 0.65137,
+    "candle_index": 15,
+    "reason": {
+      "zh": "規則式觀察進場：H1 breakout above consolidation ceiling 0.63936，進場價 0.65137",
+      "en": "Rule-based observation entry: H1 breakout above consolidation ceiling 0.63936, entry at 0.65137"
+    }
+  },
+  "initial_stop": {
+    "price": 0.616325,
+    "candle_index": 14,
+    "reason": {
+      "zh": "規則式停損 0.616325，距離 0.035045",
+      "en": "Rule-based stop at 0.616325, distance 0.035045"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.295R，MAE -0.061R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.295R, MAE -0.061R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 0.6511,
+    "ema50": null,
+    "higher_timeframe_ema15": 0.629258,
+    "ema15_context": {
+      "zh": "H1 EMA15 0.6511",
+      "en": "H1 EMA15 at 0.6511"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 0.629258，D1 支撐 None",
+    "en": "D1 EMA15 at 0.629258, D1 support None"
+  },
+  "performance": {
+    "risk_amount": 0.035045,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 0.115
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.295R，MAE -0.061R，結果 R 0.115。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.295R, MAE -0.061R, achieved R 0.115. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-23T22:10:00",
+    "confirmation_time": "2025-10-23T22:10:00",
+    "entry_time": "2025-10-23T22:10:00",
+    "h1_source_sha256": "ffa9cdbc7db6c65ffdd5f5c14797d60b26e2b41cc2b0016755568f8f951ff662",
+    "d1_source_sha256": "2443eb33417f16780dbc6d0ceeaeb7a9420de81e535b08f07832b9f6753e3d69",
+    "h1_rows": 5203,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.295,
+    "next_48h_mae_r": -0.061
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 AUDUSD D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from AUDUSD D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "平台回調與趨勢延續 型態條件滿足",
+      "en": "Flat Pullback + Trend Continuation pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 平台回調與趨勢延續 條件清晰滿足 + R:R >= 2",
+      "en": "All Flat Pullback + Trend Continuation conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/audusd_flat_pb_20250420_original.png",
+    "annotated": "/real-cases/audusd_flat_pb_20250420_annotated.png",
+    "annotation_file": null
+  }
+}

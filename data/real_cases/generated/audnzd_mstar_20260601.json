@@ -1,0 +1,131 @@
+{
+  "id": "audnzd_mstar_20260601",
+  "setup_id": "morning_star_support",
+  "case_type": "historical_pattern",
+  "symbol": "AUDNZD",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-06-01",
+  "direction": "long",
+  "context": {
+    "zh": "AUDNZD 2026-06-01：Morning Star at support 1.19771. Bar1 bearish body 0.00523, Star low 1.19771 (new low), Bar3 bullish recovery 1.20689 above 50% (1.20216). Prior decline 2.5%.",
+    "en": "AUDNZD 2026-06-01: Morning Star at support 1.19771. Bar1 bearish body 0.00523, Star low 1.19771 (new low), Bar3 bullish recovery 1.20689 above 50% (1.20216). Prior decline 2.5%."
+  },
+  "trade_thesis": {
+    "zh": "D1 主要支撐的早晨之星 成立，H1 進場觸發：H1 break above bar3 high 1.20801",
+    "en": "D1 Morning Star at Major Support setup confirmed, H1 entry trigger: H1 break above bar3 high 1.20801"
+  },
+  "entry": {
+    "price": 1.20915,
+    "candle_index": 3715,
+    "reason": {
+      "zh": "規則式觀察進場：H1 break above bar3 high 1.20801，進場價 1.20915",
+      "en": "Rule-based observation entry: H1 break above bar3 high 1.20801, entry at 1.20915"
+    }
+  },
+  "initial_stop": {
+    "price": 1.197401,
+    "candle_index": 3714,
+    "reason": {
+      "zh": "規則式初始停損設於 1.197401，風險距離 0.011749",
+      "en": "Rule-based initial stop set at 1.197401, risk distance 0.011749"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.650R，MAE -0.254R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.650R, MAE -0.254R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 1.206364,
+    "ema50": 1.205304,
+    "higher_timeframe_ema15": 1.212346,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 1.206364",
+      "en": "H1 EMA15 at 1.206364"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 1.205304",
+      "en": "H1 EMA50 at 1.205304"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 1.212346，D1 關鍵支撐/壓力位於 1.19771",
+    "en": "D1 EMA15 at 1.212346, D1 key level at 1.19771"
+  },
+  "performance": {
+    "risk_amount": 0.011749,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 0.346
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.650R，MAE -0.254R，結果 R 0.346。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.650R, MAE -0.254R, achieved R 0.346. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-06-02T01:00:00",
+    "confirmation_time": "2026-06-02T01:00:00",
+    "entry_time": "2026-06-02T01:00:00",
+    "h1_source_sha256": "e91fc7bff5030743added82d61789e23298c2f7dadfb81ba22b17bf1afe40250",
+    "d1_source_sha256": "29c0c5609d95bac7d8bc5f6c2f26bc96d3e501baa9329003969f58bb40a58fc3",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.65,
+    "next_48h_mae_r": -0.254
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 AUDNZD D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from AUDNZD D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "主要支撐的早晨之星 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Morning Star at Major Support setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/audnzd_mstar_20260601_original.png",
+    "annotated": "/real-cases/audnzd_mstar_20260601_annotated.png",
+    "annotation_file": null
+  }
+}

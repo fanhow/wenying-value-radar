@@ -1,0 +1,131 @@
+{
+  "id": "gbpjpy_flat_pb_20260824",
+  "setup_id": "flat_pullback",
+  "case_type": "historical_pattern",
+  "symbol": "GBPJPY",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-08-24",
+  "direction": "long",
+  "context": {
+    "zh": "GBPJPY 2026-08-24：EMA15 215.86224 > EMA50 215.52610, both rising. Prior 3.6% advance, then tight consolidation 2.34600. Breakout above 217.16500.",
+    "en": "GBPJPY 2026-08-24: EMA15 215.86224 > EMA50 215.52610, both rising. Prior 3.6% advance, then tight consolidation 2.34600. Breakout above 217.16500."
+  },
+  "trade_thesis": {
+    "zh": "D1 平台回調與趨勢延續 成立，H1 進場觸發：H1 breakout above consolidation ceiling 217.16500",
+    "en": "D1 Flat Pullback + Trend Continuation setup confirmed, H1 entry trigger: H1 breakout above consolidation ceiling 217.16500"
+  },
+  "entry": {
+    "price": 217.227,
+    "candle_index": 5142,
+    "reason": {
+      "zh": "規則式觀察進場：H1 breakout above consolidation ceiling 217.16500，進場價 217.227",
+      "en": "Rule-based observation entry: H1 breakout above consolidation ceiling 217.16500, entry at 217.227"
+    }
+  },
+  "initial_stop": {
+    "price": 214.696664,
+    "candle_index": 5141,
+    "reason": {
+      "zh": "規則式初始停損設於 214.696664，風險距離 2.530336",
+      "en": "Rule-based initial stop set at 214.696664, risk distance 2.530336"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.093R，MAE -0.377R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.093R, MAE -0.377R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 217.012873,
+    "ema50": 216.826613,
+    "higher_timeframe_ema15": 215.862244,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 217.012873",
+      "en": "H1 EMA15 at 217.012873"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 216.826613",
+      "en": "H1 EMA50 at 216.826613"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 215.862244，D1 關鍵支撐/壓力位於 None",
+    "en": "D1 EMA15 at 215.862244, D1 key level at None"
+  },
+  "performance": {
+    "risk_amount": 2.530336,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -0.23
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.093R，MAE -0.377R，結果 R -0.23。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.093R, MAE -0.377R, achieved R -0.23. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-08-25T03:00:00",
+    "confirmation_time": "2026-08-25T03:00:00",
+    "entry_time": "2026-08-25T03:00:00",
+    "h1_source_sha256": "51ea93fec8abe36cac1e30261d523c5ba4baed06b78ce3e3f78faa13873f7f00",
+    "d1_source_sha256": "239796daa73aeb7fadcb75bee6470bec37161d39e8bfac80ae053afc78d52d9e",
+    "h1_rows": 5208,
+    "d1_rows": 1644,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.093,
+    "next_48h_mae_r": -0.377
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 GBPJPY D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from GBPJPY D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "平台回調與趨勢延續 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Flat Pullback + Trend Continuation setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/gbpjpy_flat_pb_20260824_original.png",
+    "annotated": "/real-cases/gbpjpy_flat_pb_20260824_annotated.png",
+    "annotation_file": null
+  }
+}

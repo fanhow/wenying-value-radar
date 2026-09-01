@@ -1,0 +1,131 @@
+{
+  "id": "usdjpy_exhaust_20250411",
+  "setup_id": "exhaustion_reversal",
+  "case_type": "historical_pattern",
+  "symbol": "USDJPY",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-04-13",
+  "direction": "long",
+  "context": {
+    "zh": "USDJPY 2025-04-13：Extended decline 6.1% into support 142.05800. Exhaustion wick 1.45700 at 2025-04-11. Higher low confirmed 143.50500 > 142.05800.",
+    "en": "USDJPY 2025-04-13: Extended decline 6.1% into support 142.05800. Exhaustion wick 1.45700 at 2025-04-11. Higher low confirmed 143.50500 > 142.05800."
+  },
+  "trade_thesis": {
+    "zh": "D1 耗竭跌勢後反轉 setup 形成，H1 進場觸發：H1 break above swing high 144.19900",
+    "en": "D1 Exhaustion Move to Reversal setup formed, H1 entry trigger: H1 break above swing high 144.19900"
+  },
+  "entry": {
+    "price": 152.492,
+    "candle_index": 1,
+    "reason": {
+      "zh": "規則式觀察進場：H1 break above swing high 144.19900，進場價 152.492",
+      "en": "Rule-based observation entry: H1 break above swing high 144.19900, entry at 152.492"
+    }
+  },
+  "initial_stop": {
+    "price": 141.873074,
+    "candle_index": 0,
+    "reason": {
+      "zh": "規則式停損 141.873074，距離 10.618926",
+      "en": "Rule-based stop at 141.873074, distance 10.618926"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.131R，MAE -0.090R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.131R, MAE -0.090R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": null,
+    "ema50": null,
+    "higher_timeframe_ema15": 146.914771,
+    "ema15_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 146.914771，D1 支撐 142.058",
+    "en": "D1 EMA15 at 146.914771, D1 support 142.058"
+  },
+  "performance": {
+    "risk_amount": 10.618926,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 0.118
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.131R，MAE -0.090R，結果 R 0.118。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.131R, MAE -0.090R, achieved R 0.118. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-23T08:00:00",
+    "confirmation_time": "2025-10-23T08:00:00",
+    "entry_time": "2025-10-23T08:00:00",
+    "h1_source_sha256": "bbe7317f2698c09fcd98198a806fec4a779fa2b9f4ab733762ed8bf8c3cde946",
+    "d1_source_sha256": "e9825a28aceb427980c6346bfac902e4cf038aebeb95c570b285fb8aabdcc562",
+    "h1_rows": 5208,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.131,
+    "next_48h_mae_r": -0.09
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 USDJPY D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from USDJPY D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "耗竭跌勢後反轉 型態條件滿足",
+      "en": "Exhaustion Move to Reversal pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 耗竭跌勢後反轉 條件清晰滿足 + R:R >= 2",
+      "en": "All Exhaustion Move to Reversal conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/usdjpy_exhaust_20250411_original.png",
+    "annotated": "/real-cases/usdjpy_exhaust_20250411_annotated.png",
+    "annotation_file": null
+  }
+}

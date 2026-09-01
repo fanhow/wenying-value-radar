@@ -108,7 +108,10 @@ test("real-market case helpers support zero, one, and multiple cases safely", as
   const cases = await import(moduleUrl.href);
 
   assert.equal(cases.realCasesForSetup("not_registered").length, 0);
-  assert.equal(cases.realCasesForSetup("failed_m_top").length, 1);
+  assert.equal(cases.realCasesForSetup("failed_m_top").length, 4);
+  assert.equal(cases.realCasesForSetup("false_break_reclaim").length, 3);
+  assert.equal(cases.realCasesForSetup("compression_expansion").length, 0);
+  assert.ok(cases.REAL_MARKET_CASES.length >= 27);
   const first = cases.REAL_MARKET_CASES[0];
   assert.equal(cases.realCasesForSetup(first.setup_id, [first, { ...first, id: `${first.id}_copy` }]).length, 2);
   assert.equal(cases.formatNullableMetric(null), "—");

@@ -1,0 +1,131 @@
+{
+  "id": "eurjpy_failed_mtop_20260809",
+  "setup_id": "failed_m_top",
+  "case_type": "historical_pattern",
+  "symbol": "EURJPY",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-08-09",
+  "direction": "long",
+  "context": {
+    "zh": "EURJPY 2026-08-09：M-top peaks at 187.46800/186.66300, neckline 186.02600. Breakdown into support 179.36100. Doji-star rejection (body/range 0.22).",
+    "en": "EURJPY 2026-08-09: M-top peaks at 187.46800/186.66300, neckline 186.02600. Breakdown into support 179.36100. Doji-star rejection (body/range 0.22)."
+  },
+  "trade_thesis": {
+    "zh": "D1 M 頂失敗後多頭反轉 成立，H1 進場觸發：H1 close above doji high 182.51700, early reversal entry",
+    "en": "D1 Failed M Top to Bullish Reversal setup confirmed, H1 entry trigger: H1 close above doji high 182.51700, early reversal entry"
+  },
+  "entry": {
+    "price": 182.549,
+    "candle_index": 4875,
+    "reason": {
+      "zh": "規則式觀察進場：H1 close above doji high 182.51700, early reversal entry，進場價 182.549",
+      "en": "Rule-based observation entry: H1 close above doji high 182.51700, early reversal entry, entry at 182.549"
+    }
+  },
+  "initial_stop": {
+    "price": 182.226575,
+    "candle_index": 4875,
+    "reason": {
+      "zh": "規則式初始停損設於 182.226575，風險距離 0.322425",
+      "en": "Rule-based initial stop set at 182.226575, risk distance 0.322425"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +5.887R，MAE -0.375R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +5.887R, MAE -0.375R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 182.369317,
+    "ema50": 182.313668,
+    "higher_timeframe_ema15": 183.415125,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 182.369317",
+      "en": "H1 EMA15 at 182.369317"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 182.313668",
+      "en": "H1 EMA50 at 182.313668"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 183.415125，D1 關鍵支撐/壓力位於 179.361",
+    "en": "D1 EMA15 at 183.415125, D1 key level at 179.361"
+  },
+  "performance": {
+    "risk_amount": 0.322425,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 5.356
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +5.887R，MAE -0.375R，結果 R 5.356。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +5.887R, MAE -0.375R, achieved R 5.356. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-08-10T00:00:00",
+    "confirmation_time": "2026-08-10T00:00:00",
+    "entry_time": "2026-08-10T00:00:00",
+    "h1_source_sha256": "79f122f0cba63b17b3f2ba701ba4d9b2e62d1022520fc03267772bb6cf81a3e4",
+    "d1_source_sha256": "a71973ea93bce3f2f1a832dfad36b3e33e3a6624ca1a799baab040887770f574",
+    "h1_rows": 5208,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 5.887,
+    "next_48h_mae_r": -0.375
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 EURJPY D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from EURJPY D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "M 頂失敗後多頭反轉 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Failed M Top to Bullish Reversal setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurjpy_failed_mtop_20260809_original.png",
+    "annotated": "/real-cases/eurjpy_failed_mtop_20260809_annotated.png",
+    "annotation_file": null
+  }
+}

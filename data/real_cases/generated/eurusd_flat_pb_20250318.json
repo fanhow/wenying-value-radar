@@ -1,0 +1,131 @@
+{
+  "id": "eurusd_flat_pb_20250318",
+  "setup_id": "flat_pullback",
+  "case_type": "historical_pattern",
+  "symbol": "EURUSD",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-03-18",
+  "direction": "long",
+  "context": {
+    "zh": "EURUSD 2025-03-18：EMA15 1.07976 > EMA50 1.05994, both rising. Prior 5.6% advance, then tight consolidation 0.01495. Breakout above 1.09544.",
+    "en": "EURUSD 2025-03-18: EMA15 1.07976 > EMA50 1.05994, both rising. Prior 5.6% advance, then tight consolidation 0.01495. Breakout above 1.09544."
+  },
+  "trade_thesis": {
+    "zh": "D1 平台回調與趨勢延續 setup 形成，H1 進場觸發：H1 breakout above consolidation ceiling 1.09544",
+    "en": "D1 Flat Pullback + Trend Continuation setup formed, H1 entry trigger: H1 breakout above consolidation ceiling 1.09544"
+  },
+  "entry": {
+    "price": 1.16199,
+    "candle_index": 15,
+    "reason": {
+      "zh": "規則式觀察進場：H1 breakout above consolidation ceiling 1.09544，進場價 1.16199",
+      "en": "Rule-based observation entry: H1 breakout above consolidation ceiling 1.09544, entry at 1.16199"
+    }
+  },
+  "initial_stop": {
+    "price": 1.079168,
+    "candle_index": 14,
+    "reason": {
+      "zh": "規則式停損 1.079168，距離 0.082822",
+      "en": "Rule-based stop at 1.079168, distance 0.082822"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.059R，MAE -0.088R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.059R, MAE -0.088R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 1.161019,
+    "ema50": null,
+    "higher_timeframe_ema15": 1.079764,
+    "ema15_context": {
+      "zh": "H1 EMA15 1.161019",
+      "en": "H1 EMA15 at 1.161019"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 1.079764，D1 支撐 None",
+    "en": "D1 EMA15 at 1.079764, D1 support None"
+  },
+  "performance": {
+    "risk_amount": 0.082822,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -0.062
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.059R，MAE -0.088R，結果 R -0.062。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.059R, MAE -0.088R, achieved R -0.062. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-23T22:10:00",
+    "confirmation_time": "2025-10-23T22:10:00",
+    "entry_time": "2025-10-23T22:10:00",
+    "h1_source_sha256": "c6730a6f92af1867b5b71991d4e561885efccd19ad1fa00b320792754e8f40a7",
+    "d1_source_sha256": "d8fb6a1f3e92ddc1e581fcdf62dc464a6cf8d5e34ab483bfdc48f2bba6925cae",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.059,
+    "next_48h_mae_r": -0.088
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 EURUSD D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from EURUSD D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "平台回調與趨勢延續 型態條件滿足",
+      "en": "Flat Pullback + Trend Continuation pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 平台回調與趨勢延續 條件清晰滿足 + R:R >= 2",
+      "en": "All Flat Pullback + Trend Continuation conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurusd_flat_pb_20250318_original.png",
+    "annotated": "/real-cases/eurusd_flat_pb_20250318_annotated.png",
+    "annotation_file": null
+  }
+}

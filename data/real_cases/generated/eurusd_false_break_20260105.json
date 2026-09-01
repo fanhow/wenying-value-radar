@@ -1,0 +1,131 @@
+{
+  "id": "eurusd_false_break_20260105",
+  "setup_id": "false_break_reclaim",
+  "case_type": "historical_pattern",
+  "symbol": "EURUSD",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-01-05",
+  "direction": "long",
+  "context": {
+    "zh": "EURUSD 2026-01-05：D1 broke below 1.17000 support (low 1.16589) then reclaimed with close 1.17143. Lower wick 0.00461 shows rejection.",
+    "en": "EURUSD 2026-01-05: D1 broke below 1.17000 support (low 1.16589) then reclaimed with close 1.17143. Lower wick 0.00461 shows rejection."
+  },
+  "trade_thesis": {
+    "zh": "D1 假跌破與收復 成立，H1 進場觸發：H1 close above D1 rejection high 1.17285 and EMA15, entry next bar open",
+    "en": "D1 False Break + Reclaim setup confirmed, H1 entry trigger: H1 close above D1 rejection high 1.17285 and EMA15, entry next bar open"
+  },
+  "entry": {
+    "price": 1.17369,
+    "candle_index": 1216,
+    "reason": {
+      "zh": "規則式觀察進場：H1 close above D1 rejection high 1.17285 and EMA15, entry next bar open，進場價 1.17369",
+      "en": "Rule-based observation entry: H1 close above D1 rejection high 1.17285 and EMA15, entry next bar open, entry at 1.17369"
+    }
+  },
+  "initial_stop": {
+    "price": 1.165559,
+    "candle_index": 1215,
+    "reason": {
+      "zh": "規則式初始停損設於 1.165559，風險距離 0.008131",
+      "en": "Rule-based initial stop set at 1.165559, risk distance 0.008131"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.070R，MAE -1.464R。觸及停損。",
+      "en": "Historical pattern observation, MFE +0.070R, MAE -1.464R. SL hit."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 1.171779,
+    "ema50": 1.171711,
+    "higher_timeframe_ema15": 1.173573,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 1.171779",
+      "en": "H1 EMA15 at 1.171779"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 1.171711",
+      "en": "H1 EMA50 at 1.171711"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 1.173573，D1 關鍵支撐/壓力位於 1.17",
+    "en": "D1 EMA15 at 1.173573, D1 key level at 1.17"
+  },
+  "performance": {
+    "risk_amount": 0.008131,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -1.0
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.070R，MAE -1.464R，結果 R -1.0。觸及停損。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.070R, MAE -1.464R, achieved R -1.0. SL hit. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-01-06T03:00:00",
+    "confirmation_time": "2026-01-06T03:00:00",
+    "entry_time": "2026-01-06T03:00:00",
+    "h1_source_sha256": "c6730a6f92af1867b5b71991d4e561885efccd19ad1fa00b320792754e8f40a7",
+    "d1_source_sha256": "d8fb6a1f3e92ddc1e581fcdf62dc464a6cf8d5e34ab483bfdc48f2bba6925cae",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.07,
+    "next_48h_mae_r": -1.464
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 EURUSD D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from EURUSD D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "假跌破與收復 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "False Break + Reclaim setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurusd_false_break_20260105_original.png",
+    "annotated": "/real-cases/eurusd_false_break_20260105_annotated.png",
+    "annotation_file": null
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "id": "audnzd_false_break_20250304",
+  "setup_id": "false_break_reclaim",
+  "case_type": "historical_pattern",
+  "symbol": "AUDNZD",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-03-04",
+  "direction": "long",
+  "context": {
+    "zh": "AUDNZD 2025-03-04：D1 broke below 1.10484 support (low 1.10421) then reclaimed with close 1.10711. Lower wick 0.00290 shows rejection.",
+    "en": "AUDNZD 2025-03-04: D1 broke below 1.10484 support (low 1.10421) then reclaimed with close 1.10711. Lower wick 0.00290 shows rejection."
+  },
+  "trade_thesis": {
+    "zh": "D1 假跌破與收復 setup 形成，H1 進場觸發：H1 close above D1 rejection high 1.10805, entry on next bar open",
+    "en": "D1 False Break + Reclaim setup formed, H1 entry trigger: H1 close above D1 rejection high 1.10805, entry on next bar open"
+  },
+  "entry": {
+    "price": 1.13124,
+    "candle_index": 27,
+    "reason": {
+      "zh": "規則式觀察進場：H1 close above D1 rejection high 1.10805, entry on next bar open，進場價 1.13124",
+      "en": "Rule-based observation entry: H1 close above D1 rejection high 1.10805, entry on next bar open, entry at 1.13124"
+    }
+  },
+  "initial_stop": {
+    "price": 1.10386,
+    "candle_index": 26,
+    "reason": {
+      "zh": "規則式停損 1.10386，距離 0.027381",
+      "en": "Rule-based stop at 1.10386, distance 0.027381"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點逐步上移停損。",
+    "en": "Raise stop behind confirmed H1 structural lows."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.467R，MAE -0.077R。未達到停損或獲利目標。",
+      "en": "Historical pattern observation, MFE +0.467R, MAE -0.077R. neither."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 1.131243,
+    "ema50": null,
+    "higher_timeframe_ema15": 1.108289,
+    "ema15_context": {
+      "zh": "H1 EMA15 1.131243",
+      "en": "H1 EMA15 at 1.131243"
+    },
+    "ema50_context": {
+      "zh": "資料不足",
+      "en": "Insufficient data"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 1.108289，D1 支撐 1.10484",
+    "en": "D1 EMA15 at 1.108289, D1 support 1.10484"
+  },
+  "performance": {
+    "risk_amount": 0.027381,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 0.417
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.467R，MAE -0.077R，結果 R 0.417。未達到停損或獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.467R, MAE -0.077R, achieved R 0.417. neither. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-10-24T10:00:00",
+    "confirmation_time": "2025-10-24T10:00:00",
+    "entry_time": "2025-10-24T10:00:00",
+    "h1_source_sha256": "e91fc7bff5030743added82d61789e23298c2f7dadfb81ba22b17bf1afe40250",
+    "d1_source_sha256": "29c0c5609d95bac7d8bc5f6c2f26bc96d3e501baa9329003969f58bb40a58fc3",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.467,
+    "next_48h_mae_r": -0.077
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v1 掃描器從 AUDNZD D1/H1 歷史 OHLC 自動偵測，不是實際成交紀錄。",
+      "en": "This case was auto-detected by the fx-all-patterns-v1 scanner from AUDNZD D1/H1 historical OHLC, not an executed trade."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "假跌破與收復 型態條件滿足",
+      "en": "False Break + Reclaim pattern conditions met"
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記錄；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效突破停損位。",
+      "en": "Price breaks the stop loss level decisively."
+    },
+    "a_plus": {
+      "zh": "所有 假跌破與收復 條件清晰滿足 + R:R >= 2",
+      "en": "All False Break + Reclaim conditions clearly met + R:R >= 2"
+    },
+    "downgrade": {
+      "zh": "型態不清晰、R:R 不佳或缺乏動能確認。",
+      "en": "Unclear pattern, poor R:R, or lacking momentum confirmation."
+    }
+  },
+  "images": {
+    "original": "/real-cases/audnzd_false_break_20250304_original.png",
+    "annotated": "/real-cases/audnzd_false_break_20250304_annotated.png",
+    "annotation_file": null
+  }
+}

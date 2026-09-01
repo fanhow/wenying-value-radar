@@ -1,0 +1,131 @@
+{
+  "id": "eurjpy_first_pb_20251211",
+  "setup_id": "first_pullback",
+  "case_type": "historical_pattern",
+  "symbol": "EURJPY",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2025-12-11",
+  "direction": "long",
+  "context": {
+    "zh": "EURJPY 2025-12-11：Resistance 181.49080 tested 9x, broken on 2025-12-10. Pullback low 181.87000 holds as support.",
+    "en": "EURJPY 2025-12-11: Resistance 181.49080 tested 9x, broken on 2025-12-10. Pullback low 181.87000 holds as support."
+  },
+  "trade_thesis": {
+    "zh": "D1 突破後第一次回踩 成立，H1 進場觸發：H1 break above pullback high 182.74400",
+    "en": "D1 Breakout to First Pullback setup confirmed, H1 entry trigger: H1 break above pullback high 182.74400"
+  },
+  "entry": {
+    "price": 182.788,
+    "candle_index": 856,
+    "reason": {
+      "zh": "規則式觀察進場：H1 break above pullback high 182.74400，進場價 182.788",
+      "en": "Rule-based observation entry: H1 break above pullback high 182.74400, entry at 182.788"
+    }
+  },
+  "initial_stop": {
+    "price": 181.790843,
+    "candle_index": 855,
+    "reason": {
+      "zh": "規則式初始停損設於 181.790843，風險距離 0.997157",
+      "en": "Rule-based initial stop set at 181.790843, risk distance 0.997157"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +0.376R，MAE -1.233R。觸及停損。",
+      "en": "Historical pattern observation, MFE +0.376R, MAE -1.233R. SL hit."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": null,
+    "high": null,
+    "low": null,
+    "target": null
+  },
+  "ema": {
+    "ema15": 182.533853,
+    "ema50": 182.31033,
+    "higher_timeframe_ema15": 181.263325,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 182.533853",
+      "en": "H1 EMA15 at 182.533853"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 182.31033",
+      "en": "H1 EMA50 at 182.31033"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 181.263325，D1 關鍵支撐/壓力位於 181.4908",
+    "en": "D1 EMA15 at 181.263325, D1 key level at 181.4908"
+  },
+  "performance": {
+    "risk_amount": 0.997157,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -1.0
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +0.376R，MAE -1.233R，結果 R -1.0。觸及停損。這不是實際交易。",
+    "en": "Rule-based observation: MFE +0.376R, MAE -1.233R, achieved R -1.0. SL hit. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2025-12-12T01:00:00",
+    "confirmation_time": "2025-12-12T01:00:00",
+    "entry_time": "2025-12-12T01:00:00",
+    "h1_source_sha256": "79f122f0cba63b17b3f2ba701ba4d9b2e62d1022520fc03267772bb6cf81a3e4",
+    "d1_source_sha256": "a71973ea93bce3f2f1a832dfad36b3e33e3a6624ca1a799baab040887770f574",
+    "h1_rows": 5208,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 0.376,
+    "next_48h_mae_r": -1.233
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 EURJPY D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from EURJPY D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "突破後第一次回踩 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Breakout to First Pullback setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurjpy_first_pb_20251211_original.png",
+    "annotated": "/real-cases/eurjpy_first_pb_20251211_annotated.png",
+    "annotation_file": null
+  }
+}

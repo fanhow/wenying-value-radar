@@ -1,0 +1,131 @@
+{
+  "id": "cadchf_lw_adr_20260415_0800",
+  "setup_id": "lower_wick_adr",
+  "case_type": "historical_pattern",
+  "symbol": "CADCHF",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-04-15",
+  "direction": "long",
+  "context": {
+    "zh": "CADCHF 2026-04-15：H1 low 0.56652 near D1 support 0.56648 (dist 0.013 ADR). Lower wick 1.421 ATR. ADR used 32.2%. D1 EMA15 0.57124 overhead.",
+    "en": "CADCHF 2026-04-15: H1 low 0.56652 near D1 support 0.56648 (dist 0.013 ADR). Lower wick 1.421 ATR. ADR used 32.2%. D1 EMA15 0.57124 overhead."
+  },
+  "trade_thesis": {
+    "zh": "D1 支撐長下影與 ADR 空間 成立，H1 進場觸發：H1 momentum confirmation: close above signal high 0.56725 and EMA15",
+    "en": "D1 Long Lower Wick at Support to ADR setup confirmed, H1 entry trigger: H1 momentum confirmation: close above signal high 0.56725 and EMA15"
+  },
+  "entry": {
+    "price": 0.56739,
+    "candle_index": 2920,
+    "reason": {
+      "zh": "規則式觀察進場：H1 momentum confirmation: close above signal high 0.56725 and EMA15，進場價 0.56739",
+      "en": "Rule-based observation entry: H1 momentum confirmation: close above signal high 0.56725 and EMA15, entry at 0.56739"
+    }
+  },
+  "initial_stop": {
+    "price": 0.566489,
+    "candle_index": 2918,
+    "reason": {
+      "zh": "規則式初始停損設於 0.566489，風險距離 0.000901",
+      "en": "Rule-based initial stop set at 0.566489, risk distance 0.000901"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +5.905R，MAE -0.044R。觸及獲利目標。",
+      "en": "Historical pattern observation, MFE +5.905R, MAE -0.044R. TP hit."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": 32.21,
+    "high": null,
+    "low": null,
+    "target": 0.5695
+  },
+  "ema": {
+    "ema15": 0.567243,
+    "ema50": 0.568005,
+    "higher_timeframe_ema15": 0.57124,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 0.567243",
+      "en": "H1 EMA15 at 0.567243"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 0.568005",
+      "en": "H1 EMA50 at 0.568005"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 0.57124，D1 關鍵支撐/壓力位於 0.56648",
+    "en": "D1 EMA15 at 0.57124, D1 key level at 0.56648"
+  },
+  "performance": {
+    "risk_amount": 0.000901,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": 2.342
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +5.905R，MAE -0.044R，結果 R 2.342。觸及獲利目標。這不是實際交易。",
+    "en": "Rule-based observation: MFE +5.905R, MAE -0.044R, achieved R 2.342. TP hit. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-04-15T10:00:00",
+    "confirmation_time": "2026-04-15T10:00:00",
+    "entry_time": "2026-04-15T10:00:00",
+    "h1_source_sha256": "cae076556a569726190612ec264171b520ff94523df5343197e72bbda556e81f",
+    "d1_source_sha256": "473533e790fa2fffdd38992817d6caea1d6cc9e9ad4da841e7aa455b9ca0c1ce",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 5.905,
+    "next_48h_mae_r": -0.044
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 CADCHF D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from CADCHF D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "支撐長下影與 ADR 空間 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Long Lower Wick at Support to ADR setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/cadchf_lw_adr_20260415_0800_original.png",
+    "annotated": "/real-cases/cadchf_lw_adr_20260415_0800_annotated.png",
+    "annotation_file": null
+  }
+}

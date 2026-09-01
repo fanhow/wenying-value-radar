@@ -1,0 +1,131 @@
+{
+  "id": "eurgbp_lw_adr_20260710_0700",
+  "setup_id": "lower_wick_adr",
+  "case_type": "historical_pattern",
+  "symbol": "EURGBP",
+  "market": "FX",
+  "execution_timeframe": "H1",
+  "higher_timeframe": "D1",
+  "trade_date": "2026-07-10",
+  "direction": "long",
+  "context": {
+    "zh": "EURGBP 2026-07-10：H1 low 0.85170 near D1 support 0.85173 (dist 0.011 ADR). Lower wick 1.070 ATR. ADR used 33.0%. D1 EMA15 0.85742 overhead.",
+    "en": "EURGBP 2026-07-10: H1 low 0.85170 near D1 support 0.85173 (dist 0.011 ADR). Lower wick 1.070 ATR. ADR used 33.0%. D1 EMA15 0.85742 overhead."
+  },
+  "trade_thesis": {
+    "zh": "D1 支撐長下影與 ADR 空間 成立，H1 進場觸發：H1 momentum confirmation: close above signal high 0.85216 and EMA15",
+    "en": "D1 Long Lower Wick at Support to ADR setup confirmed, H1 entry trigger: H1 momentum confirmation: close above signal high 0.85216 and EMA15"
+  },
+  "entry": {
+    "price": 0.85232,
+    "candle_index": 4380,
+    "reason": {
+      "zh": "規則式觀察進場：H1 momentum confirmation: close above signal high 0.85216 and EMA15，進場價 0.85232",
+      "en": "Rule-based observation entry: H1 momentum confirmation: close above signal high 0.85216 and EMA15, entry at 0.85232"
+    }
+  },
+  "initial_stop": {
+    "price": 0.851672,
+    "candle_index": 4378,
+    "reason": {
+      "zh": "規則式初始停損設於 0.851672，風險距離 0.000648",
+      "en": "Rule-based initial stop set at 0.851672, risk distance 0.000648"
+    }
+  },
+  "trailing_method": {
+    "zh": "依 H1 結構低點/高點逐步移動停損。",
+    "en": "Trail stop progressively behind confirmed H1 structural swing points."
+  },
+  "trailing_stops": [],
+  "exit": {
+    "price": null,
+    "candle_index": null,
+    "reason": {
+      "zh": "歷史型態觀察，MFE +3.194R，MAE -10.664R。觸及停損。",
+      "en": "Historical pattern observation, MFE +3.194R, MAE -10.664R. SL hit."
+    }
+  },
+  "adr": {
+    "period": 20,
+    "completed_at_entry_percent": 33.0,
+    "high": null,
+    "low": null,
+    "target": 0.854256
+  },
+  "ema": {
+    "ema15": 0.852208,
+    "ema50": 0.852818,
+    "higher_timeframe_ema15": 0.857416,
+    "ema15_context": {
+      "zh": "H1 EMA15 位於 0.852208",
+      "en": "H1 EMA15 at 0.852208"
+    },
+    "ema50_context": {
+      "zh": "H1 EMA50 位於 0.852818",
+      "en": "H1 EMA50 at 0.852818"
+    }
+  },
+  "higher_timeframe_context": {
+    "zh": "D1 EMA15 位於 0.857416，D1 關鍵支撐/壓力位於 0.85173",
+    "en": "D1 EMA15 at 0.857416, D1 key level at 0.85173"
+  },
+  "performance": {
+    "risk_amount": 0.000648,
+    "result_amount": null,
+    "result_percent": null,
+    "result_r": -1.0
+  },
+  "outcome_summary": {
+    "zh": "規則式觀察：MFE +3.194R，MAE -10.664R，結果 R -1.0。觸及停損。這不是實際交易。",
+    "en": "Rule-based observation: MFE +3.194R, MAE -10.664R, achieved R -1.0. SL hit. This is not an executed trade."
+  },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-all-patterns-v2",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-07-10T09:00:00",
+    "confirmation_time": "2026-07-10T09:00:00",
+    "entry_time": "2026-07-10T09:00:00",
+    "h1_source_sha256": "df4a91c3a4f6440de50aa7b46f9280d17d842cdd482d81f011cda9d3bc332118",
+    "d1_source_sha256": "a64068917814b1d29fcd1a6d9470c5a19cd11eee22b8c2195cece411d266b275",
+    "h1_rows": 5204,
+    "d1_rows": 5131,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": 3.194,
+    "next_48h_mae_r": -10.664
+  },
+  "notes": [
+    {
+      "zh": "本案例由 fx-all-patterns-v2 掃描器從 EURGBP D1/H1 歷史 OHLC 自動偵測，完全遵循無未來資料偏差原則。",
+      "en": "This case was auto-detected by fx-all-patterns-v2 scanner from EURGBP D1/H1 historical OHLC, strictly preventing look-ahead bias."
+    }
+  ],
+  "lessons": {
+    "what_worked": {
+      "zh": "支撐長下影與 ADR 空間 型態條件明確，H1 出現及時進場動能確認。",
+      "en": "Long Lower Wick at Support to ADR setup was clear, and H1 offered timely momentum confirmation."
+    },
+    "what_was_imperfect": {
+      "zh": "來源時區未記載；進場與停損為固定規則推導。",
+      "en": "Source timezone undocumented; entry and stop are rule-derived."
+    },
+    "invalidation": {
+      "zh": "價格有效跌破/突破結構停損位。",
+      "en": "Price decisively breaches the structural stop level."
+    },
+    "a_plus": {
+      "zh": "高階 D1 位置優勢 + H1 早期低風險進場 + 充足 ADR 空間。",
+      "en": "High-tier D1 location advantage + H1 early low-risk entry + ample ADR room."
+    },
+    "downgrade": {
+      "zh": "型態模糊、進場過慢或上方空間不足。",
+      "en": "Unclear pattern, late entry, or insufficient room to major obstacle."
+    }
+  },
+  "images": {
+    "original": "/real-cases/eurgbp_lw_adr_20260710_0700_original.png",
+    "annotated": "/real-cases/eurgbp_lw_adr_20260710_0700_annotated.png",
+    "annotation_file": null
+  }
+}
