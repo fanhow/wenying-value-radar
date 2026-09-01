@@ -16,10 +16,10 @@ export function SiteHeader({ active }: { active: "home" | "technical" | "funds" 
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "technical" ? "active" : ""} href="/technical">{t("技術分析", "Technical")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Fund Tracker")}</Link>
+        <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setup Library")}</Link>
         <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK Tool")}</Link>
         <Link href="/#watchlist">{t("我的觀察", "Watchlist")}</Link>
         <Link className={active === "sentiment" ? "active" : ""} href="/sentiment">{t("市場情緒", "Sentiment")}</Link>
-        <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setup Library")}</Link>
         <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About Us")}</Link>
       </nav>
       <div className="header-controls">
@@ -33,9 +33,9 @@ export function SiteHeader({ active }: { active: "home" | "technical" | "funds" 
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "technical" ? "active" : ""} href="/technical">{t("技術分析", "Technical")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Funds")}</Link>
+        <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setups")}</Link>
         <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK")}</Link>
         <Link className={active === "sentiment" ? "active" : ""} href="/sentiment">{t("市場情緒", "Sentiment")}</Link>
-        <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setups")}</Link>
         <Link className={active === "about" ? "active" : ""} href="/about">{t("關於我們", "About")}</Link>
       </nav>
     </header>

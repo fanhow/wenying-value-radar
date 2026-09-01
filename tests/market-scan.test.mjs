@@ -115,7 +115,7 @@ test("passes six-fund ownership and sector P/E context into U.S. scan rows", () 
   const stock = marketStockFromRatio({ ...row, market: "US" });
 
   assert.ok(stock);
-  assert.equal(stock.institutionalSignal?.heldByCount, 3);
+  assert.equal(stock.institutionalSignal?.heldByCount, 2);
   assert.equal(stock.institutionalSignal?.increasedByCount, 1);
   assert.equal(stock.fundSectorPe?.sector, "Technology");
   assert.ok((stock.fundSectorPe?.sampleSize ?? 0) >= 30);

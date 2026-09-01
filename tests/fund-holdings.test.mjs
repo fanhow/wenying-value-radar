@@ -20,8 +20,8 @@ test("tracks the top six managers in ranking order", () => {
 
 test("compares two complete 13F quarters and retains usable holdings", () => {
   for (const fund of snapshot.funds) {
-    assert.equal(fund.reportDate, "2026-03-31");
-    assert.equal(fund.previousReportDate, "2025-12-31");
+    assert.equal(fund.reportDate, "2026-06-30");
+    assert.equal(fund.previousReportDate, "2026-03-31");
     assert.ok(fund.holdings.length >= 8);
     assert.ok(fund.holdings.every((holding) => /^[A-Z][A-Z0-9.-]*$/.test(holding.ticker)));
     assert.ok(fund.holdings.some((holding) => holding.significantChange));

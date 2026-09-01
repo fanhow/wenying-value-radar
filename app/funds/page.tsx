@@ -8,10 +8,17 @@ import { buildComparableMap } from "../../lib/market-comparables";
 import { normalizeSector } from "../../lib/sector-normalization";
 import fundSnapshotJson from "../../lib/fund-holdings-snapshot.json";
 import usMarketSnapshot from "../../lib/us-market-snapshot.json";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../language-context";
 import { SiteHeader } from "../site-header";
 import { SiteFooter } from "../site-footer";
+
+function formatReportQuarter(dateStr?: string) {
+  if (!dateStr) return "2026 Q2";
+  const [year, month] = dateStr.split("-").map(Number);
+  const q = Math.ceil(month / 3);
+  return `${year} Q${q}`;
+}
 
 type FundHolding = {
   ticker: string;
@@ -251,37 +258,59 @@ export default function FundsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const refreshedByTicker = new Map(refreshedRows.map((row) => [row.ticker.toUpperCase(), row]));
-  const activeMarketByTicker = new Map(fallbackMarketRows.map((row) => [row.ticker.toUpperCase(), row]));
-  refreshedRows.forEach((row) => activeMarketByTicker.set(row.ticker.toUpperCase(), row));
-  const activeMarketRows = [...activeMarketByTicker.values()];
-  const activePeReferences: FundPeReference[] = activeMarketRows.map((row) => ({
-    ticker: row.ticker,
-    name: row.name,
-    price: row.price,
-    eps: row.eps,
-    sector: row.sector,
-    financialDataDate: row.financialDataDate ?? row.date,
-  }));
-  const activeFundPortfolioPe = fundPortfolioPeSummary(snapshot, activePeReferences);
-  const activeSectorPeProfiles = fundPortfolioPeProfiles(snapshot, activePeReferences);
-  const activeBusinessPeProfiles = fundPortfolioBusinessPeProfiles(snapshot, activePeReferences);
-  const activeFundManagerPeProfiles = fundManagerPeProfiles(snapshot, activePeReferences);
-  const activeFundOverlapProfiles = fundPortfolioOverlapProfiles(snapshot, activePeReferences);
-  const valuationContext: FundValuationContext = {
-    comparableByTicker: buildComparableMap(activeMarketRows),
-    fundPortfolioPe: activeFundPortfolioPe,
-    fundSectorPeProfiles: activeSectorPeProfiles,
-    fundBusinessPeProfiles: activeBusinessPeProfiles,
-  };
-  const valuedFunds: ValuedFund[] = snapshot.funds.map((fund) => ({
-    ...fund,
-    holdings: fund.holdings.map((holding) => valueHolding(
-      holding,
-      refreshedByTicker.get(holding.ticker.toUpperCase()),
-      valuationContext,
-    )),
-  }));
+  const {
+    valuedFunds,
+    activeFundManagerPeProfiles,
+    activeFundOverlapProfiles,
+    activeSectorPeProfiles,
+    activeFundPortfolioPe,
+    activeBusinessPeProfiles,
+  } = useMemo(() => {
+    const refreshedByTicker = new Map(refreshedRows.map((row) => [row.ticker.toUpperCase(), row]));
+    const activeMarketByTicker = new Map(fallbackMarketRows.map((row) => [row.ticker.toUpperCase(), row]));
+    refreshedRows.forEach((row) => activeMarketByTicker.set(row.ticker.toUpperCase(), row));
+    const activeMarketRows = [...activeMarketByTicker.values()];
+    const activePeReferences: FundPeReference[] = activeMarketRows.map((row) => ({
+      ticker: row.ticker,
+      name: row.name,
+      price: row.price,
+      eps: row.eps,
+      sector: row.sector,
+      financialDataDate: row.financialDataDate ?? row.date,
+    }));
+    const fundPortfolioPe = fundPortfolioPeSummary(snapshot, activePeReferences);
+    const fundSectorPeProfiles = fundPortfolioPeProfiles(snapshot, activePeReferences);
+    const fundBusinessPeProfiles = fundPortfolioBusinessPeProfiles(snapshot, activePeReferences);
+    const managerProfiles = fundManagerPeProfiles(snapshot, activePeReferences);
+    const overlapProfiles = fundPortfolioOverlapProfiles(snapshot, activePeReferences);
+    const valuationContext: FundValuationContext = {
+      comparableByTicker: buildComparableMap(activeMarketRows),
+      fundPortfolioPe,
+      fundSectorPeProfiles,
+      fundBusinessPeProfiles,
+    };
+    const funds: ValuedFund[] = snapshot.funds.map((fund) => ({
+      ...fund,
+      holdings: fund.holdings.map((holding) => valueHolding(
+        holding,
+        refreshedByTicker.get(holding.ticker.toUpperCase()),
+        valuationContext,
+      )),
+    }));
+    return {
+      valuedFunds: funds,
+      activeFundManagerPeProfiles: managerProfiles,
+      activeFundOverlapProfiles: overlapProfiles,
+      activeSectorPeProfiles: fundSectorPeProfiles,
+      activeFundPortfolioPe: fundPortfolioPe,
+      activeBusinessPeProfiles: fundBusinessPeProfiles,
+    };
+  }, [refreshedRows]);
+
+  const latestReportDate = snapshot.funds[0]?.reportDate ?? "2026-06-30";
+  const previousReportDate = snapshot.funds[0]?.previousReportDate ?? "2026-03-31";
+  const currentQuarterLabel = formatReportQuarter(latestReportDate);
+  const previousQuarterLabel = formatReportQuarter(previousReportDate);
 
   const fundChangeTierClass = (holding: FundHolding) => {
     if (holding.changeType === "new") return "fund-change-p4";
@@ -340,7 +369,7 @@ export default function FundsPage() {
           </div>
           <div className="funds-hero-stats">
             <div><span>{t("追蹤基金", "Managers")}</span><strong>6</strong><small>{t("全球累積淨獲利前六", "Top six cumulative net gains")}</small></div>
-            <div><span>{t("最新申報季度", "Latest reported quarter")}</span><strong>2026 Q1</strong><small>{t("與 2025 Q4 比較", "Compared with 2025 Q4")}</small></div>
+            <div><span>{t("最新申報季度", "Latest reported quarter")}</span><strong>{currentQuarterLabel}</strong><small>{t(`與 ${previousQuarterLabel} 比較`, `Compared with ${previousQuarterLabel}`)}</small></div>
             <div><span>{t("公開持倉", "Valued holdings")}</span><strong>{valuedFunds.reduce((sum, fund) => sum + fund.holdings.length, 0)}</strong><small>{t("前十大及台灣相關 ADR", "Top holdings and Taiwan-related ADRs")}</small></div>
           </div>
         </header>
