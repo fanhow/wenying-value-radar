@@ -25,12 +25,13 @@ function RealCaseDetail({ marketCase, language }: { marketCase: RealMarketCase; 
   const value = (number: number | null, suffix = "", digits = 2) => formatNullableMetric(number, suffix, digits);
   const t = (zh: string, en: string) => language === "zh" ? zh : en;
   const annotations = REAL_CASE_ANNOTATIONS[marketCase.id];
+  const isHistorical = marketCase.case_type === "historical_pattern";
 
   return (
     <article className="real-case-detail">
       <header className="real-case-heading">
         <div>
-          <span>{t("真實案例", "REAL MARKET CASE")}</span>
+          <span>{isHistorical ? t("來源佐證歷史型態", "SOURCE-BACKED HISTORICAL PATTERN") : t("實際交易案例", "EXECUTED TRADE CASE")}</span>
           <h3>{marketCase.symbol} · {marketCase.execution_timeframe}</h3>
         </div>
         <div className="real-case-meta">
@@ -38,6 +39,7 @@ function RealCaseDetail({ marketCase, language }: { marketCase: RealMarketCase; 
           <span>{marketCase.direction.toUpperCase()}</span>
           <span>{marketCase.higher_timeframe ?? "—"}</span>
           <span>{marketCase.trade_date ?? "—"}</span>
+          <span>{isHistorical ? t("歷史型態", "HISTORICAL") : t("實際交易", "EXECUTED")}</span>
         </div>
       </header>
 
@@ -48,9 +50,23 @@ function RealCaseDetail({ marketCase, language }: { marketCase: RealMarketCase; 
 
       <RealCaseImage marketCase={marketCase} annotations={annotations} language={language} />
 
+      <section className="real-case-evidence">
+        <header><h4>{t("資料佐證", "Data evidence")}</h4><strong>{marketCase.evidence.status === "source_backed" ? t("來源已雜湊驗證", "Source hashes verified") : t("使用者回報", "User reported")}</strong></header>
+        <dl>
+          <CaseField label={t("訊號／確認／觀察進場", "Signal / confirmation / observation entry")} value={`${marketCase.evidence.signal_time ?? "—"} / ${marketCase.evidence.confirmation_time ?? "—"} / ${marketCase.evidence.entry_time ?? "—"}`} />
+          <CaseField label={t("資料時區", "Data timezone")} value={marketCase.evidence.timezone ?? "—"} />
+          <CaseField label={t("D1 支撐距離", "Distance to D1 support")} value={value(marketCase.evidence.support_distance_adr, " ADR", 3)} />
+          <CaseField label={t("長下影強度", "Lower-wick strength")} value={value(marketCase.evidence.lower_wick_atr, " ATR", 3)} />
+          <CaseField label={t("後續 48H MFE", "Next 48H MFE")} value={value(marketCase.evidence.next_48h_mfe_r, "R", 3)} />
+          <CaseField label={t("後續 48H MAE", "Next 48H MAE")} value={value(marketCase.evidence.next_48h_mae_r, "R", 3)} />
+        </dl>
+        {marketCase.evidence.h1_source_sha256 && marketCase.evidence.d1_source_sha256 ? <code>H1 {marketCase.evidence.h1_source_sha256.slice(0, 12)}… · D1 {marketCase.evidence.d1_source_sha256.slice(0, 12)}… · {marketCase.evidence.method_version}</code> : null}
+        {isHistorical ? <p>{t("以上是固定規則對真實 OHLC 的歷史觀察，不是實際成交或回測獲利。", "This is a fixed-rule observation on real OHLC data, not an executed trade or backtest profit.")}</p> : null}
+      </section>
+
       <dl className="real-case-execution">
-        <CaseField label={t("進場", "Entry")} value={`${value(marketCase.entry.price)} · ${translated(marketCase.entry.reason, language)}`} />
-        <CaseField label={t("初始停損", "Initial stop")} value={`${value(marketCase.initial_stop.price)} · ${translated(marketCase.initial_stop.reason, language)}`} />
+        <CaseField label={isHistorical ? t("規則式觀察進場", "Rule-based observation entry") : t("進場", "Entry")} value={`${value(marketCase.entry.price)} · ${translated(marketCase.entry.reason, language)}`} />
+        <CaseField label={isHistorical ? t("規則式初始停損", "Rule-based initial stop") : t("初始停損", "Initial stop")} value={`${value(marketCase.initial_stop.price)} · ${translated(marketCase.initial_stop.reason, language)}`} />
         <CaseField label={t("結構移動停損", "Structural trailing stop")} value={translated(marketCase.trailing_method, language)} />
         <CaseField label={t("出場", "Exit")} value={`${value(marketCase.exit.price)} · ${translated(marketCase.exit.reason, language)}`} />
       </dl>
@@ -108,7 +124,7 @@ function RealCaseDetail({ marketCase, language }: { marketCase: RealMarketCase; 
 
 export function SetupLibraryCard({ setup, cases }: { setup: SetupLibraryItem; cases: RealMarketCase[] }) {
   const { language, t } = useLanguage();
-  const [view, setView] = useState<"ideal" | "real">("ideal");
+  const [view, setView] = useState<"ideal" | "real">(cases.length > 0 ? "real" : "ideal");
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id ?? "");
   const metrics = EMPTY_AGGREGATE_METRICS;
   const metricRows = [
@@ -162,7 +178,7 @@ export function SetupLibraryCard({ setup, cases }: { setup: SetupLibraryItem; ca
 
       <div className="setup-example-panel real-market-panel" hidden={view !== "real"}>
         <header className="real-market-panel-heading">
-          <div><strong>{t("真實執行紀錄", "Real execution records")}</strong><span>{t("缺少證據的數值一律顯示 —", "Unverified numeric fields always display —")}</span></div>
+          <div><strong>{t("真實市場紀錄", "Real-market records")}</strong><span>{t("區分實際交易與來源佐證的歷史型態；缺少證據的數值一律顯示 —", "Executed trades and source-backed historical patterns are identified separately; unverified fields always display —")}</span></div>
           <small>{t("Phase 3 統計欄位已預留 · 目前資料不足", "Phase 3 metrics ready · not enough data")}</small>
         </header>
         <dl className="real-case-metrics">

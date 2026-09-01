@@ -9,6 +9,9 @@ import { SETUP_LIBRARY } from "./setup-library";
 
 export default function SetupLibraryPage() {
   const { t } = useLanguage();
+  const realCaseDirectory = SETUP_LIBRARY.flatMap((setup) =>
+    realCasesForSetup(setup.id).map((marketCase) => ({ setup, marketCase })),
+  );
 
   return (
     <main className="app-shell">
@@ -28,6 +31,15 @@ export default function SetupLibraryPage() {
               "Ideal models use purpose-built synthetic OHLC. Real cases show only verifiable evidence, leaving unknown prices, dates, and performance blank. This is not live data, a win-rate claim, or investment advice.",
             )}</span>
           </div>
+          <nav className="setup-real-case-directory" aria-label={t("真實案例快速入口", "Real-market case shortcuts")}>
+            <strong>{t("真實案例", "REAL MARKET CASES")}</strong>
+            {realCaseDirectory.map(({ setup, marketCase }) => (
+              <a href={`#${setup.id}`} key={marketCase.id}>
+                <span>{marketCase.symbol} · {marketCase.execution_timeframe}</span>
+                <small>{t(setup.titleZh, setup.titleEn)}</small>
+              </a>
+            ))}
+          </nav>
         </header>
 
         <div className="setup-library-layout">

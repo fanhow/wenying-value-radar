@@ -1,7 +1,15 @@
 {
   "case_id": "usd_jpy_h1_lower_wick_adr_001",
-  "source_image": null,
-  "image_width": null,
-  "image_height": null,
-  "annotations": []
+  "source_image": "/real-cases/usdjpy_20260128_0700_original.png",
+  "image_width": 2720,
+  "image_height": 1664,
+  "annotations": [
+    { "id": "d1-support", "kind": "Support", "label": { "zh": "D1 支撐 152.089", "en": "D1 Support 152.089" }, "x": 0.78, "y": 0.91, "x2": 0.96, "y2": 0.91 },
+    { "id": "lower-wick", "kind": "Long Lower Wick", "label": { "zh": "長下影拒絕", "en": "Long Lower Wick" }, "x": 0.50, "y": 0.91, "x2": null, "y2": null },
+    { "id": "entry", "kind": "Entry", "label": { "zh": "規則進場 152.844", "en": "Rule Entry 152.844" }, "x": 0.64, "y": 0.82, "x2": null, "y2": null },
+    { "id": "initial-stop", "kind": "Initial Stop", "label": { "zh": "初始停損 152.250", "en": "Initial Stop 152.250" }, "x": 0.68, "y": 0.90, "x2": null, "y2": null },
+    { "id": "adr-target", "kind": "ADR High", "label": { "zh": "ADR 目標 153.409", "en": "ADR Target 153.409" }, "x": 0.87, "y": 0.76, "x2": null, "y2": null },
+    { "id": "ema15", "kind": "EMA15", "label": { "zh": "H1 EMA15", "en": "H1 EMA15" }, "x": 0.72, "y": 0.80, "x2": null, "y2": null },
+    { "id": "ema50", "kind": "EMA50", "label": { "zh": "H1 EMA50", "en": "H1 EMA50" }, "x": 0.72, "y": 0.72, "x2": null, "y2": null }
+  ]
 }

@@ -26,6 +26,8 @@ test("setup library keeps bilingual navigation and About Us last", async () => {
   assert.match(page, /中英文型態索引/);
   assert.match(page, /Bilingual setup index/);
   assert.match(page, /CHARLIE A\+ SETUP LIBRARY/);
+  assert.match(page, /setup-real-case-directory/);
+  assert.match(card, /cases\.length > 0 \? "real" : "ideal"/);
   assert.match(card, /unoptimized/);
   for (const id of setupIds) {
     assert.match(data, new RegExp(`id: "${id}"`));
@@ -72,6 +74,32 @@ test("real-market case files parse without invented numeric fields", async () =>
   assert.equal(avgo.entry.price, null);
   assert.equal(avgo.performance.result_r, null);
   assert.match(avgo.outcome_summary.zh, /已知獲利/);
+
+  const usdJpy = JSON.parse(await readFile(new URL("../data/real_cases/usd_jpy_lower_wick_adr.json", import.meta.url), "utf8"));
+  assert.equal(usdJpy.case_type, "historical_pattern");
+  assert.equal(usdJpy.trade_date, "2026-01-28");
+  assert.equal(usdJpy.entry.price, 152.844);
+  assert.equal(usdJpy.adr.completed_at_entry_percent, 69.56);
+  assert.equal(usdJpy.evidence.status, "source_backed");
+  assert.equal(usdJpy.evidence.next_48h_mfe_r, 2.818);
+  assert.match(usdJpy.outcome_summary.zh, /不是實際交易績效/);
+  for (const fileName of ["usdjpy_20260128_0700_original.png", "usdjpy_20260128_0700_annotated.png"]) {
+    assert.ok((await stat(new URL(`../public/real-cases/${fileName}`, import.meta.url))).size > 100_000);
+  }
+});
+
+test("FX scan audit preserves source integrity without publishing local paths", async () => {
+  const auditText = await readFile(new URL("../data/real_cases/generated/fx_scan_audit.json", import.meta.url), "utf8");
+  const audit = JSON.parse(auditText);
+
+  assert.equal(audit.method_version, "fx-location-wick-v1");
+  assert.equal(audit.sources.filter((source) => source.timeframe === "H1").length, 12);
+  assert.equal(audit.sources.filter((source) => source.timeframe === "D1").length, 12);
+  assert.equal(audit.selected_usdjpy.id, "usdjpy_20260128_0700");
+  assert.equal(audit.selected_usdjpy.signal_time, "2026-01-28T07:00:00");
+  assert.equal(audit.selected_usdjpy.lower_wick_atr, 1.196);
+  assert.equal(auditText.includes("C:\\Users"), false);
+  assert.equal(auditText.includes("CharlieTseng"), false);
 });
 
 test("real-market case helpers support zero, one, and multiple cases safely", async () => {
@@ -92,6 +120,11 @@ test("annotation files are separate, editable, and enforce normalized coordinate
   moduleUrl.searchParams.set("annotations", `${process.pid}-${Date.now()}`);
   const { REAL_CASE_ANNOTATIONS, validateAnnotationBundle } = await import(moduleUrl.href);
   assert.equal(Object.keys(REAL_CASE_ANNOTATIONS).length, 2);
+
+  const usdAnnotations = JSON.parse(await readFile(new URL("../data/real_cases/annotations/usd_jpy_lower_wick_adr.json", import.meta.url), "utf8"));
+  const usdSourcePng = await readFile(new URL("../public/real-cases/usdjpy_20260128_0700_original.png", import.meta.url));
+  assert.equal(usdAnnotations.image_width, usdSourcePng.readUInt32BE(16));
+  assert.equal(usdAnnotations.image_height, usdSourcePng.readUInt32BE(20));
 
   const valid = {
     case_id: "fixture",

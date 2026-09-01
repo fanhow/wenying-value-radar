@@ -41,6 +41,7 @@ export type AnnotationBundle = {
 export type RealMarketCase = {
   id: string;
   setup_id: string;
+  case_type: "executed_trade" | "historical_pattern";
   symbol: string;
   market: string;
   execution_timeframe: string;
@@ -76,6 +77,22 @@ export type RealMarketCase = {
     result_r: number | null;
   };
   outcome_summary: LocalizedText;
+  evidence: {
+    status: "source_backed" | "user_reported";
+    method_version: string | null;
+    timezone: string | null;
+    signal_time: string | null;
+    confirmation_time: string | null;
+    entry_time: string | null;
+    h1_source_sha256: string | null;
+    d1_source_sha256: string | null;
+    h1_rows: number | null;
+    d1_rows: number | null;
+    support_distance_adr: number | null;
+    lower_wick_atr: number | null;
+    next_48h_mfe_r: number | null;
+    next_48h_mae_r: number | null;
+  };
   notes: LocalizedText[];
   lessons: {
     what_worked: LocalizedText;
@@ -143,6 +160,7 @@ export function validateRealMarketCase(value: unknown): asserts value is RealMar
   for (const key of ["id", "setup_id", "symbol", "market", "execution_timeframe"] as const) {
     requireString(value[key], key);
   }
+  if (value.case_type !== "executed_trade" && value.case_type !== "historical_pattern") throw new Error("case_type must be executed_trade or historical_pattern");
   if (value.higher_timeframe !== null) requireString(value.higher_timeframe, "higher_timeframe");
   if (value.trade_date !== null) requireString(value.trade_date, "trade_date");
   if (value.direction !== "long" && value.direction !== "short") throw new Error("direction must be long or short");
@@ -155,7 +173,7 @@ export function validateRealMarketCase(value: unknown): asserts value is RealMar
   value.trailing_stops.forEach((event, index) => requirePriceEvent(event, `trailing_stops[${index}]`));
   requirePriceEvent(value.exit, "exit");
 
-  for (const section of ["adr", "ema", "performance", "images", "lessons"] as const) {
+  for (const section of ["adr", "ema", "performance", "images", "lessons", "evidence"] as const) {
     if (!isRecord(value[section])) throw new Error(`${section} must be an object`);
   }
   const adr = value.adr as Record<string, unknown>;
@@ -168,6 +186,14 @@ export function validateRealMarketCase(value: unknown): asserts value is RealMar
   const performance = value.performance as Record<string, unknown>;
   for (const key of ["risk_amount", "result_amount", "result_percent", "result_r"]) requireNullableFiniteNumber(performance[key], `performance.${key}`);
   requireLocalizedText(value.outcome_summary, "outcome_summary");
+  const evidence = value.evidence as Record<string, unknown>;
+  if (evidence.status !== "source_backed" && evidence.status !== "user_reported") throw new Error("evidence.status is invalid");
+  for (const key of ["method_version", "timezone", "signal_time", "confirmation_time", "entry_time", "h1_source_sha256", "d1_source_sha256"]) {
+    if (evidence[key] !== null) requireString(evidence[key], `evidence.${key}`);
+  }
+  for (const key of ["h1_rows", "d1_rows", "support_distance_adr", "lower_wick_atr", "next_48h_mfe_r", "next_48h_mae_r"]) {
+    requireNullableFiniteNumber(evidence[key], `evidence.${key}`);
+  }
   if (!Array.isArray(value.notes)) throw new Error("notes must be an array");
   value.notes.forEach((note, index) => requireLocalizedText(note, `notes[${index}]`));
   const lessons = value.lessons as Record<string, unknown>;

@@ -1,34 +1,35 @@
 {
   "id": "usd_jpy_h1_lower_wick_adr_001",
   "setup_id": "lower_wick_adr",
+  "case_type": "historical_pattern",
   "symbol": "USDJPY",
   "market": "FX",
   "execution_timeframe": "H1",
   "higher_timeframe": "D1",
-  "trade_date": null,
+  "trade_date": "2026-01-28",
   "direction": "long",
   "context": {
-    "zh": "價格抵達重要 H1 支撐與結構區，出現明顯長下影線並快速拒絕低價；D1 EMA15 位於上方，屬較高週期壓力。",
-    "en": "Price reached an important H1 support and structural area, printed a pronounced lower wick, and rejected lower prices quickly; D1 EMA15 remained overhead as higher-timeframe resistance."
+    "zh": "2026-01-28 07:00（來源時區）USDJPY H1 低點 152.275 接近先前已完成 D1 的 20 日支撐 152.089，形成約 1.196 倍 H1 ATR 的長下影，收盤回到 152.646；D1 EMA15 156.391 位於上方。",
+    "en": "At 07:00 source time on 2026-01-28, USDJPY H1 reached 152.275 near the prior completed D1 20-day support at 152.089, printed a 1.196 H1-ATR lower wick, and closed back at 152.646; D1 EMA15 remained overhead at 156.391."
   },
   "trade_thesis": {
-    "zh": "位置＋長下影拒絕＋向上動能＋仍有 ADR 空間，目標是捕捉 H1 日內擴張，不是預測 USDJPY 長期大反轉。",
-    "en": "Location + long-wick rejection + upward momentum + remaining ADR room. The objective was an H1 intraday expansion, not a major long-term USDJPY reversal."
+    "zh": "支撐距離僅 0.164 倍 ADR，訊號 K 棒出現明顯低價拒絕；13:00 收盤突破訊號高點並站上 H1 EMA15，規則式觀察進場為下一根 14:00 開盤 152.844。當時 ADR 約完成 69.56%，仍有上行空間。",
+    "en": "Support was only 0.164 ADR away and the signal candle showed clear lower-price rejection. At 13:00, price closed above the signal high and H1 EMA15; the rule-based observation entry is the next 14:00 open at 152.844. About 69.56% of ADR had been used, leaving upside room."
   },
   "entry": {
-    "price": null,
-    "candle_index": null,
+    "price": 152.844,
+    "candle_index": 1603,
     "reason": {
-      "zh": "支撐拒絕後動能迅速轉強，並確認 ADR 仍有具意義的上行空間後進場。",
-      "en": "Entry followed strong support rejection, a rapid momentum turn, and confirmation that meaningful ADR room remained."
+      "zh": "這是掃描規則的觀察進場，不是實際成交：13:00 完成動能確認後，取下一根 H1 開盤價 152.844。",
+      "en": "This is a rule-based observation entry, not an actual fill: after momentum confirmation at 13:00, the next H1 open at 152.844 is used."
     }
   },
   "initial_stop": {
-    "price": null,
-    "candle_index": null,
+    "price": 152.25032,
+    "candle_index": 1596,
     "reason": {
-      "zh": "保護於相關結構低點與長下影線區域下方；精確價格尚未驗證。",
-      "en": "Protected below the relevant structural low and lower-wick area; the exact price has not been validated."
+      "zh": "規則式初始停損為訊號低點 152.275 下方 0.08 倍 H1 ATR，即 152.250；不是實際委託。",
+      "en": "The rule-based initial stop is 0.08 H1 ATR below the 152.275 signal low, at 152.250; it is not an actual order."
     }
   },
   "trailing_method": {
@@ -44,33 +45,50 @@
     "price": null,
     "candle_index": null,
     "reason": {
-      "zh": "ADR 完成、D1 EMA15 壓力或結構移動停損皆為合理出場條件；實際精確出場尚未驗證。",
-      "en": "ADR completion, D1 EMA15 resistance, or the structural trailing stop were logical exits; the exact realized exit is not yet validated."
+      "zh": "這是歷史型態觀察，沒有實際出場紀錄；ADR 目標、D1 EMA15 或後續 H1 結構只能作為研究條件，不能冒充成交。",
+      "en": "This is a historical pattern observation with no executed exit. The ADR objective, D1 EMA15, and later H1 structure are research conditions, not fills."
     }
   },
-  "adr": { "period": 20, "completed_at_entry_percent": null, "high": null, "low": null, "target": null },
+  "adr": { "period": 20, "completed_at_entry_percent": 69.56, "high": 153.4092, "low": 152.275, "target": 153.4092 },
   "ema": {
-    "ema15": null,
-    "ema50": null,
-    "higher_timeframe_ema15": null,
-    "ema15_context": { "zh": "H1 EMA15 精確值尚未還原。", "en": "The exact H1 EMA15 value has not been recovered." },
-    "ema50_context": { "zh": "H1 EMA50 精確值尚未還原。", "en": "The exact H1 EMA50 value has not been recovered." }
+    "ema15": 152.726811,
+    "ema50": 153.571242,
+    "higher_timeframe_ema15": 156.390965,
+    "ema15_context": { "zh": "規則式觀察進場 152.844 已站上 H1 EMA15 152.727。", "en": "The 152.844 rule-based observation entry was above H1 EMA15 at 152.727." },
+    "ema50_context": { "zh": "H1 EMA50 153.571 仍在上方，代表短線反彈仍面臨趨勢壓力。", "en": "H1 EMA50 at 153.571 remained overhead, so the short-term rebound still faced trend resistance." }
   },
   "higher_timeframe_context": {
-    "zh": "D1 EMA15 位於價格上方，視為較高週期壓力與潛在目標限制。",
-    "en": "D1 EMA15 was above price and treated as higher-timeframe resistance and a possible objective constraint."
+    "zh": "先前已完成 D1 的 EMA15 為 156.391，遠高於觀察進場；本案例是 H1 支撐反彈，不代表 D1 趨勢已反轉。",
+    "en": "Prior completed D1 EMA15 was 156.391, well above the observation entry. This is an H1 support rebound, not evidence that the D1 trend had reversed."
   },
   "performance": { "risk_amount": null, "result_amount": null, "result_percent": null, "result_r": null },
-  "outcome_summary": { "zh": "結果尚待原始成交紀錄驗證。", "en": "Outcome awaits validation from the original execution record." },
+  "outcome_summary": { "zh": "以規則式進場與停損衡量，後續 48 根 H1 的最大有利移動為 +2.818R、最大不利移動為 -0.332R；這只是前瞻路徑觀察，不是實際交易績效。", "en": "Using the rule-based entry and stop, the next 48 H1 bars reached +2.818R maximum favorable excursion and -0.332R maximum adverse excursion. This is forward-path observation, not executed performance." },
+  "evidence": {
+    "status": "source_backed",
+    "method_version": "fx-location-wick-v1",
+    "timezone": "source/broker timezone not documented",
+    "signal_time": "2026-01-28T07:00:00",
+    "confirmation_time": "2026-01-28T13:00:00",
+    "entry_time": "2026-01-28T14:00:00",
+    "h1_source_sha256": "bbe7317f2698c09fcd98198a806fec4a779fa2b9f4ab733762ed8bf8c3cde946",
+    "d1_source_sha256": "e9825a28aceb427980c6346bfac902e4cf038aebeb95c570b285fb8aabdcc562",
+    "h1_rows": 5208,
+    "d1_rows": 5130,
+    "support_distance_adr": 0.164,
+    "lower_wick_atr": 1.196,
+    "next_48h_mfe_r": 2.818,
+    "next_48h_mae_r": -0.332
+  },
   "notes": [
-    { "zh": "長下影線本身不是買進訊號；必須先有正確位置，再有拒絕、動能與 ADR 空間。", "en": "A long wick alone is not a buy signal; location must come first, followed by rejection, momentum, and ADR room." }
+    { "zh": "長下影線本身不是買進訊號；本案例同時要求 D1 支撐位置、H1 拒絕、六根內動能確認與 ADR 空間。", "en": "A long wick alone is not a buy signal; this case also requires D1 support location, H1 rejection, momentum confirmation within six bars, and ADR room." },
+    { "zh": "圖表由保存的 USDJPY D1／H1 OHLC 原始檔重建，屬歷史型態案例，不是 Charlie 的實際成交紀錄。", "en": "The chart is reconstructed from preserved USDJPY D1/H1 OHLC source files. It is a historical pattern case, not Charlie's executed trade." }
   ],
   "lessons": {
     "what_worked": { "zh": "支撐位置、低價拒絕、動能反轉與 ADR 空間形成一致性。", "en": "Support location, lower-price rejection, momentum reversal, and ADR room aligned." },
-    "what_was_imperfect": { "zh": "缺少可核對的原始日期、成交價格與完整截圖。", "en": "The original date, execution prices, and complete screenshot are not yet available for verification." },
+    "what_was_imperfect": { "zh": "來源／券商時區沒有文件；進場與停損是固定規則推導，不是實際委託。", "en": "The source/broker timezone is undocumented; entry and stop are rule-derived rather than actual orders." },
     "invalidation": { "zh": "價格有效跌破結構低點，或拒絕後沒有向上動能延續。", "en": "A valid break below the structural low or no upside follow-through after rejection." },
     "a_plus": { "zh": "明確多次測試支撐＋長下影拒絕＋小波段高點突破＋充足 ADR 空間。", "en": "Clearly tested support + long-wick rejection + minor-high break + sufficient ADR room." },
     "downgrade": { "zh": "影線懸在區間中段、動能不足、ADR 已接近完成或上方壓力過近。", "en": "A wick in mid-range, weak momentum, nearly completed ADR, or resistance too close overhead." }
   },
-  "images": { "original": null, "annotated": null, "annotation_file": "data/real_cases/annotations/usd_jpy_lower_wick_adr.json" }
+  "images": { "original": "/real-cases/usdjpy_20260128_0700_original.png", "annotated": "/real-cases/usdjpy_20260128_0700_annotated.png", "annotation_file": "data/real_cases/annotations/usd_jpy_lower_wick_adr.json" }
 }

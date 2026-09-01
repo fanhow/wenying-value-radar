@@ -1,6 +1,7 @@
 {
   "id": "avgo_h1_failed_m_top_reversal_001",
   "setup_id": "failed_m_top",
+  "case_type": "executed_trade",
   "symbol": "AVGO",
   "market": "US",
   "execution_timeframe": "H1",
@@ -59,6 +60,22 @@
   "higher_timeframe_context": { "zh": "未取得足夠資料以可靠描述較高週期背景。", "en": "Insufficient evidence is available to describe the higher-timeframe context reliably." },
   "performance": { "risk_amount": null, "result_amount": null, "result_percent": null, "result_r": null },
   "outcome_summary": { "zh": "已知獲利；精確 R、百分比與成交價格均待原始紀錄驗證。", "en": "Known profitable; exact R, percentage, and execution prices await validation from original records." },
+  "evidence": {
+    "status": "user_reported",
+    "method_version": null,
+    "timezone": null,
+    "signal_time": null,
+    "confirmation_time": null,
+    "entry_time": null,
+    "h1_source_sha256": null,
+    "d1_source_sha256": null,
+    "h1_rows": null,
+    "d1_rows": null,
+    "support_distance_adr": null,
+    "lower_wick_atr": null,
+    "next_48h_mfe_r": null,
+    "next_48h_mae_r": null
+  },
   "notes": [
     { "zh": "真實案例保留較晚進場的不完美，不能反過來修改 Phase 1 的理想早期跳空進場模型。", "en": "The real case preserves the imperfect late entry and must not reshape the approved Phase 1 early-gap ideal model." }
   ],
