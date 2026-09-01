@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findStockDirectoryEntries, isTaiwanSymbolQuery, rankMarketSymbols, type MarketSymbol } from "../../../lib/stock-directory";
 import tpexSnapshot from "../../../lib/tpex-snapshot.json";
+import usMarketSnapshot from "../../../lib/us-market-snapshot.json";
+import marketScanSnapshot from "../../../lib/market-scan-snapshot.json";
+import { EXPERT_CONSENSUS_TAIWAN_ALL_BENCHMARKS } from "../../../lib/expert-consensus-tw-benchmark";
+import { EXPERT_CONSENSUS_US_ALL_BENCHMARKS } from "../../../lib/expert-consensus-us-benchmark";
 
 type TwseSymbolRow = { Code?: string; Name?: string };
 type TpexSymbolRow = { SecuritiesCompanyCode?: string; CompanyName?: string };
@@ -19,12 +23,20 @@ const DIRECTORY_HEADERS = {
   "User-Agent": "WenYing Value Radar fanhow@hotmail.com",
 };
 
+const LOCAL_INDEXED_SYMBOLS: MarketSymbol[] = [
+  ...EXPERT_CONSENSUS_TAIWAN_ALL_BENCHMARKS.map((b) => ({ ticker: b.ticker, name: b.name, market: "TW" as const })),
+  ...EXPERT_CONSENSUS_US_ALL_BENCHMARKS.map((b) => ({ ticker: b.ticker, name: b.name, market: "US" as const })),
+  ...(marketScanSnapshot.taiwanUniverse || []).map((s) => ({ ticker: s.ticker, name: s.name, market: "TW" as const })),
+  ...tpexSnapshot.map((s) => ({ ticker: s.ticker, name: s.name, market: "TW" as const })),
+  ...usMarketSnapshot.map((s) => ({ ticker: s.ticker, name: s.name, market: "US" as const })),
+];
+
 async function optionalJson<T>(url: string): Promise<T | null> {
   try {
     const response = await fetch(url, {
       headers: DIRECTORY_HEADERS,
       next: { revalidate: 60 * 60 * 12 },
-      signal: AbortSignal.timeout(2_500),
+      signal: AbortSignal.timeout(2_000),
     });
     if (!response.ok) return null;
     return response.json() as Promise<T>;
@@ -37,12 +49,18 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (!query || query.length > 40) return NextResponse.json({ symbols: [] });
 
-  const local = findStockDirectoryEntries(query, 6).map((entry) => ({
+  const localDirectory = findStockDirectoryEntries(query, 6).map((entry) => ({
     ticker: entry.ticker,
     name: entry.nameZh || entry.nameEn,
     market: entry.market,
   }));
-  if (local.length) return NextResponse.json({ symbols: local, source: "local-directory" });
+
+  const localMatches = rankMarketSymbols(LOCAL_INDEXED_SYMBOLS, query, 6);
+  const combinedLocal = [...localDirectory, ...localMatches.filter((s) => !localDirectory.some((d) => d.ticker === s.ticker))].slice(0, 6);
+
+  if (combinedLocal.length > 0) {
+    return NextResponse.json({ symbols: combinedLocal, source: "local-index" });
+  }
 
   let entries: MarketSymbol[] = [];
   if (isTaiwanSymbolQuery(query)) {
@@ -59,7 +77,6 @@ export async function GET(request: NextRequest) {
         name: row.CompanyAbbreviation?.trim() || row.CompanyName?.trim() || "",
         market: "TW" as const,
       })),
-      ...tpexSnapshot.map((row) => ({ ticker: row.ticker, name: row.name, market: "TW" as const })),
     ];
   } else {
     const secRows = await optionalJson<Record<string, SecTickerRow>>("https://www.sec.gov/files/company_tickers.json");

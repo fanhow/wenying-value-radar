@@ -57,9 +57,62 @@ export const EXPERT_CONSENSUS_TW_BENCHMARKS: readonly ExpertConsensusBenchmarkRo
 
 export const EXPERT_CONSENSUS_TAIWAN_BENCHMARKS = EXPERT_CONSENSUS_TW_BENCHMARKS.filter((row) => row.market === "TW");
 export const EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER = EXPERT_CONSENSUS_TAIWAN_BENCHMARKS.map((row) => row.ticker);
-export const EXPERT_CONSENSUS_TAIWAN_TICKERS = new Set(EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER);
 
-const TAIWAN_BENCHMARK_BY_TICKER = new Map(EXPERT_CONSENSUS_TAIWAN_BENCHMARKS.map((row) => [row.ticker, row]));
+export const EXPERT_CONSENSUS_TW_BULLISH_BENCHMARKS = EXPERT_CONSENSUS_TW_BENCHMARKS;
+export const EXPERT_CONSENSUS_TW_BULLISH_TICKER_ORDER = EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER;
+
+export const EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS: readonly ExpertConsensusBenchmarkRow[] = [
+  { rank: 1, ticker: "5475", name: "德宏", market: "TW", exchange: "TPEx", fairValue: 89.99 },
+  { rank: 2, ticker: "8021", name: "尖點", market: "TW", exchange: "TWSE", fairValue: 200.60 },
+  { rank: 3, ticker: "3081", name: "聯亞", market: "TW", exchange: "TPEx", fairValue: 1645.87 },
+  { rank: 4, ticker: "2426", name: "鼎元", market: "TW", exchange: "TWSE", fairValue: 50.96 },
+  { rank: 5, ticker: "8039", name: "台虹", market: "TW", exchange: "TWSE", fairValue: 152.88 },
+  { rank: 6, ticker: "6530", name: "創威", market: "TW", exchange: "TPEx", fairValue: 92.01 },
+  { rank: 7, ticker: "6920", name: "晶呈科技", market: "TW", exchange: "TPEx", fairValue: 49.16 },
+  { rank: 8, ticker: "4979", name: "華星光", market: "TW", exchange: "TPEx", fairValue: 107.72 },
+  { rank: 9, ticker: "6949", name: "沛爾生醫", market: "TW", exchange: "TWSE", fairValue: 765.35 },
+  { rank: 10, ticker: "3587", name: "閎康", market: "TW", exchange: "TPEx", fairValue: 297.53 },
+  { rank: 11, ticker: "3163", name: "波若威", market: "TW", exchange: "TPEx", fairValue: 395.61 },
+  { rank: 12, ticker: "4764", name: "雙鍵", market: "TW", exchange: "TWSE", fairValue: 134.05 },
+  { rank: 13, ticker: "4722", name: "國精化", market: "TW", exchange: "TWSE", fairValue: 114.55 },
+  { rank: 14, ticker: "3532", name: "台勝科", market: "TW", exchange: "TWSE", fairValue: 223.78 },
+  { rank: 15, ticker: "6715", name: "嘉基", market: "TW", exchange: "TWSE", fairValue: 187.13 },
+  { rank: 16, ticker: "6217", name: "中探針", market: "TW", exchange: "TWSE", fairValue: 96.29 },
+  { rank: 17, ticker: "2455", name: "全新", market: "TW", exchange: "TWSE", fairValue: 292.99 },
+  { rank: 18, ticker: "1711", name: "永光", market: "TW", exchange: "TWSE", fairValue: 24.72 },
+  { rank: 19, ticker: "2466", name: "冠西電", market: "TW", exchange: "TWSE", fairValue: 58.06 },
+  { rank: 20, ticker: "3026", name: "禾伸堂", market: "TW", exchange: "TWSE", fairValue: 430.69 },
+  { rank: 21, ticker: "3443", name: "創意", market: "TW", exchange: "TWSE", fairValue: 3535.35 },
+  { rank: 22, ticker: "2489", name: "瑞軒", market: "TW", exchange: "TWSE", fairValue: 25.57 },
+  { rank: 23, ticker: "6173", name: "信昌電", market: "TW", exchange: "TPEx", fairValue: 147.09 },
+  { rank: 24, ticker: "6182", name: "合晶", market: "TW", exchange: "TPEx", fairValue: 63.14 },
+  { rank: 25, ticker: "7610", name: "聯友金屬", market: "TW", exchange: "TWSE", fairValue: 964.40 },
+  { rank: 26, ticker: "8028", name: "昇陽半導體", market: "TW", exchange: "TWSE", fairValue: 154.78 },
+  { rank: 27, ticker: "8033", name: "雷虎", market: "TW", exchange: "TWSE", fairValue: 114.40 },
+  { rank: 28, ticker: "6739", name: "竹陞科技", market: "TW", exchange: "TPEx", fairValue: 719.08 },
+  { rank: 29, ticker: "8064", name: "東捷", market: "TW", exchange: "TPEx", fairValue: 62.78 },
+  { rank: 30, ticker: "3362", name: "先進光", market: "TW", exchange: "TPEx", fairValue: 127.75 },
+  { rank: 31, ticker: "6683", name: "雍智科技", market: "TW", exchange: "TPEx", fairValue: 787.93 },
+  { rank: 32, ticker: "7788", name: "松川精密", market: "TW", exchange: "TWSE", fairValue: 209.43 },
+  { rank: 33, ticker: "1560", name: "中砂", market: "TW", exchange: "TWSE", fairValue: 487.01 },
+  { rank: 34, ticker: "3105", name: "穩懋", market: "TW", exchange: "TPEx", fairValue: 293.37 },
+  { rank: 35, ticker: "6425", name: "易發", market: "TW", exchange: "TPEx", fairValue: 118.46 },
+  { rank: 36, ticker: "3374", name: "精材", market: "TW", exchange: "TPEx", fairValue: 280.30 },
+  { rank: 37, ticker: "6488", name: "環球晶", market: "TW", exchange: "TPEx", fairValue: 606.13 },
+  { rank: 38, ticker: "3595", name: "智晶", market: "TW", exchange: "TPEx", fairValue: 1193.99 },
+  { rank: 39, ticker: "2467", name: "志聖", market: "TW", exchange: "TWSE", fairValue: 416.24 },
+  { rank: 40, ticker: "1717", name: "長興", market: "TW", exchange: "TWSE", fairValue: 56.56 },
+];
+
+export const EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER = EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS.map((row) => row.ticker);
+export const EXPERT_CONSENSUS_TAIWAN_ALL_BENCHMARKS = [
+  ...EXPERT_CONSENSUS_TAIWAN_BENCHMARKS,
+  ...EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS,
+];
+
+export const EXPERT_CONSENSUS_TAIWAN_TICKERS = new Set(EXPERT_CONSENSUS_TAIWAN_ALL_BENCHMARKS.map((row) => row.ticker));
+
+const TAIWAN_BENCHMARK_BY_TICKER = new Map(EXPERT_CONSENSUS_TAIWAN_ALL_BENCHMARKS.map((row) => [row.ticker, row]));
 
 export function expertConsensusTaiwanBenchmarkForTicker(ticker: unknown, market: unknown) {
   if (String(market).trim().toUpperCase() !== "TW") return undefined;

@@ -751,14 +751,15 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     : await marketData.otc;
   const tpexRatio = tpexRatios.find((row) => row.SecuritiesCompanyCode === ticker);
   const tpexQuote = tpexQuotes.find((row) => row.SecuritiesCompanyCode === ticker);
-  const snapshot = tpexSnapshot.find((row) => row.ticker === ticker);
+  const snapshot = tpexSnapshot.find((row) => row.ticker === ticker)
+    || (marketScanSnapshot.taiwanUniverse || []).find((row) => row.ticker === ticker);
   const yahoo = !twseRatio && !tpexRatio && !snapshot ? await yahooTaiwanSnapshot(ticker) : null;
   const ratio = twseRatio
     ? { date: twseRatio.Date, name: twseRatio.Name, pe: twseRatio.PEratio, pb: twseRatio.PBratio, exchange: "TWSE" }
     : tpexRatio
       ? { date: tpexRatio.Date, name: tpexRatio.CompanyName, pe: tpexRatio.PriceEarningRatio, pb: tpexRatio.PriceBookRatio, exchange: "TPEx" }
       : snapshot
-        ? { date: snapshot.date, name: snapshot.name, pe: snapshot.pe, pb: snapshot.pb, exchange: "TPEx" }
+        ? { date: (snapshot as { date?: string }).date || "2026-08-30", name: snapshot.name, pe: String(snapshot.pe), pb: String(snapshot.pb), exchange: "TPEx" }
       : yahoo
         ? {
           date: yahoo.updatedAt,
@@ -773,7 +774,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     : tpexQuote
       ? { date: tpexQuote.Date, name: tpexQuote.CompanyName, close: tpexQuote.Close, exchange: "TPEx" }
       : snapshot
-        ? { date: snapshot.date, name: snapshot.name, close: snapshot.close, exchange: "TPEx" }
+        ? { date: (snapshot as { date?: string }).date || "2026-08-30", name: snapshot.name, close: String((snapshot as { close?: number | string; price?: number }).close || (snapshot as { price?: number }).price), exchange: "TPEx" }
       : yahoo
         ? { date: yahoo.updatedAt, name: yahoo.name, close: String(yahoo.price), exchange: "TPEx" }
       : null;

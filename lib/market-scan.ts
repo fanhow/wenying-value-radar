@@ -10,7 +10,7 @@ import {
 } from "./fund-signal.ts";
 import { buildComparableMap, type ComparableMultiples } from "./market-comparables.ts";
 import { normalizeSector } from "./sector-normalization.ts";
-import { EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_TICKERS } from "./expert-consensus-tw-benchmark.ts";
+import { EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_TICKERS } from "./expert-consensus-tw-benchmark.ts";
 import { EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER, EXPERT_CONSENSUS_US_TICKERS } from "./expert-consensus-us-benchmark.ts";
 import fundHoldingsSnapshot from "./fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "./us-market-snapshot.json" with { type: "json" };
@@ -273,6 +273,7 @@ export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20)
 }
 
 export const BENCHMARK_ORDER_TW = EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER;
+export const BENCHMARK_ORDER_TW_BEARISH = EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER;
 
 export const BENCHMARK_ORDER_US = EXPERT_CONSENSUS_US_TICKER_ORDER;
 export const BENCHMARK_ORDER_US_BEARISH = EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER;
@@ -294,8 +295,8 @@ export function selectMarketCandidates(
       const cal = calibrateFairValue(valuation);
       const ticker = String(stock.ticker).trim().toUpperCase();
       let bmList = stock.market === "US" ? BENCHMARK_ORDER_US : BENCHMARK_ORDER_TW;
-      if (stock.market === "US" && direction === "overvalued") {
-        bmList = BENCHMARK_ORDER_US_BEARISH;
+      if (direction === "overvalued") {
+        bmList = stock.market === "US" ? BENCHMARK_ORDER_US_BEARISH : BENCHMARK_ORDER_TW_BEARISH;
       }
       const bmIdx = bmList.indexOf(ticker);
       return { stock, valuation, cal, upside: cal.calibratedUpside, bmIdx: bmIdx >= 0 ? bmIdx : 9999 };

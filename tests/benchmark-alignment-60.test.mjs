@@ -3,10 +3,11 @@ import test from "node:test";
 import { calculateStock } from "../lib/valuation.ts";
 import { calibrateFairValue, effectiveValuationUpside } from "../lib/valuation-calibration.ts";
 import { BENCHMARK_ORDER_TW, marketStockFromRatio, selectMarketCandidates } from "../lib/market-scan.ts";
-import { EXPERT_CONSENSUS_TAIWAN_BENCHMARKS, EXPERT_CONSENSUS_TW_BENCHMARKS } from "../lib/expert-consensus-tw-benchmark.ts";
+import { EXPERT_CONSENSUS_TAIWAN_BENCHMARKS, EXPERT_CONSENSUS_TW_BENCHMARKS, EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS, EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER } from "../lib/expert-consensus-tw-benchmark.ts";
 import { EXPERT_CONSENSUS_US_BENCHMARKS, EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS, EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER } from "../lib/expert-consensus-us-benchmark.ts";
 
 const TW_BENCHMARKS = EXPERT_CONSENSUS_TAIWAN_BENCHMARKS;
+const TW_BEARISH_BENCHMARKS = EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS;
 const US_BENCHMARKS = EXPERT_CONSENSUS_US_BENCHMARKS;
 const US_BEARISH_BENCHMARKS = EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS;
 
@@ -26,6 +27,27 @@ test("aligns all supported Taiwan teacher anchors to the authorized benchmark", 
     const val = calculateStock(input);
     const cal = calibrateFairValue(val);
     assert.ok(Math.abs(cal.calibratedFairValue - b.fairValue) < 0.001, `${b.ticker} should match ${b.fairValue}`);
+  }
+});
+
+test("validates all 40 Taiwan bearish / overvalued benchmarks align with authorized fair value benchmark", () => {
+  assert.equal(TW_BEARISH_BENCHMARKS.length, 40);
+  for (const b of TW_BEARISH_BENCHMARKS) {
+    const input = marketStockFromRatio({
+      ticker: b.ticker,
+      name: b.name,
+      market: "TW",
+      price: b.fairValue * 1.5,
+      pe: 50,
+      pb: 5,
+      volume: 1_000_000,
+      sector: "台灣上市公司",
+    });
+    assert.ok(input, `input should exist for ${b.ticker}`);
+    const val = calculateStock(input);
+    const cal = calibrateFairValue(val);
+    assert.ok(Math.abs(cal.calibratedFairValue - b.fairValue) < 0.001, `${b.ticker} fair value (${cal.calibratedFairValue}) should match benchmark (${b.fairValue})`);
+    assert.ok(cal.calibratedUpside < 0, `${b.ticker} upside must be negative (downside)`);
   }
 });
 
@@ -75,6 +97,9 @@ test("uses the current Taiwan benchmark order and excludes the two Hong Kong lis
   assert.equal(EXPERT_CONSENSUS_TW_BENCHMARKS.length, 40);
   assert.equal(TW_BENCHMARKS.length, 38);
   assert.deepEqual(BENCHMARK_ORDER_TW, TW_BENCHMARKS.map((row) => row.ticker));
+  assert.equal(EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS.length, 40);
+  assert.deepEqual(EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER.slice(0, 5), ["5475", "8021", "3081", "2426", "8039"]);
+  assert.deepEqual(EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER.slice(35, 40), ["3374", "6488", "3595", "2467", "1717"]);
 });
 
 test("uses the current US benchmark order for all 40 tickers", () => {

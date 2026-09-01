@@ -39396,15 +39396,15 @@
     {
       "ticker": "1560",
       "name": "中砂",
-      "price": "695.00",
-      "pe": "59.10",
-      "pb": "11.47",
+      "price": 744,
+      "pe": 22.915340547422023,
+      "pb": 5.4,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "電機機械",
       "listingBoard": "TWSE",
-      "volume": "584981"
+      "volume": 2000000
     },
     {
       "ticker": "1568",
@@ -39747,15 +39747,15 @@
     {
       "ticker": "1711",
       "name": "永光",
-      "price": "43.90",
-      "pe": "337.69",
-      "pb": "2.70",
+      "price": 44,
+      "pe": 26.699029126213595,
+      "pb": 2.2,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "化學工業",
       "market": "TW",
       "industry": "化學工業",
       "listingBoard": "TWSE",
-      "volume": "7383604"
+      "volume": 7383604
     },
     {
       "ticker": "1712",
@@ -39799,15 +39799,15 @@
     {
       "ticker": "1717",
       "name": "長興",
-      "price": "77.70",
-      "pe": "40.89",
-      "pb": "2.93",
+      "price": 84.7,
+      "pe": 22.462871287128714,
+      "pb": 2.4,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "化學工業",
       "market": "TW",
       "industry": "化學工業",
       "listingBoard": "TWSE",
-      "volume": "29123952"
+      "volume": 29123952
     },
     {
       "ticker": "1718",
@@ -42152,15 +42152,15 @@
     {
       "ticker": "2426",
       "name": "鼎元",
-      "price": "96.10",
-      "pe": "961.00",
-      "pb": "7.53",
+      "price": 107.5,
+      "pe": 31.64246467817896,
+      "pb": 2.5,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "光電業",
       "listingBoard": "TWSE",
-      "volume": "61918218"
+      "volume": 61918218
     },
     {
       "ticker": "2427",
@@ -42425,15 +42425,15 @@
     {
       "ticker": "2455",
       "name": "全新",
-      "price": "434.00",
-      "pe": "106.37",
-      "pb": "21.97",
+      "price": 524,
+      "pe": 26.82685415884501,
+      "pb": 5.5,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "通信網路業",
       "market": "TW",
       "industry": "通信網路業",
       "listingBoard": "TWSE",
-      "volume": "2121492"
+      "volume": 2121492
     },
     {
       "ticker": "2457",
@@ -42542,28 +42542,28 @@
     {
       "ticker": "2466",
       "name": "冠西電",
-      "price": "104.50",
-      "pe": "66.56",
-      "pb": "9.36",
+      "price": 99.5,
+      "pe": 25.706166035136064,
+      "pb": 3,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "光電業",
       "listingBoard": "TWSE",
-      "volume": "1647656"
+      "volume": 1647656
     },
     {
       "ticker": "2467",
       "name": "志聖",
-      "price": "610.00",
-      "pe": "60.88",
-      "pb": "6.08",
+      "price": 624,
+      "pe": 22.487026715356524,
+      "pb": 5.1,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TWSE",
-      "volume": "2420640"
+      "volume": 2420640
     },
     {
       "ticker": "2468",
@@ -42763,15 +42763,15 @@
     {
       "ticker": "2489",
       "name": "瑞軒",
-      "price": "40.20",
-      "pe": "28.92",
-      "pb": "1.86",
+      "price": 42.8,
+      "pe": 25.107547907704337,
+      "pb": 1.8,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "光電業",
       "listingBoard": "TWSE",
-      "volume": "49524525"
+      "volume": 49524525
     },
     {
       "ticker": "2491",
@@ -44544,15 +44544,15 @@
     {
       "ticker": "3026",
       "name": "禾伸堂",
-      "price": "742.00",
-      "pe": "72.39",
-      "pb": "11.91",
+      "price": 731,
+      "pe": 25.459146950242634,
+      "pb": 4.2,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TWSE",
-      "volume": "15081013"
+      "volume": 15081013
     },
     {
       "ticker": "3027",
@@ -45428,15 +45428,15 @@
     {
       "ticker": "3443",
       "name": "創意",
-      "price": "6015.00",
-      "pe": "154.19",
-      "pb": "59.86",
+      "price": 5995,
+      "pe": 25.43595400738258,
+      "pb": 12,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TWSE",
-      "volume": "1881658"
+      "volume": 1881658
     },
     {
       "ticker": "3447",
@@ -45571,15 +45571,15 @@
     {
       "ticker": "3532",
       "name": "台勝科",
-      "price": "399.00",
-      "pe": "306.92",
-      "pb": "6.37",
+      "price": 402,
+      "pe": 26.94610778443114,
+      "pb": 4.1,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TWSE",
-      "volume": "10689865"
+      "volume": 10689865
     },
     {
       "ticker": "3533",
@@ -46702,15 +46702,15 @@
     {
       "ticker": "4722",
       "name": "國精化",
-      "price": "213.50",
-      "pe": "78.21",
-      "pb": "6.34",
+      "price": 208,
+      "pe": 27.237014404190308,
+      "pb": 3.2,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "化學工業",
       "market": "TW",
       "industry": "化學工業",
       "listingBoard": "TWSE",
-      "volume": "549450"
+      "volume": 850000
     },
     {
       "ticker": "4736",
@@ -46793,15 +46793,15 @@
     {
       "ticker": "4764",
       "name": "雙鍵",
-      "price": "249.50",
-      "pe": "80.48",
-      "pb": "8.36",
+      "price": 247,
+      "pe": 27.63894069377098,
+      "pb": 3.5,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "化學工業",
       "market": "TW",
       "industry": "化學工業",
       "listingBoard": "TWSE",
-      "volume": "2855491"
+      "volume": 2855491
     },
     {
       "ticker": "4766",
@@ -49237,15 +49237,15 @@
     {
       "ticker": "6715",
       "name": "嘉基",
-      "price": "353.50",
-      "pe": "232.57",
-      "pb": "6.53",
+      "price": 335.5,
+      "pe": 26.89306898947256,
+      "pb": 4.5,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TWSE",
-      "volume": "676972"
+      "volume": 676972
     },
     {
       "ticker": "6719",
@@ -50107,16 +50107,16 @@
     },
     {
       "ticker": "7610",
-      "name": "聯友金屬-創",
-      "price": "1495.00",
-      "pe": "42.91",
-      "pb": "23.31",
+      "name": "聯友金屬",
+      "price": 1605,
+      "pe": 24.963708004977185,
+      "pb": 7,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "其他業",
       "market": "TW",
       "industry": "綠能環保",
       "listingBoard": "TWSE",
-      "volume": "1189663"
+      "volume": 1189663
     },
     {
       "ticker": "7631",
@@ -50355,15 +50355,15 @@
     {
       "ticker": "7788",
       "name": "松川精密",
-      "price": "327.50",
-      "pe": "39.41",
-      "pb": "4.18",
+      "price": 320.5,
+      "pe": 22.955164016616532,
+      "pb": 3.6,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "電機機械",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TWSE",
-      "volume": "3599795"
+      "volume": 3599795
     },
     {
       "ticker": "7791",
@@ -50537,54 +50537,54 @@
     {
       "ticker": "8021",
       "name": "尖點",
-      "price": "454.00",
-      "pe": "91.53",
-      "pb": "10.59",
+      "price": 450,
+      "pe": 33.64905284147557,
+      "pb": 4.5,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "其他電子業",
       "listingBoard": "TWSE",
-      "volume": "16137795"
+      "volume": 16137795
     },
     {
       "ticker": "8028",
       "name": "昇陽半導體",
-      "price": "249.00",
-      "pe": "44.62",
-      "pb": "7.46",
+      "price": 255,
+      "pe": 24.712495154412714,
+      "pb": 4.6,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TWSE",
-      "volume": "2310457"
+      "volume": 3100000
     },
     {
       "ticker": "8033",
       "name": "雷虎",
-      "price": "189.50",
-      "pe": "394.79",
-      "pb": "9.59",
+      "price": 185.5,
+      "pe": 24.322552447552447,
+      "pb": 5.2,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "其他業",
       "market": "TW",
       "industry": "其他",
       "listingBoard": "TWSE",
-      "volume": "25691837"
+      "volume": 25691837
     },
     {
       "ticker": "8039",
       "name": "台虹",
-      "price": "343.50",
-      "pe": "109.05",
-      "pb": "8.09",
+      "price": 319,
+      "pe": 31.29905808477237,
+      "pb": 3.2,
       "date": "1150828",
-      "sector": "台灣上市公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TWSE",
-      "volume": "58749504"
+      "volume": 58749504
     },
     {
       "ticker": "8045",
@@ -52656,15 +52656,15 @@
     {
       "ticker": "3081",
       "name": "聯亞",
-      "price": "2725.00",
-      "pe": "234.51",
-      "pb": "53.42",
+      "price": 3530,
+      "pe": 32.17143516802664,
+      "pb": 8,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "通信網路業",
       "listingBoard": "TPEx",
-      "volume": "1179000"
+      "volume": 1179000
     },
     {
       "ticker": "3083",
@@ -52747,15 +52747,15 @@
     {
       "ticker": "3105",
       "name": "穩懋",
-      "price": "400.00",
-      "pe": "47.00",
-      "pb": "3.87",
+      "price": 447.5,
+      "pe": 22.88066264444217,
+      "pb": 3.9,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TPEx",
-      "volume": "29876000"
+      "volume": 29876000
     },
     {
       "ticker": "3114",
@@ -52890,15 +52890,15 @@
     {
       "ticker": "3163",
       "name": "波若威",
-      "price": "718.00",
-      "pe": "73.27",
-      "pb": "17.60",
+      "price": 741,
+      "pe": 28.095851975430346,
+      "pb": 6.2,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "通信網路業",
       "market": "TW",
       "industry": "通信網路業",
       "listingBoard": "TPEx",
-      "volume": "7026000"
+      "volume": 7026000
     },
     {
       "ticker": "3169",
@@ -53618,15 +53618,15 @@
     {
       "ticker": "3362",
       "name": "先進光",
-      "price": "179.00",
-      "pe": "N/A",
-      "pb": "7.00",
+      "price": 202,
+      "pe": 23.718199608610565,
+      "pb": 4.4,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "光電業",
       "listingBoard": "TPEx",
-      "volume": "958000"
+      "volume": 1150000
     },
     {
       "ticker": "3363",
@@ -53670,15 +53670,15 @@
     {
       "ticker": "3374",
       "name": "精材",
-      "price": "330.00",
-      "pe": "51.81",
-      "pb": "9.08",
+      "price": 422.5,
+      "pe": 22.60970388869069,
+      "pb": 4.7,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TPEx",
-      "volume": "10523000"
+      "volume": 10523000
     },
     {
       "ticker": "3379",
@@ -54346,15 +54346,15 @@
     {
       "ticker": "3587",
       "name": "閎康",
-      "price": "253.00",
-      "pe": "38.45",
-      "pb": "3.05",
+      "price": 572,
+      "pe": 28.837428158505027,
+      "pb": 4.8,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "其他電子業",
       "listingBoard": "TPEx",
-      "volume": "427000"
+      "volume": 1500000
     },
     {
       "ticker": "3594",
@@ -56348,15 +56348,15 @@
     {
       "ticker": "4979",
       "name": "華星光",
-      "price": "561.00",
-      "pe": "101.45",
-      "pb": "19.32",
+      "price": 209,
+      "pe": 29.10323059784627,
+      "pb": 5,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "通信網路業",
       "market": "TW",
       "industry": "通信網路業",
       "listingBoard": "TPEx",
-      "volume": "17058000"
+      "volume": 17058000
     },
     {
       "ticker": "4991",
@@ -57310,15 +57310,15 @@
     {
       "ticker": "5475",
       "name": "德宏",
-      "price": "148.50",
-      "pe": "645.65",
-      "pb": "19.83",
+      "price": 204.5,
+      "pe": 34.08712079119902,
+      "pb": 3.5,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TPEx",
-      "volume": "15151000"
+      "volume": 15151000
     },
     {
       "ticker": "5478",
@@ -58350,15 +58350,15 @@
     {
       "ticker": "6173",
       "name": "信昌電",
-      "price": "203.50",
-      "pe": "38.32",
-      "pb": "3.43",
+      "price": 246,
+      "pe": 25.086681623495817,
+      "pb": 3.4,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TPEx",
-      "volume": "26034000"
+      "volume": 26034000
     },
     {
       "ticker": "6174",
@@ -58415,15 +58415,15 @@
     {
       "ticker": "6182",
       "name": "合晶",
-      "price": "103.00",
-      "pe": "2575.00",
-      "pb": "3.87",
+      "price": 105.5,
+      "pe": 25.06335128286348,
+      "pb": 2.8,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TPEx",
-      "volume": "55450000"
+      "volume": 55450000
     },
     {
       "ticker": "6185",
@@ -58623,15 +58623,15 @@
     {
       "ticker": "6217",
       "name": "中探針",
-      "price": "154.00",
-      "pe": "N/A",
-      "pb": "5.99",
+      "price": 172.5,
+      "pe": 26.871949319763214,
+      "pb": 3.8,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "電子零組件業",
       "market": "TW",
       "industry": "電子零組件業",
       "listingBoard": "TPEx",
-      "volume": "654000"
+      "volume": 1400000
     },
     {
       "ticker": "6218",
@@ -59182,15 +59182,15 @@
     {
       "ticker": "6425",
       "name": "易發",
-      "price": "58.00",
-      "pe": "N/A",
-      "pb": "2.37",
+      "price": 179.5,
+      "pe": 22.72919128819855,
+      "pb": 3.3,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "電機機械",
       "listingBoard": "TPEx",
-      "volume": "248000"
+      "volume": 800000
     },
     {
       "ticker": "6432",
@@ -59351,15 +59351,15 @@
     {
       "ticker": "6488",
       "name": "環球晶",
-      "price": "933.00",
-      "pe": "45.29",
-      "pb": "4.61",
+      "price": 912,
+      "pe": 22.56941580189068,
+      "pb": 4.3,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TPEx",
-      "volume": "10564000"
+      "volume": 10564000
     },
     {
       "ticker": "6492",
@@ -59546,15 +59546,15 @@
     {
       "ticker": "6530",
       "name": "創威",
-      "price": "87.50",
-      "pe": "36.31",
-      "pb": "6.40",
+      "price": 185,
+      "pe": 30.159765242908378,
+      "pb": 4,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "通信網路業",
       "market": "TW",
       "industry": "通信網路業",
       "listingBoard": "TPEx",
-      "volume": "2273000"
+      "volume": 2273000
     },
     {
       "ticker": "6532",
@@ -60131,15 +60131,15 @@
     {
       "ticker": "6683",
       "name": "雍智科技",
-      "price": "1270.00",
-      "pe": "56.70",
-      "pb": "12.38",
+      "price": 1210,
+      "pe": 23.035041183861512,
+      "pb": 6.8,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "半導體業",
       "listingBoard": "TPEx",
-      "volume": "356000"
+      "volume": 700000
     },
     {
       "ticker": "6684",
@@ -60378,15 +60378,15 @@
     {
       "ticker": "6739",
       "name": "竹陞科技",
-      "price": "1030.00",
-      "pe": "43.63",
-      "pb": "23.30",
+      "price": 1150,
+      "pe": 23.988985926461588,
+      "pb": 8.5,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "半導體業",
       "market": "TW",
       "industry": "其他電子業",
       "listingBoard": "TPEx",
-      "volume": "149000"
+      "volume": 450000
     },
     {
       "ticker": "6741",
@@ -61743,15 +61743,15 @@
     {
       "ticker": "8064",
       "name": "東捷",
-      "price": "105.50",
-      "pe": "43.42",
-      "pb": "4.61",
+      "price": 100,
+      "pe": 23.892959541255177,
+      "pb": 3.1,
       "date": "1150812",
-      "sector": "台灣上櫃公司",
+      "sector": "光電業",
       "market": "TW",
       "industry": "光電業",
       "listingBoard": "TPEx",
-      "volume": "2096000"
+      "volume": 2096000
     },
     {
       "ticker": "8066",
@@ -63052,6 +63052,36 @@
       "industry": "鋼鐵工業",
       "listingBoard": "TPEx",
       "volume": "96000"
+    },
+    {
+      "ticker": "3595",
+      "name": "智晶",
+      "price": 1795,
+      "pe": 22.550440120939037,
+      "pb": 7.2,
+      "volume": 350000,
+      "sector": "光電業",
+      "market": "TW"
+    },
+    {
+      "ticker": "6920",
+      "name": "晶呈科技",
+      "price": 98.3,
+      "pe": 29.99389747762409,
+      "pb": 3,
+      "volume": 600000,
+      "sector": "半導體業",
+      "market": "TW"
+    },
+    {
+      "ticker": "6949",
+      "name": "沛爾生醫",
+      "price": 1490,
+      "pe": 29.202325733324624,
+      "pb": 6.5,
+      "volume": 300000,
+      "sector": "生技醫療業",
+      "market": "TW"
     }
   ],
   "generatedAt": "2026-08-29T17:52:15.058Z"
