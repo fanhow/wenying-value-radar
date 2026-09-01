@@ -51,12 +51,12 @@ export const SETUP_LIBRARY: readonly SetupLibraryItem[] = [
   },
   {
     id: "failed_m_top", number: 5, titleZh: "M 頂失敗後多頭反轉", titleEn: "Failed M Top to Bullish Reversal", direction: "long",
-    contextZh: "M 頂跌破頸線後無法延續並迅速收復，讓追空部位受困。",
-    contextEn: "An M-top breakdown fails to continue and quickly reclaims its neckline, trapping short sellers.",
-    triggerZh: "收復頸線後，突破鄰近小波段高點。",
-    triggerEn: "After the neckline reclaim, break the nearby minor swing high.",
-    invalidationZh: "再次乾淨跌破頸線，且收盤失守。",
-    invalidationEn: "A clean second breakdown that closes below the neckline.",
+    contextZh: "成熟 M 頂跌破頸線後，價格跌向關鍵主要支撐區。賣壓動能在此耗竭並出現晨星十字星（Morning Doji Star）拒絕結構。",
+    contextEn: "After a mature M-top breakdown, price falls toward major support where selling momentum fails and a Morning Doji Star rejection develops.",
+    triggerZh: "十字星收盤即時發出警示（候選）。次日開盤若向上跳空，立即於開盤附近進場試單；初始停損設於十字星下影線下方。不等待收復頸線，爭取極限風報比。",
+    triggerEn: "Alert on the Doji session close (candidate). If the next session opens with a bullish gap, enter long near the open with initial stop slightly below the Doji lower wick. Do not wait for neckline reclaim.",
+    invalidationZh: "實質跌破十字星最低點（下影線下緣），反轉論點即刻失效。",
+    invalidationEn: "A decisive break below the lowest point of the Doji lower wick immediately invalidates the reversal thesis.",
   },
   {
     id: "failed_w_bottom", number: 6, titleZh: "W 底失敗後空頭反轉", titleEn: "Failed W Bottom to Bearish Reversal", direction: "short",
