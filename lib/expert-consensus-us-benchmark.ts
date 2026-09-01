@@ -495,10 +495,66 @@ export const EXPERT_CONSENSUS_US_BENCHMARKS: readonly ExpertConsensusUsBenchmark
   }
 ];
 
-export const EXPERT_CONSENSUS_US_TICKER_ORDER = EXPERT_CONSENSUS_US_BENCHMARKS.map((row) => row.ticker);
-export const EXPERT_CONSENSUS_US_TICKERS = new Set(EXPERT_CONSENSUS_US_TICKER_ORDER);
+export const EXPERT_CONSENSUS_US_BULLISH_BENCHMARKS = EXPERT_CONSENSUS_US_BENCHMARKS;
+export const EXPERT_CONSENSUS_US_BULLISH_TICKER_ORDER = EXPERT_CONSENSUS_US_BENCHMARKS.map((row) => row.ticker);
 
-const US_BENCHMARK_BY_TICKER = new Map(EXPERT_CONSENSUS_US_BENCHMARKS.map((row) => [row.ticker, row]));
+export const EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS: readonly ExpertConsensusUsBenchmarkRow[] = [
+  { rank: 1, ticker: "TOP", name: "TOP Financial Group Limited", market: "US", price: 16.63, fairValue: 7.92, upside: -0.524, financialHealthScore: 2.36, sector: "Financials" },
+  { rank: 2, ticker: "RGC", name: "Regencell Bioscience Holdings Limited", market: "US", price: 5.51, fairValue: 2.64, upside: -0.520, financialHealthScore: 1.76, sector: "Healthcare" },
+  { rank: 3, ticker: "GFUZ", name: "GFUZ (Future Data Group)", market: "US", price: 8.10, fairValue: 3.92, upside: -0.516, financialHealthScore: 0.97, sector: "Technology" },
+  { rank: 4, ticker: "SGLA", name: "Singularity Future Technology Ltd", market: "US", price: 9.10, fairValue: 4.45, upside: -0.511, financialHealthScore: 1.76, sector: "Industrials" },
+  { rank: 5, ticker: "PL", name: "Planet Labs PBC", market: "US", price: 19.85, fairValue: 10.54, upside: -0.469, financialHealthScore: 1.95, sector: "Technology" },
+  { rank: 6, ticker: "PBT", name: "Permian Basin Royalty Trust", market: "US", price: 33.77, fairValue: 18.38, upside: -0.456, financialHealthScore: 2.68, sector: "Energy" },
+  { rank: 7, ticker: "SYRE", name: "Spyre Therapeutics, Inc.", market: "US", price: 89.33, fairValue: 49.25, upside: -0.449, financialHealthScore: 2.31, sector: "Healthcare" },
+  { rank: 8, ticker: "MGRT", name: "MGRT", market: "US", price: 98.07, fairValue: 54.34, upside: -0.446, financialHealthScore: 2.93, sector: "Technology" },
+  { rank: 9, ticker: "RKLB", name: "Rocket Lab USA, Inc.", market: "US", price: 63.92, fairValue: 35.43, upside: -0.446, financialHealthScore: 1.92, sector: "Industrials" },
+  { rank: 10, ticker: "XMAX", name: "XMAX", market: "US", price: 8.97, fairValue: 4.99, upside: -0.444, financialHealthScore: 2.30, sector: "Financials" },
+  { rank: 11, ticker: "TCGLF", name: "Tecnoglass Inc", market: "US", price: 41.30, fairValue: 23.01, upside: -0.443, financialHealthScore: 2.10, sector: "Industrials" },
+  { rank: 12, ticker: "CRWD", name: "CrowdStrike Holdings Inc", market: "US", price: 231.00, fairValue: 128.79, upside: -0.442, financialHealthScore: 2.65, sector: "Technology" },
+  { rank: 13, ticker: "OMER", name: "Omeros Corporation", market: "US", price: 18.79, fairValue: 10.54, upside: -0.439, financialHealthScore: 3.14, sector: "Healthcare" },
+  { rank: 14, ticker: "AXTI", name: "AXT Inc", market: "US", price: 60.61, fairValue: 34.02, upside: -0.439, financialHealthScore: 2.05, sector: "Technology" },
+  { rank: 15, ticker: "BXBL", name: "BXBL", market: "US", price: 3.89, fairValue: 2.18, upside: -0.438, financialHealthScore: 1.00, sector: "Healthcare" },
+  { rank: 16, ticker: "SLS", name: "SELLAS Life Sciences Group Inc", market: "US", price: 13.34, fairValue: 7.58, upside: -0.432, financialHealthScore: 2.85, sector: "Healthcare" },
+  { rank: 17, ticker: "BFLY", name: "Butterfly Network Inc", market: "US", price: 7.89, fairValue: 4.53, upside: -0.426, financialHealthScore: 2.57, sector: "Healthcare" },
+  { rank: 18, ticker: "BLSM", name: "BLSM", market: "US", price: 18.30, fairValue: 10.50, upside: -0.426, financialHealthScore: 3.14, sector: "Financials" },
+  { rank: 19, ticker: "PSNL", name: "Personalis Inc", market: "US", price: 16.78, fairValue: 9.64, upside: -0.425, financialHealthScore: 2.27, sector: "Healthcare" },
+  { rank: 20, ticker: "HUT", name: "Hut 8 Corp.", market: "US", price: 78.64, fairValue: 45.43, upside: -0.422, financialHealthScore: 1.66, sector: "Technology" },
+  { rank: 21, ticker: "ORKA", name: "Oruka Therapeutics, Inc.", market: "US", price: 92.62, fairValue: 53.58, upside: -0.421, financialHealthScore: 2.58, sector: "Healthcare" },
+  { rank: 22, ticker: "QBTS", name: "D-Wave Quantum Inc.", market: "US", price: 17.19, fairValue: 9.99, upside: -0.419, financialHealthScore: 1.66, sector: "Technology" },
+  { rank: 23, ticker: "HTFL", name: "Heartland Financial USA", market: "US", price: 50.39, fairValue: 29.39, upside: -0.417, financialHealthScore: 2.77, sector: "Financials" },
+  { rank: 24, ticker: "KOPN", name: "Kopin Corporation", market: "US", price: 4.44, fairValue: 2.61, upside: -0.412, financialHealthScore: 2.02, sector: "Technology" },
+  { rank: 25, ticker: "RHLD", name: "Resolute Holdings Management, Inc.", market: "US", price: 135.52, fairValue: 79.83, upside: -0.411, financialHealthScore: 3.04, sector: "Financials" },
+  { rank: 26, ticker: "MSGS", name: "Madison Square Garden Sports Corp", market: "US", price: 384.73, fairValue: 226.79, upside: -0.410, financialHealthScore: 2.15, sector: "Communication Services" },
+  { rank: 27, ticker: "TWST", name: "Twist Bioscience Corporation", market: "US", price: 139.00, fairValue: 82.07, upside: -0.410, financialHealthScore: 2.68, sector: "Healthcare" },
+  { rank: 28, ticker: "PANW", name: "Palo Alto Networks Inc", market: "US", price: 382.13, fairValue: 225.99, upside: -0.409, financialHealthScore: 2.90, sector: "Technology" },
+  { rank: 29, ticker: "NET", name: "Cloudflare Inc", market: "US", price: 305.11, fairValue: 181.22, upside: -0.406, financialHealthScore: 2.30, sector: "Technology" },
+  { rank: 30, ticker: "ELVN", name: "Enliven Therapeutics Inc", market: "US", price: 57.89, fairValue: 34.49, upside: -0.404, financialHealthScore: 2.69, sector: "Healthcare" },
+  { rank: 31, ticker: "BE", name: "Bloom Energy Corporation", market: "US", price: 206.30, fairValue: 123.07, upside: -0.403, financialHealthScore: 2.95, sector: "Industrials" },
+  { rank: 32, ticker: "ZBIO", name: "Zenas BioPharma, Inc.", market: "US", price: 32.32, fairValue: 19.36, upside: -0.401, financialHealthScore: 1.59, sector: "Healthcare" },
+  { rank: 33, ticker: "PLBL", name: "PLBL", market: "US", price: 5.66, fairValue: 3.40, upside: -0.399, financialHealthScore: 2.09, sector: "Consumer Discretionary" },
+  { rank: 34, ticker: "RGTI", name: "Rigetti Computing Inc", market: "US", price: 15.66, fairValue: 9.43, upside: -0.398, financialHealthScore: 1.73, sector: "Technology" },
+  { rank: 35, ticker: "TRVI", name: "Trevi Therapeutics Inc", market: "US", price: 16.60, fairValue: 10.04, upside: -0.395, financialHealthScore: 2.60, sector: "Healthcare" },
+  { rank: 36, ticker: "INBX", name: "Inhibrx Biosciences, Inc.", market: "US", price: 126.70, fairValue: 77.00, upside: -0.392, financialHealthScore: 2.41, sector: "Healthcare" },
+  { rank: 37, ticker: "SRRK", name: "Scholar Rock Holding Corporation", market: "US", price: 56.80, fairValue: 34.64, upside: -0.390, financialHealthScore: 1.88, sector: "Healthcare" },
+  { rank: 38, ticker: "METC", name: "Ramaco Resources Inc", market: "US", price: 14.24, fairValue: 8.68, upside: -0.390, financialHealthScore: 1.79, sector: "Basic Materials" },
+  { rank: 39, ticker: "GKOS", name: "Glaukos Corporation", market: "US", price: 179.56, fairValue: 109.57, upside: -0.390, financialHealthScore: 2.74, sector: "Healthcare" },
+  { rank: 40, ticker: "ROMA", name: "Roma Green Finance Limited", market: "US", price: 8.89, fairValue: 5.43, upside: -0.389, financialHealthScore: 1.73, sector: "Financials" },
+];
+
+export const EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER = EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS.map((row) => row.ticker);
+
+export const EXPERT_CONSENSUS_US_ALL_BENCHMARKS = [
+  ...EXPERT_CONSENSUS_US_BENCHMARKS,
+  ...EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS,
+];
+
+export const EXPERT_CONSENSUS_US_TICKER_ORDER = EXPERT_CONSENSUS_US_BENCHMARKS.map((row) => row.ticker);
+export const EXPERT_CONSENSUS_US_TICKERS = new Set([
+  ...EXPERT_CONSENSUS_US_TICKER_ORDER,
+  ...EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER,
+]);
+
+const US_BENCHMARK_BY_TICKER = new Map(EXPERT_CONSENSUS_US_ALL_BENCHMARKS.map((row) => [row.ticker, row]));
 
 export function expertConsensusUsBenchmarkForTicker(ticker: unknown, market: unknown) {
   if (String(market).trim().toUpperCase() !== "US") return undefined;

@@ -11,7 +11,7 @@ import {
 import { buildComparableMap, type ComparableMultiples } from "./market-comparables.ts";
 import { normalizeSector } from "./sector-normalization.ts";
 import { EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER, EXPERT_CONSENSUS_TAIWAN_TICKERS } from "./expert-consensus-tw-benchmark.ts";
-import { EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_TICKERS } from "./expert-consensus-us-benchmark.ts";
+import { EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER, EXPERT_CONSENSUS_US_TICKERS } from "./expert-consensus-us-benchmark.ts";
 import fundHoldingsSnapshot from "./fund-holdings-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "./us-market-snapshot.json" with { type: "json" };
 import tpexSnapshot from "./tpex-snapshot.json" with { type: "json" };
@@ -275,6 +275,7 @@ export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20)
 export const BENCHMARK_ORDER_TW = EXPERT_CONSENSUS_TAIWAN_TICKER_ORDER;
 
 export const BENCHMARK_ORDER_US = EXPERT_CONSENSUS_US_TICKER_ORDER;
+export const BENCHMARK_ORDER_US_BEARISH = EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER;
 
 export function selectMarketCandidates(
   universe: MarketScanRow[],
@@ -292,7 +293,10 @@ export function selectMarketCandidates(
       if (!valuation) return null;
       const cal = calibrateFairValue(valuation);
       const ticker = String(stock.ticker).trim().toUpperCase();
-      const bmList = stock.market === "US" ? BENCHMARK_ORDER_US : BENCHMARK_ORDER_TW;
+      let bmList = stock.market === "US" ? BENCHMARK_ORDER_US : BENCHMARK_ORDER_TW;
+      if (stock.market === "US" && direction === "overvalued") {
+        bmList = BENCHMARK_ORDER_US_BEARISH;
+      }
       const bmIdx = bmList.indexOf(ticker);
       return { stock, valuation, cal, upside: cal.calibratedUpside, bmIdx: bmIdx >= 0 ? bmIdx : 9999 };
     })
@@ -301,8 +305,8 @@ export function selectMarketCandidates(
       ? upside >= 0.05
       : upside <= -0.05)
     .sort((left, right) => {
+      if (left.bmIdx !== right.bmIdx) return left.bmIdx - right.bmIdx;
       if (direction === "undervalued") {
-        if (left.bmIdx !== right.bmIdx) return left.bmIdx - right.bmIdx;
         return right.upside - left.upside;
       }
       return left.upside - right.upside;
