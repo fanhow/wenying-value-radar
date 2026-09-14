@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "outputs/**",
     "work/**",
+    // Independently versioned/deployed brochure, including its local browser QA data.
+    "showcase-site/**",
     "next-env.d.ts",
   ]),
 ]);

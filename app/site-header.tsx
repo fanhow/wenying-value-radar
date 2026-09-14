@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "./language-context";
 
-export function SiteHeader({ active }: { active: "home" | "technical" | "funds" | "ark" | "setups" | "about" | "sentiment" }) {
+export function SiteHeader({ active }: { active: "home" | "technical" | "funds" | "ark" | "setups" | "about" | "sentiment" | "rotation" }) {
   const { language, setLanguage, t } = useLanguage();
 
   return (
@@ -15,6 +15,7 @@ export function SiteHeader({ active }: { active: "home" | "technical" | "funds" 
       <nav className="topnav" aria-label={t("主要導覽", "Primary navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "technical" ? "active" : ""} href="/technical">{t("技術分析", "Technical")}</Link>
+        <Link className={active === "rotation" ? "active" : ""} href="/rotation">{t("量化輪動", "Rotation")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Fund Tracker")}</Link>
         <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setup Library")}</Link>
         <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK Tool")}</Link>
@@ -32,6 +33,7 @@ export function SiteHeader({ active }: { active: "home" | "technical" | "funds" 
       <nav className="mobile-nav" aria-label={t("手機版導覽", "Mobile navigation")}>
         <Link className={active === "home" ? "active" : ""} href="/#overview">{t("公允價值", "Fair Value")}</Link>
         <Link className={active === "technical" ? "active" : ""} href="/technical">{t("技術分析", "Technical")}</Link>
+        <Link className={active === "rotation" ? "active" : ""} href="/rotation">{t("量化輪動", "Rotation")}</Link>
         <Link className={active === "funds" ? "active" : ""} href="/funds">{t("大戶追蹤", "Funds")}</Link>
         <Link className={active === "setups" ? "active" : ""} href="/setups">{t("型態圖庫", "Setups")}</Link>
         <Link className={active === "ark" ? "active" : ""} href="/ark">{t("方舟運算", "ARK")}</Link>
