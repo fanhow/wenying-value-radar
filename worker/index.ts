@@ -5,10 +5,12 @@ import { runSnapshotJob, snapshotKindForCron, type SnapshotValuation } from "../
 import { loadPublicTechnicalData } from "../lib/public-technical-data";
 import { runTechnicalAlertJob, TECHNICAL_ALERT_CRON } from "../lib/technical-alert-scheduler";
 import { setRuntimeDatabase, setRuntimeMarketScanMode } from "../lib/runtime-env";
+import { handleDailyRead, handleRefreshWrite } from "../lib/daily-refresh-store";
 
 interface Env {
   ASSETS: Fetcher;
   DB?: D1Database;
+  WENYING_REFRESH_SECRET?: string;
   MARKET_SCAN_MODE?: "live" | "snapshot";
   IMAGES: {
     input(stream: ReadableStream): {
@@ -41,6 +43,10 @@ const worker = {
     setRuntimeDatabase(runtimeEnv.DB);
     setRuntimeMarketScanMode(runtimeEnv.MARKET_SCAN_MODE);
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/data-refresh') return handleRefreshWrite(request, runtimeEnv.DB, runtimeEnv.WENYING_REFRESH_SECRET);
+    const dailyResponse = await handleDailyRead(request, runtimeEnv.DB);
+    if (dailyResponse) return dailyResponse;
 
     if (url.pathname === "/_vinext/image") {
       if (!runtimeEnv.ASSETS || !runtimeEnv.IMAGES) {

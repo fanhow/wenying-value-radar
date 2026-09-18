@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SiteHeader } from "../site-header";
 import { SiteFooter } from "../site-footer";
+import { DailyDataStatus } from '../daily-data-status';
 import { useLanguage } from "../language-context";
 import { stockDetailHref } from "../../lib/navigation";
 import { EChartsCandlestickChart } from "../echarts-candlestick-chart";
 import type { DailyCandle } from "../../lib/price-history";
 import type { TechnicalAnalysis } from "../../lib/technical-analysis";
 import {
-  buildTechnicalSnapshot,
+  type TechnicalSnapshot,
   type TechnicalCandidate,
   type TechnicalCategory,
 } from "../../lib/technical-screener";
@@ -40,7 +41,15 @@ function formatPercent(value: number | null | undefined) {
 
 export default function TechnicalAnalysisPage() {
   const { language, t } = useLanguage();
-  const snapshot = useMemo(() => buildTechnicalSnapshot(), []);
+  const [snapshot,setSnapshot] = useState<TechnicalSnapshot|null>(null);
+  const [snapshotError,setSnapshotError] = useState('');
+  useEffect(()=>{
+    const controller=new AbortController();
+    fetch('/api/technical-scan',{cache:'no-store',signal:controller.signal}).then(async r=>{
+      const data=await r.json();if(!r.ok)throw new Error(data.error??'技術資料未就緒');setSnapshot(data);
+    }).catch(e=>{if(!controller.signal.aborted)setSnapshotError(e.message);});
+    return()=>controller.abort();
+  },[]);
   const [activeCategory, setActiveCategory] = useState<TechnicalCategory>("trend-pullback");
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("ALL");
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
@@ -145,6 +154,8 @@ export default function TechnicalAnalysisPage() {
       <SiteHeader active="technical" />
 
       <main className="content-container">
+        <DailyDataStatus />
+        {snapshotError&&<p role="alert">{snapshotError}；未使用舊名單或合成 K 線。</p>}
         {/* Page Header */}
         <section className="section-block technical-hero">
           <div className="section-head">

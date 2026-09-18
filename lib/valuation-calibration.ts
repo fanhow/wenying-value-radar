@@ -148,7 +148,8 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
 
   const benchmark = expertConsensusTaiwanBenchmarkForTicker(stock.ticker, stock.market)
     || expertConsensusUsBenchmarkForTicker(stock.ticker, stock.market);
-  if (benchmark) {
+  // Daily inputs must not be pinned to a historical, manually captured target.
+  if (benchmark && stock.priceSource !== 'Yahoo Finance daily close / daily-refresh-v1') {
     const calibrated = benchmark.fairValue;
     const rawUncertainty = Number(stock.uncertainty);
     const uncertainty = clamp(Number.isFinite(rawUncertainty) ? rawUncertainty : 0.25, 0.1, 0.6);

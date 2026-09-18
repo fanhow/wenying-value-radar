@@ -48,7 +48,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.09\.15\.1/);
+  assert.match(html, /Rev\. 2026\.09\.18\.1/);
   const forbiddenBrand = ["Investing", "Pro"].join("");
   assert.doesNotMatch(html, new RegExp(forbiddenBrand, "i"));
   assert.match(source, /className="table-extend-bar"/);
@@ -100,7 +100,7 @@ test("valuation details expose the bilingual model audit trail", async () => {
   assert.match(source, /結構性趨勢/);
   assert.match(source, /Structural Themes/);
   assert.match(source, /只影響 DCF 起始成長率/);
-  assert.match(source, /按月檢視/);
+  assert.match(source, /股價日期與財報期間分開標示/);
   assert.match(source, /price-independent robust outlier filter/);
   assert.match(source, /key=\{model\.id \|\| model\.label\}/);
   assert.match(source, /width <= 0\) return 50/);

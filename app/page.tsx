@@ -11,6 +11,7 @@ import { useLanguage, type Language } from "./language-context";
 import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
 import { SiteFooter } from "./site-footer";
+import { DailyDataStatus } from './daily-data-status';
 import { UsEarningsPanel } from "./us-earnings-panel";
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
@@ -500,23 +501,19 @@ export default function Home() {
   }, []);
 
   const stocks = useMemo(() => {
-    const loadedTickers = new Set(stockInputs.map((stock) => stock.ticker));
     const scanInputs = [...marketCandidates, ...overvaluedCandidates];
-    return [...scanInputs.filter((stock) => !loadedTickers.has(stock.ticker)), ...stockInputs]
+    const scanKeys = new Set(scanInputs.map(stock=>`${stock.market}:${stock.ticker}`));
+    return [...scanInputs, ...stockInputs.filter(stock=>!scanKeys.has(`${stock.market}:${stock.ticker}`))]
       .map((stock) => calculateStock(stock, formatNumber));
   }, [marketCandidates, overvaluedCandidates, stockInputs]);
   const allRankingStocks = useMemo(() => {
-    const stockInputsByTicker = new Map(stockInputs.map((stock) => [stock.ticker, stock]));
     return marketCandidates
-      .map((stock) => stockInputsByTicker.get(stock.ticker) ?? stock)
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [marketCandidates, stockInputs]);
+  }, [marketCandidates]);
   const allOvervaluedRankingStocks = useMemo(() => {
-    const stockInputsByTicker = new Map(stockInputs.map((stock) => [stock.ticker, stock]));
     return overvaluedCandidates
-      .map((stock) => stockInputsByTicker.get(stock.ticker) ?? stock)
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [overvaluedCandidates, stockInputs]);
+  }, [overvaluedCandidates]);
 
   const totalTwUndervalued = useMemo(
     () => allRankingStocks.filter((s) => s.market === "TW").length,
@@ -870,6 +867,7 @@ export default function Home() {
 
   return (
     <main className="app-shell">
+      <DailyDataStatus />
       <SiteHeader active="home" />
 
       <div id="top" className="page-content">
@@ -1145,7 +1143,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("公開資料層已接入", "Public data layer connected")}</strong><p>{t("台股市場掃描採 TWSE／TPEx；美股以 Nasdaq 價格配對 SEC XBRL 年度與可計算的 LTM 財務資料。每日價格與季度財報由背景快照排程更新，若來源暫時不可用則保留上一份可追溯資料。結構性趨勢快照按月檢視，逐檔標示資料日期、推導區間與官方來源。", "The Taiwan scan uses TWSE and TPEx data. U.S. prices are matched with SEC XBRL annual and computable LTM financials. Background snapshots refresh prices daily and core financials quarterly; if a source is temporarily unavailable, the last traceable snapshot remains in use. The structural-theme snapshot is reviewed monthly with dates, inferred ranges, and official sources shown per stock.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
+        <section className="data-layer-banner"><div className="data-layer-icon">↯</div><div><strong>{t("每日資料與估值", "Daily data and valuation")}</strong><p>{t("每日從 Yahoo Finance 更新台美股已完成交易日股價、季度／TTM 財報與真實 K 線，依本站模型重新估值。資料缺漏的股票排除；整批過期或失敗明確顯示，不以舊快照冒充今日資料。股價日期與財報期間分開標示；排名僅代表本次可用的既有股票目錄。", "Daily completed-session prices, quarterly/TTM financials and actual candles come from Yahoo Finance and feed the existing valuation models. Missing stocks are excluded; stale or failed generations are explicitly flagged. Quote dates and financial periods are separate. Rankings cover the usable subset of the maintained stock directory.")}</p></div><span className="coming-label">TRACEABLE DATA</span></section>
 
         {showAddForm && (
           <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAddForm(false); }}>
