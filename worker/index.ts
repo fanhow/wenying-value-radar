@@ -44,6 +44,12 @@ const worker = {
     setRuntimeMarketScanMode(runtimeEnv.MARKET_SCAN_MODE);
     const url = new URL(request.url);
 
+    // Keep historical case-image links working after lossless build conversion.
+    if (url.pathname.startsWith('/real-cases/') && url.pathname.endsWith('.png')) {
+      url.pathname = url.pathname.replace(/\.png$/, '.webp');
+      return Response.redirect(url.toString(), 307);
+    }
+
     if (url.pathname === '/api/data-refresh') return handleRefreshWrite(request, runtimeEnv.DB, runtimeEnv.WENYING_REFRESH_SECRET);
     const dailyResponse = await handleDailyRead(request, runtimeEnv.DB);
     if (dailyResponse) return dailyResponse;

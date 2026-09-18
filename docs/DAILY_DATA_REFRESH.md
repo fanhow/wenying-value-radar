@@ -14,4 +14,4 @@
 - 手動重跑：`gh workflow run daily-data-refresh.yml --repo fanhow/wenying-value-radar`。
 - 08:00 任務先讀 `/api/daily-status`，再執行 `node --experimental-strip-types scripts/daily-selection-report.mjs --expected-tw YYYY-MM-DD --expected-us YYYY-MM-DD`（網站憑證經 stdin）。報告存入 `outputs/daily-selection/runs/`；核對排行、估值與技術 API 的同一批次 runId，避免更新途中混讀。
 - 資料保留最近兩批股票與 OHLC，保留更新紀錄。沒有交易下單功能。
-- 部署圖片：`npm run build` 僅重壓縮 `dist/client` 的 PNG 副本，不修改 `public` 原圖；保持 PNG 格式與既有網址。每張以完整 RGBA 解碼核對尺寸與像素相同，不接受調色盤量化；比較報告位於 `outputs/png-compression-report.json`。
+- 部署圖片：`npm run build` 僅處理 `dist/client` 副本，不修改 `public` 原圖。大型案例圖轉為無損 WebP，舊案例 PNG 網址以 307 導向對應 WebP；型態圖庫 PNG 下載與其他 PNG 保留。每張以完整 RGBA 解碼核對尺寸與像素相同，不接受調色盤量化；比較報告位於 `outputs/png-compression-report.json`。

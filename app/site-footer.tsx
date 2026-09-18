@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.18.2";
+const SITE_REVISION = "Rev. 2026.09.18.3";
 
 const REVISION_ENTRIES = [
+  ['2026.09.18.3', '大型案例圖改以完整尺寸、像素一致的無損 WebP 提供，原始 PNG 留在專案；舊案例圖連結自動導向對應圖片，型態圖庫的 PNG 下載保留。', 'Serve large case charts as full-size, pixel-identical lossless WebP while retaining source PNGs. Redirect historical case-image links and preserve setup-library PNG downloads.'],
   ['2026.09.18.2', '上傳用 PNG 圖片改採無損壓縮，每張核對尺寸與解碼後像素完全相同；原始圖片、網址、下載格式、估值及私人權限保持不變。', 'Losslessly recompress deployment PNGs with identical dimensions and decoded pixels verified for every image. Preserve source images, URLs, download formats, valuations and private access.'],
   ['2026.09.18.1', '每日雲端更新：台灣時間 06:30 檢查台美股收盤價、季度／TTM 財報與實際 K 線，07:30 重試。完整批次才切換資料；缺漏股票排除，過期或失敗明示。每日估值不再固定錨定舊基準價，原生估值公式保留。技術頁改用真實每日掃描，停用合成示範名單。網站維持原網址及私人存取。', 'Daily cloud refresh at 06:30 Asia/Taipei with a 07:30 retry: completed-session prices, quarterly/TTM fundamentals and actual candles. Publish complete batches atomically, exclude missing inputs and explicitly flag stale or failed runs. Daily valuations bypass historical fixed-price anchors while retaining native formulas. Technical screening now uses actual daily data. Existing private URL and audience are preserved.'],
   ["2026.09.15.1", "新增量化輪動研究分頁：1. 整理台灣與美國 16 種策略的選股範圍、持股數及月度／季度差異，分開詳情核對與概覽資料；2. 提供完整人工核對名單的新增、續留、移出與等權目標檢查，阻擋缺漏、重複代碼及未來資訊；3. 區分來源觀察、歷史比較與實際交易，未取得的 AI 排名權重不捏造，也不沿用外部報酬作為本站績效；4. 原有估值引擎、即時排行榜與公開展示站保持不變。", "Added portfolio rotation research: 1. Catalogued 16 Taiwan and US strategy universes, basket sizes and monthly/quarterly differences, separating detail-verified from overview-only facts; 2. Added complete, manually verified basket comparisons for additions, retention, removals and equal-weight targets, rejecting missing lists, duplicate symbols and future information; 3. Separated observed sources, historical comparison and actual execution, without inventing proprietary AI weights or presenting external returns as our own; 4. Preserved the valuation engine, live rankings and public showcase."],
