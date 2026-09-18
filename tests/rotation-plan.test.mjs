@@ -122,7 +122,7 @@ test("built Worker renders the new research route with all controls and sources"
   const html = await response.text();
   assert.equal(response.status, 200);
   for (const text of ["量化輪動研究", "產生調倉檢查表", "尚未複製 AI 排名", "原頁名單更新期"]) assert.ok(html.includes(text));
-  assert.match(html, /Rev\. 2026\.09\.18\.1/);
+  assert.match(html, /Rev\. 2026\.09\.18\.2/);
   assert.match(html, /propicks\/methodology/);
   assert.match(html, /taiwan-chip-champions/);
   assert.match(html, /value="dividend-us"/);
