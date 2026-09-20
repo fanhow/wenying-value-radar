@@ -854,8 +854,9 @@ export function detectValueTrendResonance(
   const sma50Lookback = sma50Series[Math.max(0, latestIndex - 15)];
   if (sma50Lookback && latestSma50 < sma50Lookback * 0.99) return null;
 
-  // 2. Fundamental Safety Margin: Fair value upside >= 10%
-  const upside = fairValueUpside ?? 0.20;
+  // Missing valuation is not evidence of a 20% safety margin.
+  if (typeof fairValueUpside !== 'number' || !Number.isFinite(fairValueUpside)) return null;
+  const upside = fairValueUpside;
   if (upside < 0.08) return null;
 
   const isStrongTrend = latestEma15 >= latestSma50 && latest.close >= latestEma15;

@@ -22,8 +22,8 @@ export type TechnicalCandidate = {
   market: "TW" | "US";
   category: TechnicalCategory;
   price: number;
-  fairValue: number;
-  upside: number;
+  fairValue: number | null;
+  upside: number | null;
   stage: "confirmed" | "forming" | "candidate";
   patternNameZh: string;
   patternNameEn: string;

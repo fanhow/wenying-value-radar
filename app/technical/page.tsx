@@ -485,7 +485,7 @@ export default function TechnicalAnalysisPage() {
                       title={t("點擊直接回到公允價值頁面查看完整估值詳細資料", "Click to return to Fair Value page for complete details")}
                     >
                       <span className="ticker-code">{selectedCandidate.ticker}</span> {selectedCandidate.name}
-                      <span className="title-detail-link-tag">{t("公允價值詳細資料 ↗", "Fair Value Details ↗")}</span>
+                      <span className="title-detail-link-tag">{selectedCandidate.fairValue===null?t("估值資料待覆核", "Valuation unavailable"):t("公允價值詳細資料 ↗", "Fair Value Details ↗")}</span>
                     </Link>
                   </h3>
                 </div>
@@ -501,8 +501,8 @@ export default function TechnicalAnalysisPage() {
                   </div>
                   <div className="price-metric-box">
                     <span className="metric-label">{t("空間幅度", "Margin / Upside")}</span>
-                    <span className={`metric-val ${selectedCandidate.upside >= 0 ? "text-bullish" : "text-bearish"}`}>
-                      {selectedCandidate.upside >= 0 ? "↗" : "↘"} {formatPercent(selectedCandidate.upside)}
+                    <span className={`metric-val ${selectedCandidate.upside===null?"":selectedCandidate.upside >= 0 ? "text-bullish" : "text-bearish"}`}>
+                      {selectedCandidate.upside===null?"":selectedCandidate.upside >= 0 ? "↗" : "↘"} {formatPercent(selectedCandidate.upside)}
                     </span>
                   </div>
                 </div>
@@ -672,7 +672,7 @@ export default function TechnicalAnalysisPage() {
                 <tbody>
                   {currentCategoryCandidates.map((candidate) => {
                     const isSelected = selectedCandidate?.ticker === candidate.ticker;
-                    const isPositive = candidate.upside >= 0;
+                    const isPositive = candidate.upside!==null&&candidate.upside >= 0;
                     return (
                       <tr
                         key={`${candidate.market}-${candidate.ticker}`}
@@ -698,8 +698,8 @@ export default function TechnicalAnalysisPage() {
                         <td className="price-cell">{formatIndicator(candidate.price)}</td>
                         <td className="price-cell">{formatIndicator(candidate.fairValue)}</td>
                         <td className="upside-cell">
-                          <span className={`direction-badge ${isPositive ? "bullish" : "bearish"}`}>
-                            {isPositive ? "↗" : "↘"} {formatPercent(candidate.upside)}
+                          <span className={`direction-badge ${candidate.upside===null?"":isPositive ? "bullish" : "bearish"}`}>
+                            {candidate.upside===null?t("待覆核", "Unavailable"):<>{isPositive ? "↗" : "↘"} {formatPercent(candidate.upside)}</>}
                           </span>
                         </td>
                         <td>

@@ -144,8 +144,8 @@ async function json(url: string, fetcher: typeof fetch) {
   if(!r.ok) throw new Error(`UPSTREAM_HTTP_${r.status}`);
   return r.json();
 }
-function historyResult(ticker: string, market: 'TW'|'US', symbol: string, candles: ReturnType<typeof completedCandles>, upside: number) {
-  return {ticker,market,symbol,tradingViewSymbol:market==='TW'?`${symbol.endsWith('.TWO')?'TPEX':'TWSE'}:${ticker}`:ticker,
+function historyResult(ticker: string, market: 'TW'|'US', symbol: string, candles: ReturnType<typeof completedCandles>, upside: number|null, name: string) {
+  return {ticker,market,symbol,name,quoteSource:'Yahoo Finance daily close / daily-refresh-v1',tradingViewSymbol:market==='TW'?`${symbol.endsWith('.TWO')?'TPEX':'TWSE'}:${ticker}`:ticker,
     candles:candles.slice(-120),weeklyCandles:aggregateCandles(candles,'week').slice(-52),monthlyCandles:aggregateCandles(candles,'month').slice(-12),
     technicalAnalysis:analyzeTechnicalSetup(candles,upside)};
 }
@@ -156,12 +156,21 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
   const financialUrl=`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}?type=${[...SERIES.map(s=>'quarterly'+s),...['DilutedEPS','TotalRevenue','OperatingCashFlow','CapitalExpenditure','OperatingIncome','EBITDA','NetIncome'].map(s=>'trailing'+s),...(target.market==='TW'?['annualDilutedEPS','quarterlyEBIT','trailingEBIT','quarterlyDepreciationAndAmortization','trailingDepreciationAndAmortization']:[])].join(',')}&period1=${Math.floor(now.getTime()/1000)-DAY/1000*(target.market==='TW'?6*366:1000)}&period2=${Math.floor(now.getTime()/1000)}`;
   record.sources=[chartUrl,financialUrl];
   try {
-    const [chart, financial] = await Promise.all([json(chartUrl,fetcher),json(financialUrl,fetcher)]);
+    // A financial failure must not discard independently verified OHLC data.
+    const [chartResult, financialResult] = await Promise.allSettled([json(chartUrl,fetcher),json(financialUrl,fetcher)]);
+    if(chartResult.status==='rejected')throw chartResult.reason;
+    const chart=chartResult.value;
     const currency=chart?.chart?.result?.[0]?.meta?.currency;
     if(currency!==(target.market==='TW'?'TWD':'USD')) throw new Error('QUOTE_CURRENCY_UNSUPPORTED');
     const candles=completedCandles(chart,target.market,now,expectedDate), latest=candles.at(-1);
     record.quoteDate=latest?.date;
     if(candles.length<60 || !latest || latest.date!==expectedDate) throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
+    record.history=historyResult(target.ticker,target.market,symbol,candles,null,target.name);
+    // This flag is the liquidity filter shared by technical scans and rankings;
+    // rankings additionally require status=ready. US size still needs shares.
+    record.rankingEligible=target.market==='TW'&&latest.volume>=100000&&latest.close*latest.volume>=5000000;
+    if(financialResult.status==='rejected')throw financialResult.reason;
+    const financial=financialResult.value;
     const inputs=quarterlyInputs(financial,currency,now);
     const perShareIssue=target.market==='TW'?taiwanPerShareIssue(inputs):null;
     if(perShareIssue)throw new Error(perShareIssue);
@@ -170,7 +179,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
       targetPe:0,targetPb:0,targetFcfMultiple:0,uncertainty:0.30,...inputs,updatedAt:latest.date,source:'自動資料',priceSource:'Yahoo Finance daily close / daily-refresh-v1',
       sourceNote:`每日雲端更新；${inputs.sourceNote}，截至 ${inputs.financialDataDate}；股價 ${latest.date}；擷取 ${now.toISOString()}。公開資料供應商，尚未逐檔與公司原始申報核對；非分析師即時目標價。`};
     const value=calculateStock(stock), upside=calibrateFairValue(value).calibratedUpside;
-    record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside); record.status='ready';
+    record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside,target.name); record.status='ready';
     const shares = (financial.timeseries?.result??[]).find((r: {meta?:{type?:string[]}})=>r.meta?.type?.[0]==='quarterlyOrdinarySharesNumber')?.quarterlyOrdinarySharesNumber?.find((p:Point)=>p.asOfDate===inputs.financialDataDate)?.reportedValue?.raw;
     record.rankingEligible=target.market==='TW'?latest.volume>=100000&&latest.close*latest.volume>=5000000:latest.close>=3&&latest.volume>=100000&&Number(shares)*latest.close>=500000000;
   } catch(error) { record.issues=[error instanceof Error?error.message:'UPSTREAM_UNAVAILABLE']; }

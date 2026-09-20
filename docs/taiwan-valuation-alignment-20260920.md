@@ -52,6 +52,41 @@
 
 另於稍後外部和碩頁面看到 FV 124.85，模板內價格也可能與頁首不同；本表不偷偷更新原 120.74 比較基準。下一輪需重新同步外部觀察時間及模型輸入。
 
+## 第二輪：創見／智邦逐模型拆解（9/20 21:16 UTC 前完成觀察）
+
+本節是訂閱帳戶可見頁面的必要比較事實；不是複製完整付費模板，也不把外部選定倍數寫成本站生產常數。兩個公司頁的 FV／股價仍與原凍結基準一致。
+
+| PE 模型比較 | 2451 創見 | 2345 智邦 |
+|---|---:|---:|
+| 本站原型 PE | 1,646.90 | 1,343.27 |
+| 本站大類產業 PE 中位數 | 28.63765x | 21.21622x |
+| 外部 Selected LTM PE（畫面四捨五入） | 8.2x | 33.4x |
+| 外部 LTM PE 分支結果 | 472.93 | 2,125.35 |
+| 外部 Selected Forward PE（畫面四捨五入） | 5.5x | 18.4x |
+| 外部前瞻歸母淨利（百萬元） | 29,139 | 64,921 |
+| 外部 forward PE 分支結果 | 373.86 | 2,141.71 |
+
+- 外部 PE 採用 LTM／forward 兩分支平均。創見畫面結論 423.39，與 `(472.93 + 373.86) / 2` 的差僅顯示精度；智邦畫面結論取整顯示 2,134。**不要反推未公開精確倍數或把四捨五入誤差當程式錯誤。**
+- 兩頁 Financials 均標明 Latest Fiscal Year=Dec-25、LTM=Jun-26；forward 使用 **Two Fiscal Years Forward（2027 財年）**。創見 FY2026 淨利 45,699M 與 FY2027 29,139M 不同；智邦分別為 47,434M 與 64,921M。這不是 NTM，也不能以目前 EPS 直接取代。外部數值只能作本次比較，尚無可持續授權的自動共識資料 feed。
+- 創見 peer 範圍包括記憶體相關企業；本站大類 PE 的 148 筆中心卻落在宏觀／台積電。外部 peer median 9.8x、historical median 15.5x，selected 8.2x 也不等於任一中位數。只有改用同業中位數仍不等於原廠模型。
+- 智邦外部 peer 含廣達、光通訊、啟碁及 NVIDIA；本站「通信網路業」會排除廣達與境外公司，啟碁在本次 capture 財報不足。本站 PB 2.0961x 對出 258.92，是五模型平均的重要下拉項；外部 PB 模型約 1,946。沒有證據可直接把產業 PB 乘任意係數修正。
+- 本站兩股的乘除、五模型平均與輸入 hash 可重現；NI／期末股數與供應商稀釋 EPS 只差 +0.051%／−0.535%，不是主要落差。**本輪未修改估值倍數，十檔誤差統計仍是上節的研究結果。**
+
+智邦官方核對（2025 FY＋2026 H1−2025 H1）：營收 310,622.779M、歸母 NI 35,576.883M、D&A 2,345.024M、CFO 13,091.212M、CapEx 7,043.064M、FCF 6,048.148M 皆吻合凍結输入。營業利益官方 42,492.947M，供應商 42,476.088M，差約 0.04%；即使改正也不足以解釋千元以上 FV 差距。H1 存貨及應收占用使現金流降低，不等於淨利輸入錯誤。
+
+其 cash 欄位實際包含現金＋短期金融投資，共 43,407.340M，不能再把相同流動投資加一次。非流動金融／權益法投資合計 2,693.202M，約 4.82 元／股；尚須辨識營運用途，亦遠不足以解釋大型差距。FVOCI 處分利益轉保留盈餘而非當期 EPS，不能補入淨利。
+
+來源：[創見 PE](https://hk.investing.com/pro/TWSE:2451/models/pe-multiples)、[智邦 PE](https://hk.investing.com/pro/TWSE:2345/models/pe-multiples)（需訂閱）；[智邦 2026 H1 官方財報](https://doc.twse.com.tw/server-java/t57sb01?step=9&kind=A&co_id=2345&filename=202602_2345_AI1.pdf) p5–10、16–17、28、30–31、35；[智邦 2025 年度官方財報](https://doc.twse.com.tw/server-java/t57sb01?step=9&kind=A&co_id=2345&filename=202504_2345_AI1.pdf) p9–13。
+
+## 第二輪的必要資料隔離修正
+
+- 已確認 11 筆每股口徑待覆核個股都有有效 9/18 報價，但舊失敗邊界連已取得 OHLC 都丟掉。本輪把 quote 與 financial 可用性分開：保留有來源／日期／身分驗證的 history，不建立假 EPS／零價 Stock。
+- 財報不可用者 `/api/valuation` 仍 422、不進估值榜；`/api/price-history` 可回傳真實 K 線。符合既有流動性條件者可進純技術掃描，FV/upside 為 null，UI 中性顯示待覆核；美股財報缺漏且无法確認市值門檻時仍不列技術榜，不臆造股數。
+- `detectValueTrendResonance` 原本缺少估值會預設 +20%，本輪改為 null／undefined／非有限值時不產生價值共振。純 K 線判斷不變。
+- 技術結果不再依估值 upside 排序，各市場按代碼取最多 125 筆後交錯，避免台股占滿 250 筆而遮蔽美股；各型態 20 筆顯示上限保留，**這不是預期報酬高低的技術排名**。
+- 沒有變更 D1 schema、既有 project、網址或存取權限。研究版核心 `tw-comparables-v1` 仍未接入正式 collector。
+- 範圍限制：本輪處理個股財報失敗的 partial generation；原先整批最低財務覆蓋／原子切換門檻保留，未把全市場財報服務中斷改判為成功。
+
 ## 程式範圍與下一步
 
 - `company-classification.ts`：共用金融分類，不把板別當產業。
@@ -72,7 +107,9 @@
 
 ## 主要來源
 
-提交前驗證：`npm test` **292/292**（含 Sites build／artifact 驗證）通過；ESLint **0 errors、9 個既有 warnings**；`npx tsc --noEmit` 通過。這是程式驗證，不是估值準確率驗證。本輪未儲存 Sites version／未部署；正式 Sites 仍為 active、latest version 81、custom owner-only（1 位使用者、0 群組、0 外部訪客）。
+第二輪提交前驗證：`npm test` **297/297**（含 build／artifact 驗證）通過；ESLint **0 errors、9 個既有 warnings**；`npx tsc --noEmit` 通過。另有獨立相關程式審查與 44/44 針對性測試。十檔重播差距未變；這是程式驗證，不是估值準確率驗證。`/technical` 本機 HTTP 200 且 HTML 包含 Rev. 2026.09.20.4；未做完整互動式瀏覽器 QA。本輪未儲存 Sites version／未部署；正式 Sites 已重新讀取，仍為 active、latest version 81、custom owner-only（1 位使用者、0 群組、0 外部訪客），正式 revision 仍 Rev. 2026.09.20.2。
+
+Sites 統一 `build-site.mjs` 在 PowerShell 與 Git Bash 均因 Windows npm shim 尋找專案下不存在的 `node_modules/npm/bin/npm-prefix.js`／`npm-cli.js` 失敗；没有修改 plugin 或安裝額外套件掩蓋。專案既有 `npm test → npm run build → build-verified.sh` 使用 Git Bash 已成功產生並驗證 Sites 相容 Worker artifact；兩者結果分別記錄。此建置工具問題不是 Sites 權限不足，也不代表 deployment 曾開始。
 
 - [外部公允價值公開方法](https://www.investing.com/blog/know-the-best-timing-to-buy-or-sell-with-investingpros-fair-value-323)：多模型平均、產業適用性及假設檢查；不是全部公司固定同模型。
 - [外部資料及假設說明](https://www.investing-support.com/hc/en-us/articles/5921093968657-InvestingPro-s-Fair-Value)：S&P Global 資料、可用時採分析師預估。
