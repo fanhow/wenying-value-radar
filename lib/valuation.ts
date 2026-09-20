@@ -7,6 +7,7 @@ import type { UsEarningsReport } from "./us-earnings.ts";
 import { companyDescriptor, isFinancialCompany } from "./company-classification.ts";
 import { taiwanEnterpriseAdjustment, validTaiwanComparableEvidence } from './taiwan-comparables.ts';
 import { taiwanAnnualEarnings, taiwanEarningsOperationsDivergence, taiwanMaterialMinorityClaims } from './taiwan-valuation-evidence.ts';
+import type { TaiwanBusinessGroupReference } from './taiwan-business-groups.ts';
 
 export type { UsEarningsReport };
 export type Market = "TW" | "US";
@@ -66,6 +67,8 @@ export type StockInput = {
   sector: string;
   /** Accounting/industry classification; listing board is stored separately. */
   industry?: string;
+  /** Explicit, source-backed research classification; never replaces industry. */
+  taiwanBusinessGroup?: TaiwanBusinessGroupReference;
   /** Display-only exchange board metadata for Taiwan listings. */
   listingBoard?: TaiwanListingBoard;
   price: number;
@@ -1243,6 +1246,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     input.fundBusinessPe,
   );
   const comparableMultiples = input.comparableMultiples;
+  const twPeerScope = comparableMultiples?.method === 'tw-business-group-same-session-median' ? '同日同業務群' : '同日同產業';
   const marketPeProfile = input.fundBusinessPe && usableBusinessOverlayProfile(input.fundBusinessPe)
     ? input.fundBusinessPe
     : input.fundSectorPe && usableSectorPeProfile(input.fundSectorPe)
@@ -1338,7 +1342,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         range.low,
         range.high,
-        epsLabel + (twComparables ? " × 同日同產業中位數 P/E " : " × 目標本益比 ") + formatNumber(targetPe),
+        epsLabel + (twComparables ? " × " + twPeerScope + "中位數 P/E " : " × 目標本益比 ") + formatNumber(targetPe),
       ),
       "pe",
       "relative",
@@ -1436,7 +1440,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         range.low,
         range.high,
-        "每股淨值 " + formatNumber(bvps) + (twComparables ? " × 同日同產業中位數 P/B " : " × 目標 P/B ") + formatNumber(targetPb),
+        "每股淨值 " + formatNumber(bvps) + (twComparables ? " × " + twPeerScope + "中位數 P/B " : " × 目標 P/B ") + formatNumber(targetPb),
       ),
       "pb",
       "asset",
@@ -1474,7 +1478,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value * (1 - width),
         value * (1 + width),
         "每股營收 " + formatNumber(revenuePerShare) + " × "
-          + (suppliedTargetPsMultiple > 0 ? "明確輸入 P/S " : twComparables ? "同日同產業、歸母淨利率 0.5–2 倍範圍同業中位數 P/S " : "公開同業截尾中位數 P/S ")
+          + (suppliedTargetPsMultiple > 0 ? "明確輸入 P/S " : twComparables ? twPeerScope + "、歸母淨利率 0.5–2 倍範圍同業中位數 P/S " : "公開同業截尾中位數 P/S ")
           + formatNumber(comparablePsMultiple)
           + (comparableMultiples ? "（同業 " + formatNumber(comparableMultiples.psPeerCount) + " 筆）" : ""),
       ),
@@ -1661,7 +1665,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       : kind === "EV/EBITDA"
         ? comparableMultiples.evEbitdaPeerCount
         : comparableMultiples.evEbitPeerCount;
-    return (twComparables?(kind==='EV/Revenue'?"同日同產業、營業利益率 0.5–2 倍範圍同業中位數 ":"同日同產業中位數 "):"公開同業截尾中位數 ") + kind + "（同業 " + formatNumber(count) + " 筆）";
+    return (twComparables?twPeerScope+(kind==='EV/Revenue'?"、營業利益率 0.5–2 倍範圍同業中位數 ":"中位數 "):"公開同業截尾中位數 ") + kind + "（同業 " + formatNumber(count) + " 筆）";
   };
   enterpriseValueModel(
     "ev-revenue",
@@ -2053,7 +2057,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const risk = input.riskOverride
     ?? (uncertainty >= 0.34 || debtRatio >= 80 ? "高" : uncertainty >= 0.22 ? "中" : "低");
   const historicalCautionReasons: string[] = [];
-  if(twComparables)historicalCautionReasons.push('台股同日同產業相對估值第一階段；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
+  if(twComparables)historicalCautionReasons.push('台股'+twPeerScope+'相對估值研究；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
   if(earningsOperationsDivergence)historicalCautionReasons.push('營業利益與報告淨利背離；盈餘型模型暫不採用，需核對投資評價及非控制權益。');
   if(twComparables && (input.financialMetrics?.nonControllingBookPerShare??0)>0)historicalCautionReasons.push('非控制權益目前僅有帳面值：小額橋接以帳面值近似並揭露；超過母公司權益 25% 時停用 EV 模型，待獨立評價。');
   if(earningsBaseShift)historicalCautionReasons.push('EARNINGS_BASE_SHIFT：當期 EPS 與年度歷史有重大基礎變化；可能是營運成長、週期或特殊損益，不直接稱為一次性。保留原值試算，待前瞻／週期基礎覆核。');

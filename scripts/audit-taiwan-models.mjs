@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {loadUniverse} from './daily-refresh.mjs';
 import {fetchRefreshRecord,expectedSession,taiwanPerShareIssue} from '../lib/daily-refresh-data.ts';
 import {buildTaiwanComparableMap} from '../lib/taiwan-comparables.ts';
+import {withTaiwanBusinessGroup,TAIWAN_BUSINESS_REGISTRY_VERSION} from '../lib/taiwan-business-groups.ts';
 import {calculateStock} from '../lib/valuation.ts';
 import {VALUE_REFERENCES,REFERENCE_REVIEW_DATE,compareReference,summarizeComparisons} from '../lib/value-reference-audit.ts';
 const captureArg=process.argv.indexOf('--capture');
@@ -12,6 +13,8 @@ if(capture && !/^[a-z0-9-]+$/.test(capture))throw new Error('INVALID_CAPTURE_NAM
 const directory=new URL('../outputs/taiwan-model-audit/'+(capture?capture+'/':''),import.meta.url);
 await mkdir(directory,{recursive:true});
 const replay=process.argv.includes('--replay');
+const businessGroups=process.argv.includes('--business-groups');
+if(businessGroups&&!replay)throw new Error('BUSINESS_COMPARISON_REQUIRES_FROZEN_REPLAY');
 let data;
 if(replay)data=JSON.parse(await readFile(new URL('inputs.json',directory),'utf8'));
 else {
@@ -30,7 +33,7 @@ else {
 }
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const inputSha256=sha(JSON.stringify(data));
-const modelFiles=['valuation.ts','valuation-calibration.ts','taiwan-comparables.ts','taiwan-valuation-evidence.ts','company-classification.ts','daily-refresh-data.ts'];
+const modelFiles=['valuation.ts','valuation-calibration.ts','taiwan-comparables.ts','taiwan-business-groups.ts','taiwan-valuation-evidence.ts','company-classification.ts','daily-refresh-data.ts'];
 const modelSha256=sha((await Promise.all(modelFiles.map(file=>readFile(new URL('../lib/'+file,import.meta.url),'utf8')))).join('\n'));
 const stocks=data.records.filter(r=>r.status==='ready'&&!taiwanPerShareIssue(r.stock)).map(r=>r.stock);
 // Replay old captures using their already-recorded accounting identities only;
@@ -39,8 +42,9 @@ for(const s of stocks)if(s.financialMetrics.nonControllingBookPerShare===undefin
   const nci=s.bvps*s.financialLeverage*(1-s.debtRatio/100)-s.bvps;
   s.financialMetrics.nonControllingBookPerShare=Math.abs(nci)<1e-8?0:nci;
 }
-const peers=buildTaiwanComparableMap(stocks);
-const rows=stocks.map(stock=>{
+const candidateStocks=businessGroups?stocks.map(withTaiwanBusinessGroup):stocks;
+const peers=buildTaiwanComparableMap(candidateStocks);
+const rows=candidateStocks.map(stock=>{
   const current=calculateStock(stock),comparableMultiples=peers.get(stock.ticker);
   const candidate=calculateStock({...stock,comparableMultiples,valuationPolicy:'tw-comparables-v1'});
   return {ticker:stock.ticker,name:stock.name,stock,comparableMultiples,
@@ -53,6 +57,8 @@ const comparisons=VALUE_REFERENCES.filter(r=>r.market==='TW').map(reference=>{
     quoteDate:row.stock.updatedAt,modelCount:row.candidate.models.length,financialDate:row.stock.financialDataDate}:null),reviewRequired:row?.candidate.reviewRequired??true};
 });
 const discoverySummary=summarizeComparisons(comparisons);
-await writeFile(new URL('comparison.json',directory),JSON.stringify({observedAt:data.observedAt,session:data.session,inputSha256,modelSha256,
+const output=businessGroups?'comparison-business-groups.json':'comparison.json';
+await writeFile(new URL(output,directory),JSON.stringify({observedAt:data.observedAt,session:data.session,inputSha256,modelSha256,
+  peerClassification:businessGroups?TAIWAN_BUSINESS_REGISTRY_VERSION:'industry',
   referenceReviewedAt:REFERENCE_REVIEW_DATE,discoverySetOnly:true,discoverySummary,comparisons,rows},null,2));
-console.log(JSON.stringify({ready:stocks.length,withPeers:peers.size,total:data.records.length,discoverySummary,output:new URL('comparison.json',directory).pathname}));
+console.log(JSON.stringify({ready:stocks.length,withPeers:peers.size,total:data.records.length,discoverySummary,output:new URL(output,directory).pathname}));

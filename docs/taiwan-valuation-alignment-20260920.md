@@ -1,6 +1,22 @@
-# 台股公允價值對齊：第一輪根因與未發布研究
+# 台股公允價值對齊：根因、模型研究與未發布進度
 
 狀態：進行中，**不是已完成對齊／已上線聲明**。基底 Git `74660c3d03ebdd99be42553ce15da8f776a7905c`；原有 Sites project／網址／owner-only 存取不變。
+
+## 第三輪：官方業務同業與前瞻研究契約
+
+- 新增 `taiwan-business-groups.ts`：根據七家 2025 官方年報的主業，區分記憶體／儲存產品與廣義半導體。商丞因系統方案為主排除，品安保留 mixed-EMS 註記；這是事前指定研究群，不宣稱完整產業覆蓋。
+- `taiwan-comparables.ts` 保留 industry bins，另建 business bins；已分類成員仍留在其他標的的原產業池。明確無效 ref、版本、target／peer 成員不符不得 fallback。`null`／空物件與未指定 ref 的重複輸入也須衝突排除，與順序無關。
+- 同一 1,786 筆凍結輸入，**只有 7 家模型數值改變**。創見由 1,208.58 變 363.02（外部 394.47）；原十檔 discovery 平均絕對差距由 37.2954% 變 17.4548%，仍是已用過案例的觀察，不是準確率。
+- 事前固定的七個額外案例，有模型 6、同價 4、日期＋價格皆驗證 3。這三筆平均絕對差距由 387.9242% 變 34.5738%；十銓仍 +82.8711%，不能宣稱全組對齊。品安在同價但日期未驗證的比較反而由 +52.8410% 變 −55.5613%，不隱藏反例。
+- 詳細[事前規則與結果](taiwan-memory-peer-protocol-20260920.md)、[必要來源觀察](taiwan-memory-peer-observations-20260920.json)。重播：`node --experimental-strip-types scripts/audit-taiwan-models.mjs --capture operating-v2 --replay --business-groups`；再執行 `node scripts/compare-taiwan-memory-peers.mjs`。兩者只寫 ignored research outputs，不更新正式資料。
+- 新增 `forward-earnings-evidence.ts` 純函式：明確 annual／LTM／NTM、FY2 財年末、source as-of、TWD、reported／adjusted、basic／diluted、股份调整基準及觀測 PE。拒絕 NI÷期末股數冒充 EPS；兩支各自有效及口徑一致才平均，缺值不補零。只有合成測試，沒有供應商 adapter 或 production 匯入。
+- 前瞻方法依據：[IAS 33](https://www.ifrs.org/issued-standards/list-of-standards/ias-33-earnings-per-share/)、[FactSet FY1/FY2](https://go.factset.com/hubfs/Website_Downloads/Statistical%20Package%20Integration/Docs%203.0/estimates-ondemand.pdf)、[NTM 官方 SDK 文件](https://www.nuget.org/packages/FactSet.SDK.FactSetEstimates/3.3.0)。通過契約不等於來源可信度／授權已成立。MVP 只接受完整 12 個日曆月，52／53 週及季度近似未支援。
+
+正式接線下一步：完整 TW generation 擷取後一次建 peerMap，再計算及上傳；`status` 保留財報可用性、`eligible` 保留流動性，新增共用估值資格將無模型／待覆核的 DB upside 設 NULL。排名、rotation top10、valuation API、純技術與 valueTrend 必須一致；四因子研究不因 peer 不足而刪除財務資料。history 保存實際最多 400 bars，僅重新判定 valueTrend。首頁 localStorage 旧 daily inputs 必須在 422／版本不符時失效，不能讓舊高估值繼續顯示。完成這些邊界前，不啟用 `tw-comparables-v1` 到正式榜。
+
+第三輪最終驗證：`npm test` **347/347**（含 vinext build、103 張 PNG 像素一致壓縮及 Sites Worker artifact 驗證）；ESLint **0 errors／9 個既有 warnings**；`npx tsc --noEmit` 通過。獨立審查發現的分類重複、malformed 時間、NaN/null 衝突、比較重複身份、雙側日期／價格及溢位問題均已補測並關閉；最後独立前瞻測試 34/34、比較測試 6/6 通過。
+
+研究 revision **Rev. 2026.09.20.5**；本輪沒有供應商前瞻 feed、沒有正式 collector 接線、沒有 Sites save/deploy。Sites 管理狀態重新確認 active／version 81／custom owner-only（1 位使用者、0 群組、0 外部訪客），正式仍為 Rev. 2026.09.20.2／原即時每日流程，並非快照。這不是部署權限不足，而是正式估值接線尚未完成。本輪未另做完整瀏覽器互動 QA；通過的是程式／渲染測試和研究來源 UI 核對。統一 `build-site.mjs` 本輪未重跑；下文保留第二輪 Windows npm shim 失敗紀錄，專案既有建置路徑本輪已成功。
 
 ## 資料與比較範圍
 

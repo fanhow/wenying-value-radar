@@ -46,6 +46,8 @@ export type ComparableMultiples = {
   sector: string;
   /** Narrow business-model peer label when a curated group is available. */
   peerGroup?: string;
+  /** Versioned Taiwan issuer-business evidence; absent for broad industry/US. */
+  taiwanBusinessRegistryVersion?: string;
   market: string;
   peerCount: number;
   pePeerCount: number;
@@ -62,7 +64,7 @@ export type ComparableMultiples = {
   pFfoMedian: number | null;
   dataBasis: string;
   asOf: string | null;
-  method: "sector-trimmed-median" | "business-group-trimmed-median" | "business-group-with-sector-fallback" | "tw-industry-same-session-median";
+  method: "sector-trimmed-median" | "business-group-trimmed-median" | "business-group-with-sector-fallback" | "tw-industry-same-session-median" | "tw-business-group-same-session-median";
 };
 
 const MIN_PEERS = 5;

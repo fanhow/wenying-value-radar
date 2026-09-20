@@ -1,0 +1,16 @@
+{
+  "purpose": "Research comparison only. Never import into valuation or production rankings.",
+  "observedOn": "2026-09-20",
+  "observationsCompletedBy": "2026-09-20T21:48:44Z",
+  "protocol": "docs/taiwan-memory-peer-protocol-20260920.md",
+  "inputSha256": "43c2bca489c504ededead8c4f25f0b560d8b78a609537e85eb2184ef4b905c1a",
+  "rows": [
+    {"ticker":"3135","source":"https://hk.investing.com/pro/TWSE:3135","price":163.5,"fairValue":166.36,"modelCount":13,"quoteDate":"2026-09-18","quoteSource":"https://www.investing.com/equities/goldkey-tech-historical-data","note":"Historical table showed Sep 18, 2026 and 163.50 on the same row."},
+    {"ticker":"3260","source":"https://hk.investing.com/pro/TPEX:3260","price":403,"fairValue":466.17,"modelCount":13,"quoteDate":null,"quoteSource":"https://www.investing.com/equities/adata-technology-co-ltd-historical-data","note":"Source has anomalous Sunday Sep 20=403.00, alongside Sep 18=396.50. Not an accepted completed session and not matched to frozen input."},
+    {"ticker":"4967","source":"https://hk.investing.com/pro/TWSE:4967","price":277,"fairValue":201.17,"modelCount":9,"quoteDate":"2026-09-18","quoteSource":"https://www.investing.com/equities/team-group-historical-data","note":"Historical table showed Sep 18, 2026 and 277.00. FV is from the authenticated Pro overview, not the public widget's transient zero."},
+    {"ticker":"4973","source":"https://hk.investing.com/pro/TPEX:4973","price":148.5,"fairValue":175.81,"modelCount":10,"quoteDate":null,"quoteSource":null,"note":"Quote differs from frozen 139.50. Overview shows closing time only; date not independently verified."},
+    {"ticker":"8088","source":"https://hk.investing.com/pro/TPEX:8088","price":42.7,"fairValue":58.52,"modelCount":9,"quoteDate":null,"quoteSource":null,"note":"Price matches within source precision, but overview closing time is not a verified date. Retain worsening numerical comparison outside aligned statistics."},
+    {"ticker":"8271","source":"https://hk.investing.com/pro/TWSE:8271","price":205.5,"fairValue":227.4,"modelCount":14,"quoteDate":"2026-09-18","quoteSource":"https://www.investing.com/equities/apacer-historical-data","note":"Historical table showed Sep 18, 2026 and 205.50 on the same row."},
+    {"ticker":"8277","source":"https://hk.investing.com/pro/TPEX:8277","price":8.05,"fairValue":9.45,"modelCount":5,"quoteDate":null,"quoteSource":null,"note":"Identity verified as TPEX:8277. Large price discrepancy vs frozen 18.6737 remains unresolved. Not a core business-group member and no valid research models; unavailable is not zero fair value."}
+  ]
+}
