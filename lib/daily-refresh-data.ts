@@ -1,5 +1,5 @@
 import { valuationTargets, calculateStock, type StockInput } from './valuation.ts';
-import { parseYahooDailyCandles, type YahooChartPayload } from './price-history.ts';
+import { parseYahooDailyCandles, type YahooChartPayload, type DailyCandle } from './price-history.ts';
 import { aggregateCandles, analyzeTechnicalSetup } from './technical-analysis.ts';
 import { calibrateFairValue } from './valuation-calibration.ts';
 import { officialSession } from './refresh-calendar.ts';
@@ -129,6 +129,14 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
   result.assetTurnover=revenue/assets; if(equity!==0) result.financialLeverage=assets/equity;
   return result;
 }
+/** Shared ingestion/storage contract. Reject a bad series; never repair OHLC or remove a middle bar. */
+export function validRefreshCandles(candles:DailyCandle[]|undefined,expectedDate:string) {
+  return Array.isArray(candles)&&candles.length>=60&&candles.length<=400&&candles.at(-1)?.date===expectedDate
+    &&candles.every((c,i)=>c&&isoDate(c.date)&&c.date<=expectedDate&&(i===0||c.date>candles[i-1].date)
+      &&[c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)
+      &&Math.min(c.open,c.high,c.low,c.close)>0&&c.volume>=0
+      &&c.high>=Math.max(c.open,c.close,c.low)&&c.low<=Math.min(c.open,c.close));
+}
 
 export function taiwanPerShareIssue(s:Partial<StockInput>) {
   const net=s.financialMetrics?.netIncomePerShare,eps=s.eps;
@@ -165,6 +173,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const candles=completedCandles(chart,target.market,now,expectedDate), latest=candles.at(-1);
     record.quoteDate=latest?.date;
     if(candles.length<60 || !latest || latest.date!==expectedDate) throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
+    if(!validRefreshCandles(candles,expectedDate))throw new Error('INVALID_CAUSAL_HISTORY');
     record.history=historyResult(target.ticker,target.market,symbol,candles,null,target.name);
     // This flag is the liquidity filter shared by technical scans and rankings;
     // rankings additionally require status=ready. US size still needs shares.

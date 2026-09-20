@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.20.7";
+const SITE_REVISION = "Rev. 2026.09.20.8";
 
 const REVISION_ENTRIES = [
+  ['2026.09.20.8', '正式更新驗證修補：採集端與儲存端共用同一套完成日 OHLC 檢查。價格越出當日高低區間、非正價格或重複日期的資料列單獨標記不可用，不修造 K 線、不放寬伺服器規則，也不讓單檔異常阻斷其他合格股票的整批更新。', 'Production refresh validation fix: share completed-session OHLC checks between collection and storage. Mark an invalid series unavailable when prices fall outside its high/low, are non-positive, or have duplicate dates. Do not fabricate candles or weaken server validation; one bad instrument no longer prevents a complete generation of valid records.'],
   ['2026.09.20.7', '發布前介面防護：同一市場／股票的手動資料優先且只顯示一張卡片；新增手動股票會取消進行中的搜尋，避免遲到回應搶回選取。不改估值模型或資料來源。', 'Pre-release UI safeguards: keep one card per market/ticker with manual inputs taking priority; cancel pending lookups when adding a manual stock so late responses cannot steal selection. Valuation models and data sources are unchanged.'],
   ['2026.09.20.6', '台股每日估值整合：完整收集同交易日財報與行情後，再建立具版本的同行／業務群模型；伺服器以同批原始輸入重驗，完整批次才切換。無模型與待覆核估值不列入高低估排名或價值趨勢，保留財務、K 線、純技術與四因子研究。移除瀏覽器舊每日估值快取，保留手動資料與觀察名單；未完成前瞻共識模型，並非外部 AI 的複製。', 'Integrate Taiwan daily valuations: collect a complete same-session cohort before building versioned industry/business peers; revalidate against generation inputs before atomic activation. Missing/review-required values are excluded from valuation rankings and value-trend signals while financials, charts, pure technicals and four-factor research remain available. Prevent stale daily browser caches while preserving manual inputs and watchlists. Forward consensus models remain unavailable; proprietary AI is not replicated.'],
   ['2026.09.20.5', '台股業務同業研究：依官方年報建立具來源與版本的記憶體模組／儲存產品群，保留其他產業與美股原計算；明確無效分類不得退回大產業。新增前瞻盈餘期間／口徑與歷史、前瞻 PE 分支的獨立研究契約及驗證，不把 FY2 當 NTM，不捏造共識。此輪仍未接入正式排行榜，額外比較保留日期／報價不一致及惡化案例。', 'Taiwan business-peer research: add issuer-report-sourced, versioned memory/storage-product peers without changing other industries or US valuations; invalid classifications fail closed. Add an isolated evidence contract and historical/forward PE research kernel with explicit periods and accounting/share bases, without relabeling FY2 as NTM or inventing consensus. Not yet connected to production rankings; additional comparisons retain date/price mismatches and worsening cases.'],

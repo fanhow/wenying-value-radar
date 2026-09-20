@@ -134,3 +134,16 @@ test('collector retains completed OHLC after finance HTTP errors or per-share re
   const stale=await fetchRefreshRecord({ticker:'1000',name:'Test only',sector:'Technology',market:'TW'},'2026-09-21',now,async()=>Response.json(chart));
   assert.equal(stale.status,'unavailable');assert.equal(stale.history,undefined);
 });
+
+test('collector isolates invalid OHLC series without weakening storage validation or inventing candles',async()=>{
+  const end='2026-09-18',now=new Date('2026-09-20T15:00:00Z'),target={ticker:'1000',name:'Test only',sector:'Technology',market:'TW'};
+  const edits=[c=>c[20].open=c[20].high+1,c=>c[20].close=c[20].low-1,c=>c[20].low=0,c=>c[20].open=-1,c=>c[20].date=c[19].date];
+  for(const edit of edits) {
+    const candles=candlesTo(end);edit(candles);
+    const chart={chart:{result:[{meta:{currency:'TWD'},timestamp:candles.map(c=>Date.parse(c.date+'T01:00:00Z')/1000),indicators:{quote:[Object.fromEntries(['open','high','low','close','volume'].map(k=>[k,candles.map(c=>c[k])]))]}}]}};
+    const r=await fetchRefreshRecord(target,end,now,async url=>url.includes('/chart/')?Response.json(chart):new Response('',{status:503}));
+    assert.equal(r.status,'unavailable');assert.deepEqual(r.issues,['INVALID_CAUSAL_HISTORY']);
+    assert.equal(r.history,undefined);assert.equal(r.stock,undefined);assert.notEqual(r.rankingEligible,true);
+    assert.doesNotThrow(()=>validateRecord(r,{targets:[target],expectedSessions:{TW:end,US:end}}));
+  }
+});

@@ -1,6 +1,6 @@
 import './runtime-env.ts';
 import { DAILY_VALUATION_VERSION, dailyValuationState } from './daily-valuation-state.ts';
-import { isoDate,taiwanPerShareIssue, type RefreshRecord } from './daily-refresh-data.ts';
+import { isoDate,taiwanPerShareIssue,validRefreshCandles, type RefreshRecord } from './daily-refresh-data.ts';
 import { detectValueTrendResonance } from './technical-analysis.ts';
 import type { TechnicalSnapshot, TechnicalCandidate } from './technical-screener.ts';
 import { rotationAudit } from './rotation-audit-store.ts';
@@ -29,11 +29,7 @@ export function validateRecord(record:RefreshRecord,manifest:Manifest,runId?:str
   const history=record.history,date=manifest.expectedSessions[record.market];
   if(history && (history.ticker!==record.ticker||history.market!==record.market||!history.name?.trim()
     ||history.quoteSource!=='Yahoo Finance daily close / daily-refresh-v1'||record.quoteDate!==date
-    ||!Array.isArray(history.candles)||history.candles.length<60||history.candles.length>400
-    ||history.candles.at(-1)?.date!==date||history.technicalAnalysis?.asOf!==date
-    ||history.candles.some((c,i)=>!isoDate(c.date)||c.date>date||(i>0&&c.date<=history.candles[i-1].date)
-      ||![c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)
-      ||Math.min(c.open,c.high,c.low,c.close)<=0||c.volume<0||c.high<Math.max(c.open,c.close,c.low)||c.low>Math.min(c.open,c.close))
+    ||!validRefreshCandles(history.candles,date)||history.technicalAnalysis?.asOf!==date
   ))throw new Error('INVALID_CAUSAL_HISTORY');
   if(record.status==='unavailable') {
     if(!record.issues.length) throw new Error('FAILURE_REASON_REQUIRED');
