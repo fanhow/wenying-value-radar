@@ -154,6 +154,9 @@ export type StockInput = {
   comparableMultiples?: ComparableMultiples;
   /** Explicit opt-in; requires same-session Taiwan peer provenance. */
   valuationPolicy?: "tw-comparables-v1";
+  /** Daily generation provenance; never an external fair-value anchor. */
+  dailyValuationVersion?: string;
+  dailyRunId?: string;
   /** Public annual/LTM EPS observations used only for historical normalization. */
   epsHistory?: EarningsHistoryPoint[];
   /** Optional US earnings calendar, alerts, and market expectation details. */

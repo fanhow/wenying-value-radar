@@ -5,6 +5,7 @@ import {quarterlyInputs,fetchRefreshRecord} from '../lib/daily-refresh-data.ts';
 import {handleRefreshWrite,handleDailyRead,refreshIsCurrent,validateRecord} from '../lib/daily-refresh-store.ts';
 import {analyzeTechnicalSetup,detectValueTrendResonance} from '../lib/technical-analysis.ts';
 import {calculateStock} from '../lib/valuation.ts';
+import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import {latestCalendarSession,parseNyseHolidays} from '../lib/refresh-calendar.ts';
 const secret='test-only-credential-00000000000000000000';
 function database() {
@@ -14,8 +15,12 @@ function database() {
 }
 const date=new Date().toISOString().slice(0,10);
 const stock={ticker:'2330',market:'TW',name:'Fixture',sector:'Technology',price:100,eps:10,bvps:40,fcfPerShare:9,revenueGrowth:10,roe:25,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,uncertainty:0.3,financialDataDate:date,updatedAt:date,priceSource:'Yahoo Finance daily close / daily-refresh-v1'};
-function manifest(){return {expectedSessions:{TW:date,US:date},universeSource:['fixture'],targets:['TW','US'].flatMap(market=>Array.from({length:10},(_,i)=>({market,ticker:market==='TW'?String(1000+i):`T${i}`})))};}
-function record(t,ready){return {ticker:t.ticker,market:t.market,status:ready?'ready':'unavailable',issues:ready?[]:['CORE_FINANCIAL_FIELDS_MISSING'],fetchedAt:new Date().toISOString(),sources:[],rankingEligible:ready,...(ready?{stock:{...stock,...t},history:{candles:[{date,open:100,high:101,low:99,close:100,volume:1000000}],weeklyCandles:[],monthlyCandles:[],technicalAnalysis:{asOf:date,candlestickPattern:'none'}}}:{})};}
+function manifest(){return {valuationVersion:DAILY_VALUATION_VERSION,expectedSessions:{TW:date,US:date},universeSource:['fixture'],targets:['TW','US'].flatMap(market=>Array.from({length:10},(_,i)=>({market,ticker:market==='TW'?String(1000+i):`T${i}`})))};}
+function record(t,ready){
+  const candles=candlesTo(date).map(c=>({...c,open:100,high:101,low:99,close:100}));
+  return {ticker:t.ticker,market:t.market,status:ready?'ready':'unavailable',issues:ready?[]:['CORE_FINANCIAL_FIELDS_MISSING'],fetchedAt:new Date().toISOString(),sources:[],rankingEligible:ready,
+    ...(ready?{quoteDate:date,financialDate:date,stock:{...stock,...t,valuationPolicy:'tw-comparables-v1',dailyValuationVersion:DAILY_VALUATION_VERSION,dailyRunId:'fixture_run_1'},history:{...t,name:'Fixture',quoteSource:stock.priceSource,candles,weeklyCandles:[],monthlyCandles:[],technicalAnalysis:analyzeTechnicalSetup(candles,null)}}:{})};
+}
 const post=(db,body,key=secret)=>handleRefreshWrite(new Request('https://test/api/data-refresh',{method:'POST',headers:{'X-WenYing-Refresh-Key':key},body:JSON.stringify({runId:'fixture_run_1',...body})}),db,secret);
 test('private write rejects absent and incorrect credentials',async()=>{
   assert.equal((await post(database(),{action:'begin'},'')).status,401);
@@ -31,7 +36,8 @@ test('missing batches never publish; complete accounting publishes only usable r
   const done=await (await post(db,{action:'finalize'})).json();assert.equal(done.state,'partial');assert.equal(done.coverage.TW.ready,3);
   const bad=await handleDailyRead(new Request('https://test/api/valuation',{method:'POST',body:JSON.stringify({ticker:'1009',market:'TW'})}),db);
   assert.equal(bad.status,422);assert.match((await bad.json()).error,/未使用舊估值/);
-  const fresh=await (await handleDailyRead(new Request('https://test/api/valuation',{method:'POST',body:JSON.stringify({ticker:'1000',market:'TW'})}),db)).json();assert.equal(fresh.cache,'daily-refresh');
+  const reviewed=await handleDailyRead(new Request('https://test/api/valuation',{method:'POST',body:JSON.stringify({ticker:'1000',market:'TW'})}),db);assert.equal(reviewed.status,422);
+  const fresh=await (await handleDailyRead(new Request('https://test/api/valuation',{method:'POST',body:JSON.stringify({ticker:'T0',market:'US'})}),db)).json();assert.equal(fresh.cache,'daily-refresh');
   await db.prepare("UPDATE daily_refresh_runs SET started_at='2020-01-01T00:00:00Z'").run();
   assert.equal((await handleDailyRead(new Request('https://test/api/market-scan'),db)).status,503);
 });

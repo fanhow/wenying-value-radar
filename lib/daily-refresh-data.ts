@@ -146,7 +146,7 @@ async function json(url: string, fetcher: typeof fetch) {
 }
 function historyResult(ticker: string, market: 'TW'|'US', symbol: string, candles: ReturnType<typeof completedCandles>, upside: number|null, name: string) {
   return {ticker,market,symbol,name,quoteSource:'Yahoo Finance daily close / daily-refresh-v1',tradingViewSymbol:market==='TW'?`${symbol.endsWith('.TWO')?'TPEX':'TWSE'}:${ticker}`:ticker,
-    candles:candles.slice(-120),weeklyCandles:aggregateCandles(candles,'week').slice(-52),monthlyCandles:aggregateCandles(candles,'month').slice(-12),
+    candles:candles.slice(-400),weeklyCandles:aggregateCandles(candles,'week').slice(-52),monthlyCandles:aggregateCandles(candles,'month').slice(-12),
     technicalAnalysis:analyzeTechnicalSetup(candles,upside)};
 }
 export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: string, now = new Date(), fetcher: typeof fetch = fetch): Promise<RefreshRecord> {
@@ -178,7 +178,8 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const stock: StockInput={...target,price:latest.close,eps:0,bvps:0,fcfPerShare:0,revenueGrowth:0,roe:0,debtRatio:0,
       targetPe:0,targetPb:0,targetFcfMultiple:0,uncertainty:0.30,...inputs,updatedAt:latest.date,source:'自動資料',priceSource:'Yahoo Finance daily close / daily-refresh-v1',
       sourceNote:`每日雲端更新；${inputs.sourceNote}，截至 ${inputs.financialDataDate}；股價 ${latest.date}；擷取 ${now.toISOString()}。公開資料供應商，尚未逐檔與公司原始申報核對；非分析師即時目標價。`};
-    const value=calculateStock(stock), upside=calibrateFairValue(value).calibratedUpside;
+    // TW is capture-only until the complete same-session peer cohort exists.
+    const upside=target.market==='TW'?null:calibrateFairValue(calculateStock(stock)).calibratedUpside;
     record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside,target.name); record.status='ready';
     const shares = (financial.timeseries?.result??[]).find((r: {meta?:{type?:string[]}})=>r.meta?.type?.[0]==='quarterlyOrdinarySharesNumber')?.quarterlyOrdinarySharesNumber?.find((p:Point)=>p.asOfDate===inputs.financialDataDate)?.reportedValue?.raw;
     record.rankingEligible=target.market==='TW'?latest.volume>=100000&&latest.close*latest.volume>=5000000:latest.close>=3&&latest.volume>=100000&&Number(shares)*latest.close>=500000000;

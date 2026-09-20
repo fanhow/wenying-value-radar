@@ -2,6 +2,8 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {fetchRefreshRecord,expectedSession} from '../lib/daily-refresh-data.ts';
+import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts';
+import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 
 const base='https://stable-value.fanhow.chatgpt.site';
 const token=process.env.WENYING_SITE_TOKEN, key=process.env.WENYING_REFRESH_SECRET;
@@ -28,16 +30,16 @@ async function main() {
   if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
   const now=new Date(),[tw,us]=await Promise.all([expectedSession('TW',now),expectedSession('US',now)]);
   const targets=await loadUniverse();
-  const manifest={targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
+  const manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
     universeSource:['Existing WenYing Taiwan equity directory and US equity directory; new listings require directory maintenance',tw.source,us.source,tw.calendarSource,us.calendarSource]};
   let began=false;
   try {
     await api({action:'begin',manifest});began=true;
-    let done=0,ready=0;const reasons={};
+    let done=0,ready=0;const reasons={},collected=[];
     // A fixed, small pool and pause avoid an unbounded burst to the public data provider.
     for(let offset=0;offset<targets.length;offset+=8) {
       const records=await Promise.all(targets.slice(offset,offset+8).map(t=>fetchRefreshRecord(t,manifest.expectedSessions[t.market],new Date())));
-      await api({action:'batch',records});
+      collected.push(...records);
       done+=records.length;ready+=records.filter(r=>r.status==='ready').length;
       for(const r of records)for(const issue of r.issues)reasons[issue]=(reasons[issue]??0)+1;
       if(done%200===0||done===targets.length)console.log(JSON.stringify({event:'progress',checked:done,total:targets.length,ready,unavailable:done-ready}));
@@ -45,11 +47,24 @@ async function main() {
       if((reasons.UPSTREAM_HTTP_429??0)>100)throw new Error('PROVIDER_RATE_LIMITED');
       await sleep(150);
     }
+    const generation=prepareTaiwanRefreshGeneration(collected,runId);
+    for(const records of refreshUploadBatches(generation,runId))await api({action:'batch',records});
     const result=await api({action:'finalize'});
     console.log(JSON.stringify({event:'published',...result,reasons}));
     const check=await fetch(base+'/api/daily-status',{headers:{'OAI-Sites-Authorization':`Bearer ${token}`},cache:'no-store'});
     const status=await check.json();if(!check.ok||status.runId!==runId||!['complete','partial'].includes(status.state))throw new Error('READBACK_VERIFICATION_FAILED');
     console.log('Private website readback verified. No stock-level payloads or credentials are written to CI logs.');
   } catch(e) {if(began)await api({action:'fail',error:e.message}).catch(()=>{});throw e;}
+}
+export function refreshUploadBatches(records,runId) {
+  const batches=[];let batch=[];
+  const bytes=items=>Buffer.byteLength(JSON.stringify({runId,action:'batch',records:items}),'utf8');
+  for(const record of records) {
+    if(bytes([record])>1400000)throw new Error('RECORD_PAYLOAD_TOO_LARGE');
+    if(batch.length===8||bytes([...batch,record])>1400000){batches.push(batch);batch=[];}
+    batch.push(record);
+  }
+  if(batch.length)batches.push(batch);
+  return batches;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.message);process.exitCode=1;});

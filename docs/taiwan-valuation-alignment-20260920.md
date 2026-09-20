@@ -2,6 +2,18 @@
 
 狀態：進行中，**不是已完成對齊／已上線聲明**。基底 Git `74660c3d03ebdd99be42553ce15da8f776a7905c`；原有 Sites project／網址／owner-only 存取不變。
 
+## 第四輪：每日流程整合（Rev. 2026.09.20.6）
+
+- 完整收集台美股後，才建立同一交易日的 TW 同行／業務群證據；TW 擷取階段不先計算舊啟發式估值。保留最多 400 根實際 K 線，僅重算價值趨勢訊號，US 數學模型不變。
+- `dailyValuationState` 統一 API、排名、技術與 rotation 的估值資格。財報 `ready` 與流動性 `eligible` 不改意義；無模型／待覆核的 `upside` 寫入 SQL NULL，不是零元、−100% 或假低估。四因子研究保留財務資料。
+- 新 manifest／stock 需相同 version、runId、policy。伺服器驗證 ready／unavailable 的 OHLC 日期、身份、價格，封存完整批次後重建同行倍數；錯倍數、錯業務群、混批均不得切換 head。遲到 batch 不能修改已封存資料，舊 run 不能覆蓋較新 head。
+- 舊版 head 的 TW 估值暫停，但 OHLC、純技術與 US 保留。瀏覽器不持久化 daily inputs，依 active run／version 過濾；保留手動資料、觀察清單與無估值股票的獨立 K 線入口。失敗或遲到的 lookup／status 不得使舊估值復活。
+- Frozen operating-v2 重播：1,952 檔 TW，1,786 財報 ready；227 無模型、782 模型待覆核、777 通過估值檢查。與原流動性資格交集為 490，低估超過 5% 有 230、高估超過 5% 有 212。**這是離線同一輸入的流程驗證，不是目前 production 名單或準確率。**
+- 驗證：`npm test` 357/357（含 build、103 張 PNG 無損像素驗證及 Worker default.fetch）；ESLint 0 errors／9 既有 warnings；TypeScript 通過。10 項新 generation 測試涵蓋 UTF-8 payload、完整 cohort、輸入順序、400 bars、NULL、錯倍數、舊 head、遲到 batch 及本機 cache。
+- 本機唯讀市場 fixture 的瀏覽器 QA：2451 顯示待覆核、沒有 FV／upside，K 線可載入；加入觀察後 reload 仍保留技術入口。3036 顯示 FV 288.55；rotation 的 2451 363.02 明示僅供差異研究，四因子仍可見。測試來源是 ignored frozen capture，不是正式站資料；未把測試 server 或 capture 包入 artifact。QA 發現舊同行／平滑說明不適用新 TW policy，已改為實際規則。
+- 部署是下一個獨立步驟；本段程式提交本身不宣稱已上線。仍缺授權且口徑完整的前瞻共識資料、部分非營業資產橋接及跨期間獨立驗證，不能宣稱完整重現外部模型或 AI。
+- 來源界線：保留既有 `sourceNote`，未新增機器可驗證的財報公告時間；financial period end 不等於當時已公開時間，本流程不是 point-in-time 回測。
+
 ## 第三輪：官方業務同業與前瞻研究契約
 
 - 新增 `taiwan-business-groups.ts`：根據七家 2025 官方年報的主業，區分記憶體／儲存產品與廣義半導體。商丞因系統方案為主排除，品安保留 mixed-EMS 註記；這是事前指定研究群，不宣稱完整產業覆蓋。

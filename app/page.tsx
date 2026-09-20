@@ -12,6 +12,7 @@ import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
 import { SiteFooter } from "./site-footer";
 import { DailyDataStatus } from './daily-data-status';
+import {currentClientInput,isDailyInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs,type DailyClientStatus} from '../lib/daily-client-state';
 import { UsEarningsPanel } from "./us-earnings-panel";
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
@@ -331,6 +332,13 @@ export default function Home() {
   const [filter, setFilter] = useState<Filter>("undervalued");
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
   const [selectedTicker, setSelectedTicker] = useState("");
+  const [dailyStatus,setDailyStatus]=useState<DailyClientStatus|null>(null);
+  const dailyStatusRef=useRef<DailyClientStatus|null>(null);
+  const onDailyStatus=useCallback((next:DailyClientStatus)=>{
+    const compact={state:next.state,runId:next.runId,valuationVersion:next.valuationVersion,taiwanValuationCurrent:next.taiwanValuationCurrent};
+    dailyStatusRef.current=compact;
+    setDailyStatus(previous=>JSON.stringify(previous)===JSON.stringify(compact)?previous:compact);
+  },[]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isLookupLoading, setIsLookupLoading] = useState(false);
@@ -339,6 +347,11 @@ export default function Home() {
   const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
   const [marketCandidates, setMarketCandidates] = useState<StockInput[]>([]);
   const [overvaluedCandidates, setOvervaluedCandidates] = useState<StockInput[]>([]);
+  const invalidateDaily=useCallback((ticker:string,market:Market)=>{
+    setStockInputs(current=>withoutDailyInstrument(current,ticker,market));
+    setMarketCandidates(current=>withoutDailyInstrument(current,ticker,market));
+    setOvervaluedCandidates(current=>withoutDailyInstrument(current,ticker,market));
+  },[]);
   const [scannedCount, setScannedCount] = useState(0);
   const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
   const [isMarketScanLoading, setIsMarketScanLoading] = useState(true);
@@ -379,11 +392,11 @@ export default function Home() {
     let savedTechnicalLastSeen = "";
     let savedNotificationPermission: NotificationPermission = "default";
     try {
-      savedStocks = JSON.parse(
+      try {savedStocks = JSON.parse(
         localStorage.getItem("wenying-value-radar-stocks-v1")
           || localStorage.getItem("stable-value-stocks-v1")
           || "[]",
-      ) as StockInput[];
+      ) as StockInput[];}catch {savedStocks=[];}
       savedWatchlist = JSON.parse(
         localStorage.getItem("wenying-value-radar-watchlist-v1")
           || localStorage.getItem("stable-value-watchlist-v1")
@@ -401,7 +414,7 @@ export default function Home() {
       localStorage.removeItem("wenying-value-radar-watchlist-v1");
     }
     const timer = window.setTimeout(() => {
-      if (Array.isArray(savedStocks)) setStockInputs(savedStocks);
+      if (Array.isArray(savedStocks)) setStockInputs(persistableInputs(savedStocks));
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist);
       setTechnicalClientId(savedClientId);
       setTechnicalLastSeen(savedTechnicalLastSeen);
@@ -436,7 +449,7 @@ export default function Home() {
   }, [query]);
 
   useEffect(() => {
-    if (hasLoadedStorage) localStorage.setItem("wenying-value-radar-stocks-v1", JSON.stringify(stockInputs));
+    if (hasLoadedStorage) localStorage.setItem("wenying-value-radar-stocks-v1", JSON.stringify(persistableInputs(stockInputs)));
   }, [hasLoadedStorage, stockInputs]);
 
   useEffect(() => {
@@ -457,16 +470,18 @@ export default function Home() {
   useEffect(() => {
     const controller = new AbortController();
     async function loadMarketCandidates() {
+      setIsMarketScanLoading(true);
       try {
         const response = await fetch("/api/market-scan", { signal: controller.signal });
         const payload = await response.json() as MarketScanResponse;
+        if(controller.signal.aborted)return;
         if (!response.ok) throw new Error("market scan failed");
         const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
         setMarketCandidates(candidates);
         setOvervaluedCandidates(Array.isArray(payload.overvaluedCandidates) ? payload.overvaluedCandidates : []);
         if (!new URLSearchParams(window.location.search).get("ticker") && candidates[0]?.ticker) {
           const firstCandidate = candidates[0];
-          setSelectedTicker(firstCandidate.ticker);
+          setSelectedTicker(current=>current||firstCandidate.ticker);
           void fetch("/api/valuation", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -474,9 +489,14 @@ export default function Home() {
             signal: controller.signal,
           }).then(async (valuationResponse) => {
             const valuationPayload = await valuationResponse.json() as { stock?: StockInput };
-            if (!valuationResponse.ok || !valuationPayload.stock) return;
+            if(controller.signal.aborted)return;
+            if (!valuationResponse.ok || !valuationPayload.stock) {
+              if(valuationResponse.status===422)invalidateDaily(firstCandidate.ticker,firstCandidate.market);
+              return;
+            }
+            if(!currentClientInput(valuationPayload.stock,dailyStatusRef.current))return;
             setStockInputs((current) => [
-              ...current.filter((stock) => stock.ticker !== valuationPayload.stock?.ticker),
+              ...withoutDailyInstrument(current,valuationPayload.stock!.ticker,valuationPayload.stock!.market),
               valuationPayload.stock as StockInput,
             ]);
           }).catch(() => {
@@ -498,22 +518,22 @@ export default function Home() {
     }
     void loadMarketCandidates();
     return () => controller.abort();
-  }, []);
+  }, [dailyStatus?.runId,dailyStatus?.state,invalidateDaily]);
 
   const stocks = useMemo(() => {
-    const scanInputs = [...marketCandidates, ...overvaluedCandidates];
-    const scanKeys = new Set(scanInputs.map(stock=>`${stock.market}:${stock.ticker}`));
-    return [...scanInputs, ...stockInputs.filter(stock=>!scanKeys.has(`${stock.market}:${stock.ticker}`))]
+    return mergeCurrentInputs([...marketCandidates, ...overvaluedCandidates],stockInputs,dailyStatus)
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [marketCandidates, overvaluedCandidates, stockInputs]);
+  }, [marketCandidates, overvaluedCandidates, stockInputs,dailyStatus]);
   const allRankingStocks = useMemo(() => {
     return marketCandidates
+      .filter(stock=>currentClientInput(stock,dailyStatus))
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [marketCandidates]);
+  }, [marketCandidates,dailyStatus]);
   const allOvervaluedRankingStocks = useMemo(() => {
     return overvaluedCandidates
+      .filter(stock=>currentClientInput(stock,dailyStatus))
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [overvaluedCandidates]);
+  }, [overvaluedCandidates,dailyStatus]);
 
   const totalTwUndervalued = useMemo(
     () => allRankingStocks.filter((s) => s.market === "TW").length,
@@ -544,7 +564,7 @@ export default function Home() {
     const us = allOvervaluedRankingStocks.filter((s) => s.market === "US").slice(0, usDisplayLimit);
     return [...tw, ...us];
   }, [allOvervaluedRankingStocks, twDisplayLimit, usDisplayLimit]);
-  const selected = stocks.find((stock) => stock.ticker === selectedTicker) ?? stocks[0];
+  const selected = selectedTicker?stocks.find((stock) => stock.ticker === selectedTicker):stocks[0];
   const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
   const selectedUpside = selected?.calibratedUpside ?? selected?.upside ?? 0;
   const selectedDirection = valuationDirection(selectedUpside);
@@ -682,18 +702,22 @@ export default function Home() {
     setLookupError("");
     setRemoteSymbols([]);
     const match = stocks.find((stock) => stock.ticker.toLowerCase() === value.trim().toLowerCase());
-    if (match) setSelectedTicker(match.ticker);
+    if (match) {
+      lookupRequest.current?.abort();lookupRequest.current=null;setIsLookupLoading(false);
+      setSelectedTicker(match.ticker);
+    }
   }
 
   function selectStock(ticker: string) {
+    lookupRequest.current?.abort();lookupRequest.current=null;setIsLookupLoading(false);
     setSelectedTicker(ticker);
     setQuery("");
     window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   function openWatchlistStock(ticker: string) {
-    const local = stocks.find((stock) => stock.ticker === ticker);
-    if (local) selectStock(ticker);
+    selectStock(ticker);
+    void lookupTicker(ticker);
   }
 
   function openRankedStock(ticker: string) {
@@ -752,25 +776,31 @@ export default function Home() {
     const ticker = value.trim().toUpperCase();
     if (!ticker) return;
     const local = stocks.find((stock) => stock.ticker === ticker);
-    if (local && !forceRefresh) {
+    if (local && !isDailyInput(local) && !forceRefresh) {
       selectStock(local.ticker);
       return;
     }
     setIsLookupLoading(true);
     setLookupError("");
+    setSelectedTicker(ticker);
     lookupRequest.current?.abort();
     const controller = new AbortController();
     lookupRequest.current = controller;
+    const startingRun=dailyStatusRef.current?.runId;
     const timeout = window.setTimeout(() => controller.abort(), 20_000);
     try {
       const stock = await requestValuation({ ticker, market: /^\d/.test(ticker) ? "TW" : "US", refresh: forceRefresh }, controller.signal);
-      setStockInputs((current) => [...current.filter((item) => item.ticker !== stock.ticker), stock]);
+      if(lookupRequest.current!==controller||controller.signal.aborted)return;
+      if(startingRun!==dailyStatusRef.current?.runId)return;
+      if(!currentClientInput(stock,dailyStatusRef.current))throw new Error('每日資料批次已變更，請重新查詢。');
+      setStockInputs((current) => [...withoutDailyInstrument(current,stock.ticker,stock.market),stock]);
       setWatchlist((current) => current.includes(stock.ticker) ? current : [...current, stock.ticker]);
       setSelectedTicker(stock.ticker);
       setQuery(stock.ticker);
       window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     } catch (error) {
-      if (lookupRequest.current === controller) {
+      if (lookupRequest.current === controller&&startingRun===dailyStatusRef.current?.runId) {
+        invalidateDaily(ticker,/^\d/.test(ticker)?'TW':'US');
         setLookupError(controller.signal.aborted
           ? (language === "zh" ? "查詢超過 12 秒，已停止；請稍後再試。" : "The lookup exceeded 12 seconds and was stopped. Please try again.")
           : safeLookupError(error instanceof Error ? error.message : "", language));
@@ -782,48 +812,20 @@ export default function Home() {
         setIsLookupLoading(false);
       }
     }
-  }, [language, query, stocks]);
+  }, [language, query, stocks,invalidateDaily]);
 
   useEffect(() => {
-    if (!hasLoadedStorage || initialTickerHandled.current) return;
-    initialTickerHandled.current = true;
+    if (!hasLoadedStorage || !dailyStatus || initialTickerHandled.current) return;
     const ticker = new URLSearchParams(window.location.search).get("ticker")?.trim().toUpperCase();
     if (!ticker || !/^[A-Z0-9-]{1,10}$/.test(ticker)) return;
-    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      setQuery(ticker);
-      const local = stockInputs.find((stock) => stock.ticker === ticker);
-      if (local) {
-        setSelectedTicker(ticker);
-        window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-      }
-      setIsLookupLoading(true);
-      setLookupError("");
-      void fetch("/api/valuation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker, market: /^\d/.test(ticker) ? "TW" : "US" }),
-        signal: controller.signal,
-      }).then(async (response) => {
-        const payload = await response.json() as { stock?: StockInput; error?: string };
-        if (!response.ok || !payload.stock) throw new Error(payload.error || "暫時無法建立估值");
-        setStockInputs((current) => [...current.filter((item) => item.ticker !== payload.stock?.ticker), payload.stock as StockInput]);
-        setWatchlist((current) => current.includes(ticker) ? current : [...current, ticker]);
-        setSelectedTicker(ticker);
-        window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-      }).catch((error) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setLookupError(safeLookupError(error instanceof Error ? error.message : "", language));
-        }
-      }).finally(() => {
-        if (!controller.signal.aborted) setIsLookupLoading(false);
-      });
+      initialTickerHandled.current = true;
+      void lookupTicker(ticker,true);
     }, 0);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [hasLoadedStorage, language, stockInputs]);
+    return () => window.clearTimeout(timer);
+  }, [hasLoadedStorage,dailyStatus,lookupTicker]);
+
+  useEffect(()=>()=>lookupRequest.current?.abort(),[]);
 
   function updateForm(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -867,7 +869,7 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <DailyDataStatus />
+      <DailyDataStatus onStatus={onDailyStatus} />
       <SiteHeader active="home" />
 
       <div id="top" className="page-content">
@@ -1042,13 +1044,13 @@ export default function Home() {
                   <div className="native-fair-value-card"><span className="focus-label">{t("WenYing 原生模型中心公允價值", "WenYing Native Model Center Fair Value")}</span><span className="native-fair-value-price">{formatPrice(selected.fairValue, selected.market)}</span><small>{t("校準差距", "Gap")} {formatSignedPercent(selected.calibrationGap ?? 0)}</small></div>
                 </div>
                 {selected.isOutOfDistribution && selected.oodReasons && selected.oodReasons.length > 0 && (
-                  <div className="ood-warning-banner"><span>⚠️ {t("超出常規訓練分布（已保守平滑）", "Out of Distribution (Safely Dampened)")}</span><small>{selected.oodReasons.join(" · ")}</small></div>
+                  <div className="ood-warning-banner"><span>⚠️ {selected.valuationPolicy==='tw-comparables-v1'?t('部分輸入超出參考範圍；未套用校準溢價或平滑','Some inputs exceed reference ranges; no calibration uplift or smoothing applied'):t("超出常規訓練分布（已保守平滑）", "Out of Distribution (Safely Dampened)")}</span><small>{selected.oodReasons.map(reason=>selected.valuationPolicy==='tw-comparables-v1'?reason.replaceAll('訓練分布','參考範圍'):reason).join(" · ")}</small></div>
                 )}
                 {selected.marketPricing?.enabled && selected.marketPricing.fairValue !== null && <div className="market-fair-value-banner"><span>{t("市場定價參考（非內在公允價值）", "Market pricing reference (not intrinsic fair value)")}</span><strong>{formatPrice(selected.marketPricing.fairValue, selected.market)}</strong><small>{t(`依公開基金本益比分布與產業倍數，較模型中心 ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} · 不含分析師共識`, `Based on public fund P/E distribution and peer multiples, ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} versus the model center · no analyst consensus`)}</small></div>}
                 <div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("校準悲觀", "Calibrated Bear")} {formatPrice(selected.calibratedRangeLow ?? selected.rangeLow, selected.market)}</span><span>{t("校準樂觀", "Calibrated Bull")} {formatPrice(selected.calibratedRangeHigh ?? selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>
                 <div className="valuation-meta-grid">
                   <div><span>{t("校準模型版本", "Calibration Version")}</span><strong>{selected.calibrationMetadata?.modelVersion ?? "2026.08.17-v1.0"}</strong><small>{t("歷史校準版本不是目前資料的準確率。", "A historical calibration version does not establish accuracy on current data.")} <a href="/rotation">{t("查看當次估值差異", "View current comparison")}</a></small></div>
-                  {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
+                  {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{selected.valuationPolicy==='tw-comparables-v1'?t('同日同行中位數，每種倍數至少 5 個有效樣本；已分類業務群不退回廣義產業。分散過大或缺證據時排除，銷售倍數另檢查利潤率。','Same-session peer medians with at least 5 valid observations per multiple. Assigned business groups never fall back to broad industries. Missing or dispersed evidence is excluded; sales multiples also require comparable margins.'):t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
                   <div><span>CAPM / WACC</span><strong>CAPM {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
                   <div><span>{t("資料基礎", "Data Basis")}</span><strong>{formatDataBasis(selected.assumptions.dataBasis, language)}</strong>{selected.assumptions.financialDataDate && <small>{t("財務日期", "Financial date")} {selected.assumptions.financialDataDate}</small>}</div>
                   <div><span>{t("資料新鮮度", "Data Freshness")}</span><strong>{formatFinancialFreshness(selected.assumptions.financialFreshness, language)}</strong><small>{selected.assumptions.financialAgeDays === null ? t("無法計算資料年齡", "Age unavailable") : t(`距今約 ${selected.assumptions.financialAgeDays} 天`, `About ${selected.assumptions.financialAgeDays} days old`)}</small></div>
@@ -1063,7 +1065,7 @@ export default function Home() {
                 </div>}
               </div>
               <div className="detail-section">
-                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{t("模型家族平衡 · 家族內等權、家族間等權", "Family-balanced · equal within and across families")}</span></div>
+                <div className="detail-section-title"><h3>{t("納入模型", "Included Models")}</h3><span>{selected.valuationPolicy==='tw-comparables-v1'?t('同日同行模型等權；相關倍數不視為獨立證據','Equal-weight same-session peer models; related multiples are not independent evidence'):t("模型家族平衡 · 家族內等權、家族間等權", "Family-balanced · equal within and across families")}</span></div>
                 <div className="model-list">{selected.models.map((model) => (
                   <div className="model-row" key={model.id || model.label}>
                     <div className="model-label"><span className="model-dot" /><span><strong>{localizedModelLabel(model, language)}</strong><small>{localizedModelExplanation(model, language)}</small></span></div>
@@ -1080,6 +1082,13 @@ export default function Home() {
               <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
             </aside>
           )}
+          {!selected&&selectedTicker&&<aside id="valuation-detail" className="detail-panel panel" aria-label={t('個股資料狀態','Stock data status')}>
+            <h2>{selectedTicker}</h2><p role="status">{isLookupLoading?t('正在核對當前批次估值…','Checking the current valuation generation…'):
+              lookupError||t('估值模型不足或待覆核，未顯示舊估值。仍可查看 K 線。','Valuation unavailable or under review. Old values are hidden; price charts remain available.')}</p>
+            <button type="button" disabled={isLookupLoading} onClick={()=>void lookupTicker(selectedTicker,true)}>{t('重新查詢','Retry')}</button>
+            <button type="button" onClick={()=>toggleWatchlist(selectedTicker)}>{watchlist.includes(selectedTicker)?t('移除觀察','Remove from watchlist'):t('加入觀察','Add to watchlist')}</button>
+            <DailyCandlestickChart ticker={selectedTicker} market={/^\d/.test(selectedTicker)?'TW':'US'} language={language}/>
+          </aside>}
         </section>
 
         <section id="overview" className="overview-grid" aria-label={t("估值摘要", "Valuation summary")}>
@@ -1139,7 +1148,11 @@ export default function Home() {
               const direction = valuationDirection(upside);
               const label = directionLabel(direction, language);
               return <article key={stock.ticker} className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`}><button type="button" className="watch-card-main" onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={directionTextClass(direction)}><span className={`watch-direction direction-${direction}`}>{valuationDirectionSymbol(direction)}</span>{formatSignedPercent(upside)}</strong><small>{stock.valuationConfidence === "low" ? `${t("低信心初估", "Low-confidence estimate")} · ${label}` : label}</small></div></button><button type="button" className="watch-remove" onClick={() => toggleWatchlist(stock.ticker)} aria-label={t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`)}>− {t("移除", "Remove")}</button></article>;
-            }) : <div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>}
+            }) : watchlist.length===0?<div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>:null}
+            {watchlist.filter(ticker=>!watchlistStocks.some(stock=>stock.ticker===ticker)).map(ticker=><article className="watch-card" key={ticker}>
+              <button type="button" className="watch-card-main" onClick={()=>openWatchlistStock(ticker)}><strong>{ticker}</strong><span>{t('估值未就緒 · 查看 K 線','Valuation unavailable · View chart')}</span></button>
+              <button type="button" className="watch-remove" onClick={()=>toggleWatchlist(ticker)}>{t('移除','Remove')}</button>
+            </article>)}
           </div>
         </section>
 
