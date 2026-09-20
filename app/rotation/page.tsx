@@ -8,6 +8,7 @@ import { useLanguage } from "../language-context";
 import { SiteHeader } from "../site-header";
 import { SiteFooter } from "../site-footer";
 import styles from "./rotation.module.css";
+import LiveAudit from './live-audit';
 
 function RotationReview({ profile }: { profile: RotationProfile }) {
   const { t } = useLanguage();
@@ -61,7 +62,8 @@ export default function RotationPage() {
         <div><p className={styles.kicker}>WENYING / PORTFOLIO RESEARCH</p><h1>{t("量化輪動研究", "Portfolio rotation research")}</h1></div>
         <span>{t("來源核對", "Sources reviewed")} {RESEARCH_REVIEWED_AT}</span>
       </header>
-      <div className={styles.notice}><strong>{t("已移植公開組合規則；尚未複製 AI 排名。", "Public portfolio rules implemented; proprietary AI rankings not replicated.")}</strong><p>{t("這是來源研究與手動名單調倉工具，不會自動產生原廠選股。未公開的模型權重不猜測；也不改動原有公允價值與即時排行榜。", "This is a source-backed research and manual-list rotation tool, not an automatic replica. Undisclosed weights are not guessed; the existing live valuation flow stays unchanged.")}</p></div>
+      <div className={styles.notice}><strong>{t("估值比較、獨立研究、原始策略規則分開呈現。", "Valuation comparisons, independent research and source rules stay separate.")}</strong><p>{t("每日資料自動產生穩盈研究候選；不宣稱複製未公開的 AI 模型。既有公允價值、即時排行榜與人工調倉檢查仍保留。", "Daily data generates independent WenYing research candidates, not a replica of undisclosed AI. Existing valuations, live rankings and manual rotation reviews remain available.")}</p></div>
+      <LiveAudit />
       <section className={styles.panel} aria-labelledby="profile-heading">
         <h2 id="profile-heading">{t("台灣與美國策略規則", "Taiwan and US strategy rules")}</h2>
         <label className={styles.field}>{t("選擇策略範圍", "Strategy universe")}<select value={profileId} onChange={(event) => setProfileId(event.target.value)}>{["TW", "US"].map((market) => <optgroup key={market} label={market === "TW" ? "台灣 / Taiwan" : "美國 / US"}>{ROTATION_PROFILES.filter((item) => item.market === market).map((item) => <option key={item.id} value={item.id}>{t(item.name, item.englishName)} · {item.holdings}</option>)}</optgroup>)}</select></label>

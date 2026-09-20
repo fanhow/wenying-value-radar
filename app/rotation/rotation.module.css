@@ -31,4 +31,12 @@
 .case p { margin: 4px 0; }
 .steps { padding-left: 24px; }
 .steps li { margin: 10px 0; }
+.auditControls { display:flex; align-items:end; gap:16px; flex-wrap:wrap; }
+.auditControls .field { min-width:180px; }
+.auditControls .button { margin:0; }
+.button:disabled { opacity:.6; cursor:wait; }
+.cellNote { display:block; color:var(--ink-soft); font-size:.8rem; max-width:230px; overflow-wrap:anywhere; }
+.auditDetail { margin:20px 0; border-top:1px solid var(--line); padding-top:14px; }
+.auditDetail summary { cursor:pointer; font-weight:600; }
+.table caption { text-align:left; color:var(--ink-soft); padding:12px 0; }
 @media (max-width: 720px) { .main { width: calc(100% - 28px); margin-top: 22px; } .heading { display: block; } .heading > span { display: block; margin-top: 10px; } .panel { padding: 18px; } .metrics { grid-template-columns: repeat(2, 1fr); gap: 16px; } .findings, .formGrid { grid-template-columns: 1fr; } .badge { margin: 8px 0 0; display: table; } }

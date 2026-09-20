@@ -10,7 +10,7 @@ export type RotationProfile = {
   verification: "detail" | "overview";
 };
 
-export const RESEARCH_REVIEWED_AT = "2026-09-15";
+export const RESEARCH_REVIEWED_AT = "2026-09-20";
 export const METHODOLOGY_URL = "https://hk.investing.com/pro/propicks/methodology";
 export const RATIONALE_URL = "https://www.investing.com/blog/propicks-ai-understanding-the-why-behind-every-stock-pick-335";
 export const strategySource = (id: string) => `https://hk.investing.com/pro/propicks/${id}`;
@@ -26,8 +26,8 @@ export const ROTATION_PROFILES: RotationProfile[] = [
   { id: "dominate-the-dow", market: "US", name: "道瓊藍籌研究", englishName: "Dow blue chips", holdings: 10, frequency: "monthly", universe: "道瓊 30 檔成分股中選取 10 檔。", limits: "概覽層級；需要當期指數名單，其他門檻未完整核對。", verification: "overview" },
   { id: "tech-titans", market: "US", name: "美國科技研究", englishName: "US technology", holdings: 15, frequency: "monthly", universe: "美國資訊科技股；不是只含巨型科技股。", limits: "詳情顯示市值 > US$1B、日均成交量 > 1K、未調整收盤價 > US$10。原頁未給日均量計算視窗。", verification: "detail" },
   { id: "midcap-movers", market: "US", name: "美國中型成長", englishName: "US mid caps", holdings: 20, frequency: "monthly", universe: "概覽列市值 US$2–10B 的中型股。", limits: "概覽層級；邊界是否含等號、其餘條件未完整核對。", verification: "overview" },
-  { id: "top-value-stocks", market: "US", name: "美股價值研究", englishName: "US value", holdings: 20, frequency: "monthly", universe: "概覽列本益比低於 15 倍的價值股票。", limits: "概覽層級；本益比口徑與其他篩選條件未完整核對。", verification: "overview" },
-  { id: "best-of-buffett", market: "US", name: "巴菲特持股研究", englishName: "Buffett holdings", holdings: 15, frequency: "quarterly", universe: "以 Berkshire Hathaway 持股作為候選範圍。", limits: "季度更新；應使用當時已申報的持股，不能以季末日期冒充公告日。確切調整月份未核對。", verification: "overview" },
+  { id: "top-value-stocks", market: "US", name: "美股價值研究", englishName: "US value", holdings: 20, frequency: "monthly", universe: "美國價值股票；2026-09-20 詳情頁描述寫 P/E < 15，策略主題卻寫 P/E < 35，存在矛盾。", limits: "已核對詳情但未釐清本益比門檻／口徑；現持股也非全數 P/E < 15。不把 15 倍當成已確認硬門檻；亦不自行宣稱 35 倍就是完整規則。", verification: "detail" },
+  { id: "best-of-buffett", market: "US", name: "巴菲特持股研究", englishName: "Buffett holdings", holdings: 15, frequency: "quarterly", universe: "Berkshire Hathaway 已公開申報持股；市值 > US$1B、日均成交量 > 1K，股價不限。", limits: "季度更新；基準為 S&P 500 Pure Value。需以申報公開日判斷可得資訊，不以季末日期冒充公告日；日均量視窗與確切更新時刻未公開。", verification: "detail" },
   { id: "healthcare-heroes", market: "US", name: "美國醫療研究", englishName: "US healthcare", holdings: 15, frequency: "monthly", universe: "製藥、生技、醫療設備與醫療服務。", limits: "概覽層級；數值門檻未完整核對。", verification: "overview" },
   { id: "energy-elite", market: "US", name: "美國能源研究", englishName: "US energy", holdings: 15, frequency: "monthly", universe: "油氣、再生能源及能源基礎設施。", limits: "概覽層級；數值門檻未完整核對。", verification: "overview" },
   { id: "financial-fortresses", market: "US", name: "美國金融研究", englishName: "US financials", holdings: 15, frequency: "monthly", universe: "銀行、保險與金融服務。", limits: "概覽層級；不可將工業公司的現金流門檻直接套在銀行。", verification: "overview" },

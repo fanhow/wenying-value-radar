@@ -2,6 +2,7 @@ import './runtime-env.ts';
 import { calculateStock } from './valuation.ts';
 import { isoDate, type RefreshRecord } from './daily-refresh-data.ts';
 import type { TechnicalSnapshot, TechnicalCandidate } from './technical-screener.ts';
+import { rotationAudit } from './rotation-audit-store.ts';
 
 export const REFRESH_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS daily_refresh_runs (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, completed_at TEXT, state TEXT NOT NULL, manifest TEXT NOT NULL, summary TEXT, error TEXT)`,
@@ -57,12 +58,18 @@ function candidates(rows:Stored[]):TechnicalSnapshot {
 }
 export async function handleDailyRead(request:Request,db:D1Database|undefined):Promise<Response|null> {
   const url=new URL(request.url),path=url.pathname;
-  if(!['/api/daily-status','/api/technical-scan','/api/market-scan','/api/valuation','/api/price-history'].includes(path))return null;
-  if(!db)return path==='/api/daily-status'||path==='/api/technical-scan'?response({state:'unavailable',error:'DAILY_DATABASE_UNAVAILABLE'},503):null;
+  if(!['/api/daily-status','/api/technical-scan','/api/market-scan','/api/valuation','/api/price-history','/api/rotation-audit'].includes(path))return null;
+  if(!db)return ['/api/daily-status','/api/technical-scan','/api/rotation-audit'].includes(path)?response({state:'unavailable',error:'DAILY_DATABASE_UNAVAILABLE'},503):null;
   try {
     const status=await statusData(db);
     if(path==='/api/daily-status')return response(status);
     if(!['complete','partial'].includes(status.state))return response({error:'每日資料尚未完成或已過期，暫停顯示排名與估值。',freshness:status},503);
+    if(path==='/api/rotation-audit') {
+      if(request.method!=='GET')return response({error:'METHOD_NOT_ALLOWED'},405);
+      const market=url.searchParams.get('market')??'TW';
+      if(market!=='TW'&&market!=='US')return response({error:'INVALID_MARKET'},400);
+      return response({...await rotationAudit(db,status.runId!,market),freshness:status});
+    }
     if(path==='/api/market-scan') {
       const byMarket=await Promise.all(['TW','US'].map(async market=>{
         const q=(direction:string)=>db.prepare(`SELECT stock FROM daily_refresh_records WHERE run_id=? AND market=? AND status='ready' AND eligible=1 AND upside ${direction==='DESC'?'>=0.05':'<=-0.05'} ORDER BY upside ${direction},ticker LIMIT 100`).bind(status.runId,market).all<Stored>();

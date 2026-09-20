@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.18.3";
+const SITE_REVISION = "Rev. 2026.09.20.1";
 
 const REVISION_ENTRIES = [
+  ['2026.09.20.1', '新增台美二十檔外部公允價值差異檢查：同日同價才計入統計，缺資料不算零；既有輪動頁加入現行資料四因子研究候選與完整公式，明示不是原廠 AI、未回測。重新核對策略持股數、頻率及美股價值策略門檻矛盾。每日管線接受同截止日 TTM、補入 EBITDA、排除交易日上限以後的異常 K 線；原估值引擎與私人網址保留，不用外部目標價固定本站估值。', 'Added a 20-stock Taiwan/US fair-value comparison with matched-date/price statistics and explicit missing values. Added a live four-factor research baseline and transparent formulas to rotation research, without claiming proprietary AI replication or backtested results. Rechecked basket sizes, frequencies and conflicting value-strategy thresholds. Daily ingestion accepts aligned TTM, supplies EBITDA and rejects candles beyond the verified completed session. Preserve the valuation engine, private URL and independent valuations.'],
   ['2026.09.18.3', '大型案例圖改以完整尺寸、像素一致的無損 WebP 提供，原始 PNG 留在專案；舊案例圖連結自動導向對應圖片，型態圖庫的 PNG 下載保留。', 'Serve large case charts as full-size, pixel-identical lossless WebP while retaining source PNGs. Redirect historical case-image links and preserve setup-library PNG downloads.'],
   ['2026.09.18.2', '上傳用 PNG 圖片改採無損壓縮，每張核對尺寸與解碼後像素完全相同；原始圖片、網址、下載格式、估值及私人權限保持不變。', 'Losslessly recompress deployment PNGs with identical dimensions and decoded pixels verified for every image. Preserve source images, URLs, download formats, valuations and private access.'],
   ['2026.09.18.1', '每日雲端更新：台灣時間 06:30 檢查台美股收盤價、季度／TTM 財報與實際 K 線，07:30 重試。完整批次才切換資料；缺漏股票排除，過期或失敗明示。每日估值不再固定錨定舊基準價，原生估值公式保留。技術頁改用真實每日掃描，停用合成示範名單。網站維持原網址及私人存取。', 'Daily cloud refresh at 06:30 Asia/Taipei with a 07:30 retry: completed-session prices, quarterly/TTM fundamentals and actual candles. Publish complete batches atomically, exclude missing inputs and explicitly flag stale or failed runs. Daily valuations bypass historical fixed-price anchors while retaining native formulas. Technical screening now uses actual daily data. Existing private URL and audience are preserved.'],

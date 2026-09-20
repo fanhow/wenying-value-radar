@@ -19,7 +19,8 @@ test("catalogue distinguishes four TW and twelve US strategies and quarterly exc
   assert.equal(ROTATION_PROFILES.filter((row) => row.market === "US").length, 12);
   assert.equal(new Set(ROTATION_PROFILES.map((row) => row.id)).size, 16);
   assert.deepEqual(ROTATION_PROFILES.filter((row) => row.frequency === "quarterly").map((row) => row.id), ["best-of-buffett", "dividend-us"]);
-  assert.equal(ROTATION_PROFILES.filter((row) => row.verification === "detail").length, 3);
+  assert.equal(ROTATION_PROFILES.filter((row) => row.verification === "detail").length, 5);
+  assert.match(ROTATION_PROFILES.find(row=>row.id==='top-value-stocks').universe,/15.*35.*矛盾/);
 });
 
 test("complete baskets produce equal targets without pretending to execute orders", () => {
@@ -109,7 +110,7 @@ test("rotation page retains source boundaries without a snapshot ranking depende
   assert.match(source, /stockDetailHref\(row\.ticker\)/);
   assert.match(source, /key=\{profile\.id\}/);
   assert.match(source, /onChange=\{clearResult\}/);
-  assert.match(source, /尚未複製 AI 排名/);
+  assert.match(source, /不宣稱複製未公開的 AI 模型/);
   assert.doesNotMatch(source, /market-scan-snapshot|localStorage|fetch\(/);
 });
 
@@ -121,8 +122,8 @@ test("built Worker renders the new research route with all controls and sources"
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
   const html = await response.text();
   assert.equal(response.status, 200);
-  for (const text of ["量化輪動研究", "產生調倉檢查表", "尚未複製 AI 排名", "原頁名單更新期"]) assert.ok(html.includes(text));
-  assert.match(html, /Rev\. 2026\.09\.18\.3/);
+  for (const text of ["量化輪動研究", "產生調倉檢查表", "不宣稱複製未公開的 AI 模型", "原頁名單更新期", "二十檔估值差異與獨立研究榜"]) assert.ok(html.includes(text));
+  assert.match(html, /Rev\. 2026\.09\.20\.1/);
   assert.match(html, /propicks\/methodology/);
   assert.match(html, /taiwan-chip-champions/);
   assert.match(html, /value="dividend-us"/);
