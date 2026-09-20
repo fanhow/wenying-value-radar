@@ -861,7 +861,7 @@ export default function Home() {
     };
 
     setStockInputs((current) => [...current.filter((stock) => stock.ticker !== ticker), newInput]);
-    setSelectedTicker(ticker);
+    selectStock(ticker);
     setWatchlist((current) => (current.includes(ticker) ? current : [...current, ticker]));
     setQuery(ticker);
     setShowAddForm(false);

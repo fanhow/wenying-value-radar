@@ -18,5 +18,8 @@ export function mergeCurrentInputs(scan:StockInput[],saved:StockInput[],status:D
   const manualKeys=new Set(saved.filter(s=>s.source==='手動輸入').map(key));
   const currentScan=scan.filter(s=>currentClientInput(s,status)&&!manualKeys.has(key(s)));
   const scanKeys=new Set(currentScan.map(key));
-  return [...currentScan,...saved.filter(s=>!scanKeys.has(key(s))&&currentClientInput(s,status))];
+  const merged=[...currentScan,...saved.filter(s=>!scanKeys.has(key(s))&&currentClientInput(s,status)
+    &&(s.source==='手動輸入'||!manualKeys.has(key(s))))];
+  const seen=new Set<string>();
+  return merged.filter(s=>{const id=key(s);if(seen.has(id))return false;seen.add(id);return true;});
 }

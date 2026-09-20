@@ -143,4 +143,7 @@ test('browser persistence preserves manual inputs while rejecting old/changed da
   assert.deepEqual(withoutDailyInstrument([s,manual,imported],s.ticker,s.market),[manual,imported]);
   assert.deepEqual(mergeCurrentInputs([{...s,dailyRunId:'old-run'}],[s],status),[s]);
   assert.deepEqual(mergeCurrentInputs([s],[manual],status),[manual]);
+  assert.deepEqual(mergeCurrentInputs([s],[manual,s],status),[manual]);
+  assert.deepEqual(mergeCurrentInputs([s,s],[s,s],status),[s]);
+  assert.deepEqual(mergeCurrentInputs([],[s,manual,manual],status),[manual]);
 });
