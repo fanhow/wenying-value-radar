@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.20.1";
+const SITE_REVISION = "Rev. 2026.09.20.2";
 
 const REVISION_ENTRIES = [
+  ['2026.09.20.2', '四因子研究榜新增科技分類／全部合格非金融股票範圍切換，預設科技；兩個市場內重新計算百分位，不改變二十檔估值比較、原排行榜或估值引擎。未知科技分類排除，不冒充原廠完整股票池。', 'Added technology/all-eligible non-financial universe selection to the four-factor research screen, defaulting to technology. Recompute within-market percentiles without changing reference comparisons, existing valuation rankings or the engine. Exclude unknown technology classifications rather than claiming a verified vendor universe.'],
   ['2026.09.20.1', '新增台美二十檔外部公允價值差異檢查：同日同價才計入統計，缺資料不算零；既有輪動頁加入現行資料四因子研究候選與完整公式，明示不是原廠 AI、未回測。重新核對策略持股數、頻率及美股價值策略門檻矛盾。每日管線接受同截止日 TTM、補入 EBITDA、排除交易日上限以後的異常 K 線；原估值引擎與私人網址保留，不用外部目標價固定本站估值。', 'Added a 20-stock Taiwan/US fair-value comparison with matched-date/price statistics and explicit missing values. Added a live four-factor research baseline and transparent formulas to rotation research, without claiming proprietary AI replication or backtested results. Rechecked basket sizes, frequencies and conflicting value-strategy thresholds. Daily ingestion accepts aligned TTM, supplies EBITDA and rejects candles beyond the verified completed session. Preserve the valuation engine, private URL and independent valuations.'],
   ['2026.09.18.3', '大型案例圖改以完整尺寸、像素一致的無損 WebP 提供，原始 PNG 留在專案；舊案例圖連結自動導向對應圖片，型態圖庫的 PNG 下載保留。', 'Serve large case charts as full-size, pixel-identical lossless WebP while retaining source PNGs. Redirect historical case-image links and preserve setup-library PNG downloads.'],
   ['2026.09.18.2', '上傳用 PNG 圖片改採無損壓縮，每張核對尺寸與解碼後像素完全相同；原始圖片、網址、下載格式、估值及私人權限保持不變。', 'Losslessly recompress deployment PNGs with identical dimensions and decoded pixels verified for every image. Preserve source images, URLs, download formats, valuations and private access.'],

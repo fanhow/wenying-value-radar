@@ -68,7 +68,9 @@ export async function handleDailyRead(request:Request,db:D1Database|undefined):P
       if(request.method!=='GET')return response({error:'METHOD_NOT_ALLOWED'},405);
       const market=url.searchParams.get('market')??'TW';
       if(market!=='TW'&&market!=='US')return response({error:'INVALID_MARKET'},400);
-      return response({...await rotationAudit(db,status.runId!,market),freshness:status});
+      const scope=url.searchParams.get('scope')??'all';
+      if(scope!=='all'&&scope!=='technology')return response({error:'INVALID_SCOPE'},400);
+      return response({...await rotationAudit(db,status.runId!,market,scope),freshness:status});
     }
     if(path==='/api/market-scan') {
       const byMarket=await Promise.all(['TW','US'].map(async market=>{

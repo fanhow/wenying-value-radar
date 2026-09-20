@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {screenFeature,rankResearch} from '../lib/rotation-screen.ts';
+import {screenFeature,rankResearch,inResearchScope} from '../lib/rotation-screen.ts';
 import {VALUE_REFERENCES,compareReference,summarizeComparisons} from '../lib/value-reference-audit.ts';
 const input={stock:{ticker:'TEST',name:'Test',market:'US',sector:'Technology',price:100,eps:5,fcfPerShare:4,roe:20,debtRatio:40,revenueGrowth:12,updatedAt:'2026-09-18'},eligible:true,bars:120,close21:95,close63:90};
+test('technology scope uses market-specific supplied classifications, not company-name guesses',()=>{
+  assert.equal(inResearchScope({market:'TW',sector:'台灣上市公司',industry:'半導體業'},'technology'),true);
+  assert.equal(inResearchScope({market:'TW',sector:'台灣上市公司',industry:'建材營造業'},'technology'),false);
+  assert.equal(inResearchScope({market:'TW',sector:'Technology'},'technology'),false);
+  assert.equal(inResearchScope({market:'US',sector:'Technology'},'technology'),true);
+  assert.equal(inResearchScope({market:'US',sector:'Finance'},'technology'),false);
+});
 test('research screen excludes missing data, financial companies and incomplete history',()=>{
   assert.ok(screenFeature(input));
   for(const change of [{bars:63},{close63:null},{eligible:false},{stock:{...input.stock,fcfPerShare:0}},{stock:{...input.stock,sector:'Finance'}},{stock:{...input.stock,roe:NaN}}])assert.equal(screenFeature({...input,...change}),null);

@@ -11,19 +11,20 @@ const signed=(n:number|null|undefined)=>n===null||n===undefined?'—':`${n>0?'+'
 export default function LiveAudit(){
   const {t}=useLanguage();
   const [market,setMarket]=useState<'TW'|'US'>('TW'),[retry,setRetry]=useState(0);
+  const [scope,setScope]=useState<'all'|'technology'>('technology');
   const [data,setData]=useState<Payload|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(true);
   useEffect(()=>{
     const abort=new AbortController();let active=true;
     async function load(){
       setBusy(true);setData(null);setError('');
-      try {const response=await fetch(`/api/rotation-audit?market=${market}`,{signal:abort.signal,cache:'no-store'});
+      try {const response=await fetch(`/api/rotation-audit?market=${market}&scope=${scope}`,{signal:abort.signal,cache:'no-store'});
         const result=await response.json();if(!response.ok)throw new Error(result.error??'資料服務未就緒');
         if(active)setData(result);
       }catch(e){if(active)setError(e instanceof Error?e.message:'資料服務未就緒');}
       finally{if(active)setBusy(false);}
     }
     void load();return()=>{active=false;abort.abort();};
-  },[market,retry]);
+  },[market,scope,retry]);
   return <section className={styles.panel} aria-labelledby="live-audit-heading">
     <h2 id="live-audit-heading">{t('二十檔估值差異與獨立研究榜','Twenty-stock comparison and independent research screen')}</h2>
     <div className={styles.auditControls}><label className={styles.field}>{t('比較市場','Market')}<select value={market} onChange={e=>setMarket(e.target.value as 'TW'|'US')}><option value="TW">台灣 / Taiwan</option><option value="US">美國 / US</option></select></label><button className={styles.button} disabled={busy} onClick={()=>setRetry(n=>n+1)}>{t('重新讀取本站資料','Refresh site data')}</button></div>
@@ -37,6 +38,8 @@ export default function LiveAudit(){
       <div className={styles.tableWrap}><table className={styles.table}><caption>{t('逐股比較：依你提供的外部上漲空間排序','Stock comparison, ordered by your reference upside')}</caption><thead><tr>{[t('標的','Stock'),t('參考／本站股價','Reference / site price'),t('外部公允價值','Reference FV'),t('本站公允價值','Site FV'),t('差異','Gap'),t('本站模型數','Site models'),t('資料狀態','Data status')].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{data.compared.map(r=><tr key={r.ticker}><td><a href={stockDetailHref(r.ticker)}>{r.ticker} {r.name}</a></td><td>{num(r.price)} / {num(r.actual?.price)}</td><td><a href={r.source} target="_blank" rel="noreferrer">{num(r.fairValue)}</a><small className={styles.cellNote}>+{num(r.upsidePct,1)}%</small></td><td>{num(r.actual?.fairValue)}</td><td>{signed(r.gapPct)}{r.gapPct===null?'':'%'}</td><td>{r.actual?.modelCount??'—'}</td><td>{r.aligned?t('同日同價','Aligned'):r.actual?t('日期／價格不同，排除平均','Unaligned; excluded'):t('缺資料','Unavailable')}<small className={styles.cellNote}>{r.actual?.financialDate??r.issues.join(' · ')}</small></td></tr>)}</tbody></table></div>
       <details className={styles.auditDetail}><summary>{t('本站現行公允價值前十檔','Current site FV top ten')}</summary><p>{data.top10.map(r=>`${r.rank}. ${r.ticker} ${r.name} (${signed(r.upsidePct)}%)`).join(' · ')}</p><p>{t('這是原有依低估空間排序的榜單，並非下方多因子榜。','This is the existing upside-ranked list, not the multi-factor screen below.')}</p></details>
       <h3>{t('穩盈四因子前十研究候選','WenYing four-factor top-ten research candidates')}</h3>
+      <label className={styles.field}>{t('研究榜範圍（不改變上方二十檔比較）','Research scope (does not change the reference comparison)')}<select value={scope} onChange={e=>setScope(e.target.value as 'all'|'technology')}><option value="technology">{t('科技分類','Technology classification')}</option><option value="all">{t('全部合格非金融股票','All eligible non-financial equities')}</option></select></label>
+      <p className={styles.muted}>{t('科技範圍依既有產業目錄，不猜測原廠中大型市值分界；未知分類排除。此範圍只改變研究榜，不是原廠完整股票池。','Technology uses the existing industry directory and excludes unknown classifications; unpublished vendor size boundaries are not guessed. This filters only the independent screen, not a verified vendor universe.')}</p>
       <p>{t('價值、品質、成長、動能各 25%；為獨立透明基準，未訓練、未回測，也不是原廠 AI 或買賣訊號。','Value, quality, growth and momentum each carry 25%. This is an independent transparent baseline: untrained, not backtested, not vendor AI or a trade signal.')}</p>
       <p className={styles.muted}>{data.screen.version} · {t('股票目錄','Directory')} {data.screen.universe} → {t('可用資料','Available')} {data.screen.ready} → {t('符合研究門檻','Research eligible')} {data.screen.eligible}</p>
       <div className={styles.tableWrap}><table className={styles.table}><caption>{t('依本站自訂分數排序；不使用外部目標價或持股標籤','Independent scores; no vendor price targets or holdings labels')}</caption><thead><tr>{[t('名次／標的','Rank / stock'),t('總分','Score'),t('價值','Value'),t('品質','Quality'),t('成長','Growth'),t('動能','Momentum'),t('63 日價格變動','63-session price change')].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{data.screen.candidates.map(r=><tr key={r.ticker}><td>{r.rank}. <a href={stockDetailHref(r.ticker)}>{r.ticker} {r.name}</a></td><td>{num(r.score,1)}</td><td>{num(r.valueScore,1)}</td><td>{num(r.qualityScore,1)}</td><td>{num(r.growthScore,1)}</td><td>{num(r.momentumScore,1)}</td><td>{signed(r.momentum63*100)}%</td></tr>)}</tbody></table></div>

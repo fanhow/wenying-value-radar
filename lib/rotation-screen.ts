@@ -1,6 +1,11 @@
 import type { StockInput } from './valuation.ts';
 
 export const ROTATION_SCREEN_VERSION='WY-4F-2026.09.20.1';
+export type ResearchScope='all'|'technology';
+export function inResearchScope(stock:Pick<StockInput,'market'|'sector'|'industry'>,scope:ResearchScope){
+  if(scope==='all')return true;
+  return stock.market==='TW'?/半導體|電子|電腦|光電|資訊|通信|通訊/.test(stock.industry??''):/^technology$|information technology/i.test(stock.sector);
+}
 export type ScreenInput={stock:StockInput;close21:number|null;close63:number|null;bars:number;eligible:boolean};
 export type ResearchCandidate={ticker:string;name:string;market:'TW'|'US';sector:string;quoteDate:string;price:number;
   earningsYield:number;fcfYield:number;roe:number;debtRatio:number;growth:number;momentum21:number;momentum63:number;
