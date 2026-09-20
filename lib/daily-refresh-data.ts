@@ -3,6 +3,7 @@ import { parseYahooDailyCandles, type YahooChartPayload } from './price-history.
 import { aggregateCandles, analyzeTechnicalSetup } from './technical-analysis.ts';
 import { calibrateFairValue } from './valuation-calibration.ts';
 import { officialSession } from './refresh-calendar.ts';
+import { taiwanAnnualEarnings } from './taiwan-valuation-evidence.ts';
 
 export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string };
 export type RefreshRecord = {
@@ -34,12 +35,19 @@ export function completedCandles(payload: YahooChartPayload, market: 'TW' | 'US'
 }
 export function quarterlyInputs(payload: SeriesPayload, currency: string, now = new Date()) {
   const values = new Map<string, Map<string, number>>();
+  const conflicts = new Set<string>();
   for (const item of payload.timeseries?.result ?? []) {
     const type = item.meta?.type?.[0] ?? '';
     if (!Array.isArray(item[type])) continue;
-    const map = new Map<string, number>();
+    const map = values.get(type) ?? new Map<string, number>();
     for (const p of item[type] as Point[]) {
-      if (!isoDate(p.asOfDate) || p.periodType !== (type.startsWith('trailing')?'TTM':'3M') || p.currencyCode !== currency || !Number.isFinite(p.reportedValue?.raw)) continue;
+      const period = type.startsWith('annual') ? '12M' : type.startsWith('trailing') ? 'TTM' : '3M';
+      if (!isoDate(p.asOfDate) || p.periodType !== period || p.currencyCode !== currency || !Number.isFinite(p.reportedValue?.raw)) continue;
+      const key=type+'|'+p.asOfDate!;
+      if(conflicts.has(key))continue;
+      if(map.has(p.asOfDate!)&&map.get(p.asOfDate!)!==p.reportedValue!.raw!) {
+        conflicts.add(key);map.delete(p.asOfDate!);continue;
+      }
       map.set(p.asOfDate!, p.reportedValue!.raw!);
     }
     values.set(type, map);
@@ -86,13 +94,49 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     revenueGrowth, roe, debtRatio, revenuePerShare:revenue/shares, financialDataDate:end,
     dataBasis:'ltm', dataCompleteness:'historical', qualityAvailable:true,
     ...valuationTargets(revenueGrowth,roe,debtRatio), sourceNote:`Yahoo Finance TTM（同截止日供應商 TTM；僅在四季連續時加總補足）；營收成長：${growthBasis}` };
+  const operatingIncome=sum('OperatingIncome'), depreciation=sum('DepreciationAndAmortization');
+  // Yahoo EBIT/EBITDA may include non-operating investment gains. Keep an
+  // operating basis for TW enterprise models; never substitute zero D&A.
+  const operatingEbitda=operatingIncome!==undefined&&depreciation!==undefined&&depreciation>=0
+    ?operatingIncome+depreciation:undefined;
   const optional: Array<[keyof StockInput, number | undefined]> = [
-    ['ebitPerShare',sum('OperatingIncome')],['ebitdaPerShare',sum('EBITDA')],['cashPerShare',last('CashCashEquivalentsAndShortTermInvestments')],['debtPerShare',last('TotalDebt')],
+    ['ebitPerShare',operatingIncome],['ebitdaPerShare',currency==='TWD'?operatingEbitda:sum('EBITDA')],['cashPerShare',last('CashCashEquivalentsAndShortTermInvestments')],['debtPerShare',last('TotalDebt')],
   ];
   for (const [key,value] of optional) if (value !== undefined) Object.assign(result,{[key]:value/shares});
   const net=sum('NetIncome'); if(net!==undefined&&revenue>0) result.netMargin=net/revenue*100;
+  if(currency==='TWD') {
+    // Keep the provider's reported EPS unchanged. Annual observations are
+    // separate non-overlapping periods, never four overlapping TTM samples.
+    result.epsHistory=taiwanAnnualEarnings([...(values.get('annualDilutedEPS')?.entries()??[])].map(([end,value])=>({value,end,basis:'annual'})),end);
+    const openingEquity=previous('quarterlyStockholdersEquity');
+    const averageEquity=openingEquity!==undefined&&openingEquity>0?(openingEquity+equity)/2:undefined;
+    result.roe=net!==undefined?net/(averageEquity??equity)*100:roe;
+    Object.assign(result,valuationTargets(revenueGrowth,result.roe,debtRatio));
+    result.netMarginUnit='percent';
+    result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'period-end-ordinary',
+      roeBasis:net===undefined?'eps-ending-bvps':averageEquity===undefined?'parent-income-ending-equity':'parent-income-average-equity',
+      growthBasis:priorTtm&&priorTtm>0?'ttm-yoy':'quarter-yoy',
+      revenueGrowthTtmYoY:priorTtm&&priorTtm>0?(revenue/priorTtm-1)*100:undefined,
+      revenueGrowthQuarterYoY:priorQuarter&&priorQuarter>0?(last('TotalRevenue')!/priorQuarter-1)*100:undefined,
+      netIncomePerShare:net===undefined?undefined:net/shares,sharesOutstanding:shares,
+      nonControllingBookPerShare:(assets-liabilities-equity)/shares,
+      ebitdaBasis:operatingEbitda===undefined?'unavailable':'operating-income-plus-cashflow-da',
+      depreciationPerShare:depreciation===undefined?undefined:depreciation/shares,
+      providerEbitPerShare:sum('EBIT')===undefined?undefined:sum('EBIT')!/shares,
+      providerEbitdaPerShare:sum('EBITDA')===undefined?undefined:sum('EBITDA')!/shares};
+    result.sourceNote+=`；ROE：${result.financialMetrics.roeBasis}；EBITDA：${result.financialMetrics.ebitdaBasis}；每股流量採期末普通股，EPS 保留供應商稀釋口徑；年度 EPS ${result.epsHistory.length} 期`;
+  }
   result.assetTurnover=revenue/assets; if(equity!==0) result.financialLeverage=assets/equity;
   return result;
+}
+
+export function taiwanPerShareIssue(s:Partial<StockInput>) {
+  const net=s.financialMetrics?.netIncomePerShare,eps=s.eps;
+  // This is a reconciliation gate, not a guessed share-unit conversion.
+  // Large dilution, capital changes or provider errors require source review.
+  if(typeof net==='number'&&typeof eps==='number'&&Math.abs(net)>.1&&Math.abs(eps)>.1
+    &&(eps/net<.5||eps/net>2))return 'EPS_SHARE_BASIS_RECONCILIATION_REQUIRED';
+  return null;
 }
 
 async function json(url: string, fetcher: typeof fetch) {
@@ -109,7 +153,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
   const record: RefreshRecord={ticker:target.ticker,market:target.market,status:'unavailable',issues:[],sources:[],fetchedAt:now.toISOString()};
   const symbol=target.market==='TW'?`${target.ticker}.${target.listingBoard==='TPEx'?'TWO':'TW'}`:target.ticker;
   const chartUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y&events=div%2Csplits`;
-  const financialUrl=`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}?type=${[...SERIES.map(s=>'quarterly'+s),...['DilutedEPS','TotalRevenue','OperatingCashFlow','CapitalExpenditure','OperatingIncome','EBITDA','NetIncome'].map(s=>'trailing'+s)].join(',')}&period1=${Math.floor(now.getTime()/1000)-DAY/1000*1000}&period2=${Math.floor(now.getTime()/1000)}`;
+  const financialUrl=`https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}?type=${[...SERIES.map(s=>'quarterly'+s),...['DilutedEPS','TotalRevenue','OperatingCashFlow','CapitalExpenditure','OperatingIncome','EBITDA','NetIncome'].map(s=>'trailing'+s),...(target.market==='TW'?['annualDilutedEPS','quarterlyEBIT','trailingEBIT','quarterlyDepreciationAndAmortization','trailingDepreciationAndAmortization']:[])].join(',')}&period1=${Math.floor(now.getTime()/1000)-DAY/1000*(target.market==='TW'?6*366:1000)}&period2=${Math.floor(now.getTime()/1000)}`;
   record.sources=[chartUrl,financialUrl];
   try {
     const [chart, financial] = await Promise.all([json(chartUrl,fetcher),json(financialUrl,fetcher)]);
@@ -119,6 +163,8 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     record.quoteDate=latest?.date;
     if(candles.length<60 || !latest || latest.date!==expectedDate) throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
     const inputs=quarterlyInputs(financial,currency,now);
+    const perShareIssue=target.market==='TW'?taiwanPerShareIssue(inputs):null;
+    if(perShareIssue)throw new Error(perShareIssue);
     record.financialDate=inputs.financialDataDate;
     const stock: StockInput={...target,price:latest.close,eps:0,bvps:0,fcfPerShare:0,revenueGrowth:0,roe:0,debtRatio:0,
       targetPe:0,targetPb:0,targetFcfMultiple:0,uncertainty:0.30,...inputs,updatedAt:latest.date,source:'自動資料',priceSource:'Yahoo Finance daily close / daily-refresh-v1',

@@ -4,6 +4,9 @@ import type { ComparableMultiples } from "./market-comparables.ts";
 import { classifyFinancialFreshness, financialAgeDays, type FinancialFreshness } from "./data-freshness.ts";
 import { calibrateFairValue, type CalibrationMetadata } from "./valuation-calibration.ts";
 import type { UsEarningsReport } from "./us-earnings.ts";
+import { companyDescriptor, isFinancialCompany } from "./company-classification.ts";
+import { taiwanEnterpriseAdjustment, validTaiwanComparableEvidence } from './taiwan-comparables.ts';
+import { taiwanAnnualEarnings, taiwanEarningsOperationsDivergence, taiwanMaterialMinorityClaims } from './taiwan-valuation-evidence.ts';
 
 export type { UsEarningsReport };
 export type Market = "TW" | "US";
@@ -61,7 +64,7 @@ export type StockInput = {
   name: string;
   market: Market;
   sector: string;
-  /** Display-only Taiwan industry metadata; it does not alter valuation inputs. */
+  /** Accounting/industry classification; listing board is stored separately. */
   industry?: string;
   /** Display-only exchange board metadata for Taiwan listings. */
   listingBoard?: TaiwanListingBoard;
@@ -111,6 +114,26 @@ export type StockInput = {
   ffoPerShare?: number;
   affoPerShare?: number;
   netMargin?: number;
+  /** Explicit percentage-point unit avoids interpreting 0.5% as 50%. */
+  netMarginUnit?: "percent";
+  financialMetrics?: {
+    currency: string;
+    periodBasis: "ltm";
+    shareBasis: "period-end-ordinary";
+    roeBasis: "parent-income-average-equity" | "parent-income-ending-equity" | "eps-ending-bvps";
+    growthBasis: "ttm-yoy" | "quarter-yoy";
+    revenueGrowthTtmYoY?: number;
+    revenueGrowthQuarterYoY?: number;
+    netIncomePerShare?: number;
+    sharesOutstanding?: number;
+    /** Book NCI, not its market value. Large minority claims need separate valuation. */
+    nonControllingBookPerShare?: number;
+    ebitdaBasis?: "operating-income-plus-cashflow-da" | "unavailable";
+    depreciationPerShare?: number;
+    /** Provider EBIT/EBITDA retained for reconciliation, not operating valuation. */
+    providerEbitPerShare?: number;
+    providerEbitdaPerShare?: number;
+  };
   assetTurnover?: number;
   financialLeverage?: number;
   targetEvRevenueMultiple?: number;
@@ -126,6 +149,8 @@ export type StockInput = {
   /** Optional curated business-model P/E profile from the latest six-fund holdings. */
   fundBusinessPe?: FundBusinessPeProfile;
   comparableMultiples?: ComparableMultiples;
+  /** Explicit opt-in; requires same-session Taiwan peer provenance. */
+  valuationPolicy?: "tw-comparables-v1";
   /** Public annual/LTM EPS observations used only for historical normalization. */
   epsHistory?: EarningsHistoryPoint[];
   /** Optional US earnings calendar, alerts, and market expectation details. */
@@ -237,6 +262,8 @@ export type Stock = StockInput & {
   epsNormalizationMethod: EarningsNormalizationMethod;
   epsHistoryCount: number;
 
+  /** Input/model coverage is insufficient for a ranked valuation conclusion. */
+  valuationReviewRequired?: boolean;
   calibratedFairValue?: number;
   calibratedRangeLow?: number;
   calibratedRangeHigh?: number;
@@ -322,14 +349,7 @@ function addExcluded(
 }
 
 function descriptorMatches(input: StockInput, expression: RegExp) {
-  return expression.test(input.name + " " + input.sector);
-}
-
-function isFinancialCompany(input: StockInput) {
-  return descriptorMatches(
-    input,
-    /bank|finance|financial|insurance|reinsurance|mortgage|reit|銀行|金控|保險|證券|金融/i,
-  );
+  return expression.test(companyDescriptor(input));
 }
 
 function defaultBeta(input: StockInput, financial: boolean) {
@@ -567,7 +587,21 @@ export function fadingGrowthOperatingExitDcfPerShare(
   return presentValue + terminalValue / ((1 + discount) ** years) - netDebt;
 }
 
-function robustModelFilter(models: ModelCandidate[]) {
+function robustModelFilter(models: ModelCandidate[], independentEvidence = false) {
+  if (independentEvidence) {
+    const group=(id:string)=>id==='pe'||id==='pe-peer'||id==='roe-residual'?'earnings'
+      :id==='p-fcf'||id==='epv'||id.startsWith('dcf-fcf-')?'fcf'
+      :id==='p-sales'||id==='ev-revenue'||id.startsWith('dcf-revenue-')?'revenue'
+      :id==='pb'||id==='graham'?'book'
+      :id==='ev-ebitda'||id.startsWith('dcf-ebitda-')?'ebitda':id;
+    const groups=new Map<string,number[]>();
+    for(const m of models)groups.set(group(m.id),[...(groups.get(group(m.id))??[]),Math.log(m.value)]);
+    if(groups.size<4)return {kept:models,removed:[] as ModelCandidate[]};
+    const centers=[...groups.values()].map(median),center=median(centers),mad=median(centers.map(v=>Math.abs(v-center)));
+    const threshold=Math.max(3.5*1.4826*mad,Math.log(3));
+    const removed= models.filter(m=>Math.abs(median(groups.get(group(m.id))!)-center)>threshold);
+    return {kept:models.filter(m=>!removed.includes(m)),removed};
+  }
   if (models.length < 4) return { kept: models, removed: [] as ModelCandidate[] };
   const logValues = models.map((model) => Math.log(model.value));
   const center = median(logValues);
@@ -603,7 +637,7 @@ function isCyclicalMultipleBusiness(input: StockInput) {
  * clear cycle outlier. This is a historical earning-power proxy, not a
  * forecast: no analyst consensus, target price, or forward EPS is used.
  */
-export function normalizeEarningsPerShare(input: Pick<StockInput, "ticker" | "name" | "sector" | "eps" | "epsHistory" | "dataBasis">) {
+export function normalizeEarningsPerShare(input: Pick<StockInput, "ticker" | "name" | "sector" | "industry" | "eps" | "epsHistory" | "dataBasis">) {
   const reported = numeric(input.eps);
   const observations = (input.epsHistory ?? [])
     .map((point) => ({
@@ -934,15 +968,22 @@ function deriveMarketPricing(
 }
 
 export function calculateStock(input: StockInput, formatNumber = (value: number) => String(value)): Stock {
+  const twComparables = input.market === 'TW' && input.valuationPolicy === 'tw-comparables-v1';
+  const validTwPeers = validTaiwanComparableEvidence(input);
+  if(twComparables)input={...input,comparableMultiples:validTwPeers?input.comparableMultiples:undefined,
+    targetPsMultiple:undefined,targetEvRevenueMultiple:undefined,targetEvEbitdaMultiple:undefined,targetEvEbitMultiple:undefined,targetFfoMultiple:undefined};
   const price = Math.max(numeric(input.price), 0);
   const eps = numeric(input.eps);
-  const epsNormalization = normalizeEarningsPerShare(input);
+  const annualEarningsEvidence=twComparables?taiwanAnnualEarnings(input.epsHistory,input.financialDataDate):[];
+  const epsNormalization = twComparables
+    ? {reportedEpsPerShare:Math.max(eps,0),normalizedEpsPerShare:Math.max(eps,0),applied:false,method:'reported' as const,historyCount:annualEarningsEvidence.length}
+    : normalizeEarningsPerShare(input);
   const valuationEps = epsNormalization.normalizedEpsPerShare;
   const bvps = numeric(input.bvps);
   const reportedFcfPerShare = numeric(input.fcfPerShare);
   const dividendPerShare = Math.max(numeric(input.dividendPerShare), 0);
-  const suppliedTargetPe = Math.max(numeric(input.targetPe), 0);
-  const targetPb = Math.max(numeric(input.targetPb), 0);
+  const suppliedTargetPe = Math.max(numeric(twComparables ? input.comparableMultiples?.peMedian : input.targetPe), 0);
+  const targetPb = Math.max(numeric(twComparables ? input.comparableMultiples?.pbMedian : input.targetPb), 0);
   const suppliedTargetFcfMultiple = Math.max(numeric(input.targetFcfMultiple), 0);
   const suppliedTargetPsMultiple = Math.max(numeric(input.targetPsMultiple), 0);
   const revenueGrowth = numeric(input.revenueGrowth);
@@ -1072,15 +1113,17 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const reit = descriptorMatches(input, /reit|real estate investment trust|property trust|real estate|不動產投資信託|不動產/i);
   const cashPerShare = Math.max(numeric(input.cashPerShare), 0);
   const debtPerShare = Math.max(numeric(input.debtPerShare), 0);
-  const netDebtPerShare = debtPerShare - cashPerShare;
+  const twEnterpriseBridge=twComparables?taiwanEnterpriseAdjustment(input):undefined;
+  const netDebtPerShare = twComparables && twEnterpriseBridge!==null && twEnterpriseBridge!==undefined
+    ? twEnterpriseBridge : debtPerShare - cashPerShare;
   const revenuePerShare = Math.max(numeric(input.revenuePerShare), 0);
   const ebitdaPerShare = Math.max(numeric(input.ebitdaPerShare), 0);
   const ebitPerShare = Math.max(numeric(input.ebitPerShare), 0);
-  const netMarginPercent = rate(input.netMargin, 0) * 100;
+  const netMarginPercent = input.netMarginUnit === "percent" ? numeric(input.netMargin) : rate(input.netMargin, 0) * 100;
   const netDebtToEbitda = ebitdaPerShare > 0
     ? Math.max(netDebtPerShare, 0) / ebitdaPerShare
     : 0;
-  const hasFundamentalMultipleInputs = !financial
+  const hasFundamentalMultipleInputs = !twComparables && !financial
     && !reit
     && input.source !== "手動輸入"
     && valuationEps > 0
@@ -1115,7 +1158,13 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const fcfNormalizationApplied = normalizedFcfPerShare > 0
     && reportedFcfPerShare > normalizedFcfPerShare * 1.001;
   const fcfPerShare = normalizedFcfPerShare;
-  const assetLight = !financial && !reit && roe >= 25;
+  const assetLight = !twComparables && !financial && !reit && roe >= 25;
+  const earningsOperationsDivergence = twComparables && taiwanEarningsOperationsDivergence(input);
+  const materialMinorityClaims=twComparables && taiwanMaterialMinorityClaims(input);
+  const annualEarnings=annualEarningsEvidence.map(p=>p.value);
+  const annualEarningsMedian=median(annualEarnings);
+  const earningsBaseShift=twComparables && annualEarnings.length>=3 && eps>0
+    && (annualEarningsMedian<=0 || eps/annualEarningsMedian>3);
   const mature = valuationEps > 0
     && roe > 0
     && revenueGrowth >= -5
@@ -1232,7 +1281,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     themeReviewAfter: structuralThemes[0]?.reviewAfter,
     startingGrowth,
     terminalGrowth,
-    aggregationMethod: "family-balanced-average",
+    aggregationMethod: twComparables ? "average" : "family-balanced-average",
     reportedFcfPerShare,
     normalizedFcfPerShare,
     fcfNormalizationApplied,
@@ -1250,6 +1299,27 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const candidates: ModelCandidate[] = [];
   const excludedModels: ExcludedValuationModel[] = [];
   const addCandidate = (model: ModelCandidate | null, id: string, category: ValuationModelCategory, label: string) => {
+    if(twComparables && id==='ev-ebitda' && input.financialMetrics?.ebitdaBasis!=='operating-income-plus-cashflow-da') {
+      excludedModels.push({id,category,label,status:'excluded',reason:'缺少同期間營業利益加折舊攤銷口徑，不以供應商含業外損益的 EBITDA 替代。'});return;
+    }
+    if(twComparables && !validTwPeers) {
+      addExcluded(excludedModels,id,category,label,'缺少完整同日同業證據，停止估值；不退回手填倍數或歷史固定目標。');return;
+    }
+    if(twComparables && ['pe-peer','p-fcf','roe-residual','graham'].includes(id)) {
+      addExcluded(excludedModels,id,category,label,'台股同業模式：不重複計入同一盈餘倍數，亦不混入自訂 P/FCF、Graham 或剩餘收益假設。');return;
+    }
+    if(twComparables && (id.startsWith('dcf-') || id==='epv' || id.startsWith('ddm-'))) {
+      addExcluded(excludedModels,id,category,label,'缺少逐年前瞻現金流／股利與可驗證終值假設；歷史成長外推情境不計入目前同業模型中心。');return;
+    }
+    if(twComparables && id.startsWith('ev-') && twEnterpriseBridge===null) {
+      addExcluded(excludedModels,id,category,label,'現金／負債／非控制權益橋接不足，或非控制權益相對母公司權益過大；不可將全部合併營業利益歸給母公司股東。');return;
+    }
+  if(materialMinorityClaims && id==='p-sales') {
+      addExcluded(excludedModels,id,category,label,'合併營收含重大非控制權益，無法直接以母公司股價／每股合併營收比較；保留母公司盈餘與淨值供研究。');return;
+    }
+    if(earningsOperationsDivergence && ['pe','ev-ebitda','ev-ebit','epv'].includes(id)) {
+      addExcluded(excludedModels,id,category,label,'本業營業虧損但淨利為正，尚無可驗證的可持續盈餘；保留報告 EPS，不以其套用一般盈餘倍數。');return;
+    }
     if (model) candidates.push(model);
     else addExcluded(excludedModels, id, category, label, "必要輸入不足或計算條件無效。");
   };
@@ -1268,7 +1338,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         range.low,
         range.high,
-        epsLabel + " × 目標本益比 " + formatNumber(targetPe),
+        epsLabel + (twComparables ? " × 同日同產業中位數 P/E " : " × 目標本益比 ") + formatNumber(targetPe),
       ),
       "pe",
       "relative",
@@ -1366,7 +1436,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         range.low,
         range.high,
-        "每股淨值 " + formatNumber(bvps) + " × 目標 P/B " + formatNumber(targetPb),
+        "每股淨值 " + formatNumber(bvps) + (twComparables ? " × 同日同產業中位數 P/B " : " × 目標 P/B ") + formatNumber(targetPb),
       ),
       "pb",
       "asset",
@@ -1389,7 +1459,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const marginScaledCap = input.netMargin !== undefined && input.netMargin !== null
     ? Math.max(0.15, (input.netMargin > 0 ? (input.netMargin / 100) : 0.02) * (targetPe || 15) * 1.5)
     : Math.max(0.15, (valuationEps > 0 && revenuePerShare > 0 ? (valuationEps / revenuePerShare) : 0.05) * (targetPe || 15) * 1.5);
-  const comparablePsMultiple = suppliedTargetPsMultiple > 0
+  const comparablePsMultiple = suppliedTargetPsMultiple > 0 || twComparables
     ? rawComparablePsMultiple
     : Math.min(rawComparablePsMultiple, marginScaledCap);
   if (!financial && !reit && revenuePerShare > 0 && comparablePsMultiple > 0) {
@@ -1404,7 +1474,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value * (1 - width),
         value * (1 + width),
         "每股營收 " + formatNumber(revenuePerShare) + " × "
-          + (suppliedTargetPsMultiple > 0 ? "明確輸入 P/S " : "公開同業截尾中位數 P/S ")
+          + (suppliedTargetPsMultiple > 0 ? "明確輸入 P/S " : twComparables ? "同日同產業、歸母淨利率 0.5–2 倍範圍同業中位數 P/S " : "公開同業截尾中位數 P/S ")
           + formatNumber(comparablePsMultiple)
           + (comparableMultiples ? "（同業 " + formatNumber(comparableMultiples.psPeerCount) + " 筆）" : ""),
       ),
@@ -1564,7 +1634,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         low,
         high,
         metricLabel + " " + formatNumber(metric) + " × " + multipleSource + " " + formatNumber(multiple)
-          + "，再扣除每股淨負債 " + formatNumber(netDebtPerShare) + "。",
+          + (twComparables ? "，再扣除每股債務減現金及非控制權益帳面近似 " : "，再扣除每股淨負債 ") + formatNumber(netDebtPerShare) + "。",
       ),
       id,
       "relative",
@@ -1579,7 +1649,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const marginScaledEvRevCap = input.netMargin !== undefined && input.netMargin !== null
     ? Math.max(0.15, (input.netMargin > 0 ? (input.netMargin / 100) : 0.02) * (targetPe || 15) * 1.5)
     : Math.max(0.15, (valuationEps > 0 && revenuePerShare > 0 ? (valuationEps / revenuePerShare) : 0.05) * (targetPe || 15) * 1.5);
-  const evRevenueMultiple = explicitEvRevenueMultiple > 0
+  const evRevenueMultiple = explicitEvRevenueMultiple > 0 || twComparables
     ? rawEvRevenueMultiple
     : Math.min(rawEvRevenueMultiple, marginScaledEvRevCap);
   const evEbitdaMultiple = explicitEvEbitdaMultiple || Math.max(numeric(comparableMultiples?.evEbitdaMedian), 0);
@@ -1591,7 +1661,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       : kind === "EV/EBITDA"
         ? comparableMultiples.evEbitdaPeerCount
         : comparableMultiples.evEbitPeerCount;
-    return "公開同業截尾中位數 " + kind + "（同業 " + formatNumber(count) + " 筆）";
+    return (twComparables?(kind==='EV/Revenue'?"同日同產業、營業利益率 0.5–2 倍範圍同業中位數 ":"同日同產業中位數 "):"公開同業截尾中位數 ") + kind + "（同業 " + formatNumber(count) + " 筆）";
   };
   enterpriseValueModel(
     "ev-revenue",
@@ -1902,7 +1972,9 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     );
   }
 
-  const filtered = robustModelFilter(candidates);
+  // In the relative-only stage, disagreement is disclosed rather than letting
+  // the number of EBITDA/EBIT variants erase an independent book/earnings view.
+  const filtered = twComparables ? {kept:candidates,removed:[] as ModelCandidate[]} : robustModelFilter(candidates, input.market === 'TW' && input.priceSource === 'Yahoo Finance daily close / daily-refresh-v1');
   for (const model of filtered.removed) {
     addExcluded(
       excludedModels,
@@ -1924,7 +1996,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       ...model,
       family,
       status: "applied",
-      weight: familyWeight / (familyCounts.get(family) ?? 1),
+      weight: twComparables ? 1 / filtered.kept.length : familyWeight / (familyCounts.get(family) ?? 1),
     };
   });
   const weightedAverage = (selector: (model: ValuationModel) => number) => (
@@ -1933,16 +2005,19 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       : 0
   );
   const fairValue = weightedAverage((model) => model.value);
+  // Matched-margin sales variants are correlated with earnings variants;
+  // extra variants must not manufacture additional independent evidence.
+  const informationCount=twComparables?new Set(models.map(m=>m.id==='pe'||m.id==='p-sales'?'earnings':m.id.startsWith('ev-')?'enterprise':m.family)).size:models.length;
   const dispersion = fairValue > 0 && models.length > 0
     ? models.reduce((sum, model) => sum + Math.abs(model.value - fairValue) * model.weight, 0) / fairValue
     : 0.6;
-  const modelCountFloor = models.length >= 7
+  const modelCountFloor = informationCount >= 7
     ? 0.12
-    : models.length >= 5
+    : informationCount >= 5
       ? 0.16
-      : models.length >= 3
+      : informationCount >= 3
         ? 0.22
-        : models.length >= 2
+        : informationCount >= 2
           ? 0.3
           : 0.42;
   const uncertainty = clamp(
@@ -1960,7 +2035,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     : 0;
   const upside = price > 0 ? (fairValue - price) / price : 0;
 
-  const netMarginFraction = rate(input.netMargin, 0);
+  const netMarginFraction = input.netMarginUnit === "percent" ? numeric(input.netMargin) / 100 : rate(input.netMargin, 0);
   const assetTurnover = clamp(numeric(input.assetTurnover, 1), 0, 5);
   const financialLeverage = clamp(numeric(input.financialLeverage, 1), 0, 10);
   const dupontRoe = input.netMargin !== undefined
@@ -1978,6 +2053,10 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const risk = input.riskOverride
     ?? (uncertainty >= 0.34 || debtRatio >= 80 ? "高" : uncertainty >= 0.22 ? "中" : "低");
   const historicalCautionReasons: string[] = [];
+  if(twComparables)historicalCautionReasons.push('台股同日同產業相對估值第一階段；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
+  if(earningsOperationsDivergence)historicalCautionReasons.push('營業利益與報告淨利背離；盈餘型模型暫不採用，需核對投資評價及非控制權益。');
+  if(twComparables && (input.financialMetrics?.nonControllingBookPerShare??0)>0)historicalCautionReasons.push('非控制權益目前僅有帳面值：小額橋接以帳面值近似並揭露；超過母公司權益 25% 時停用 EV 模型，待獨立評價。');
+  if(earningsBaseShift)historicalCautionReasons.push('EARNINGS_BASE_SHIFT：當期 EPS 與年度歷史有重大基礎變化；可能是營運成長、週期或特殊損益，不直接稱為一次性。保留原值試算，待前瞻／週期基礎覆核。');
   if (dataCompleteness === "limited") {
     historicalCautionReasons.push("公開財務欄位不完整。");
   }
@@ -2012,8 +2091,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   if (models.some((model) => /^dcf-(ebitda|revenue)-/.test(model.id))) {
     historicalCautionReasons.push("退出法使用公開同業終值倍數與 FCFF 近似，未納入分析師前瞻資料；倍數與成長假設仍可能造成較大分歧。");
   }
-  if (models.length < 2) {
-    historicalCautionReasons.push("適用模型少於兩種，缺少交叉驗證。");
+  if (informationCount < 2) {
+    historicalCautionReasons.push(twComparables?"獨立資料群少於兩種，相關模型變體不構成額外交叉驗證。":"適用模型少於兩種，缺少交叉驗證。");
   }
   if (dispersion >= 0.35) {
     historicalCautionReasons.push("適用模型結果分歧偏高。");
@@ -2068,6 +2147,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     epsNormalizationApplied: epsNormalization.applied,
     epsNormalizationMethod: epsNormalization.method,
     epsHistoryCount: epsNormalization.historyCount,
+    valuationReviewRequired:twComparables && (!validTwPeers || informationCount<2 || earningsOperationsDivergence || materialMinorityClaims || earningsBaseShift || dispersion>=.35),
   };
 
   const calibrated = calibrateFairValue(baseStock);

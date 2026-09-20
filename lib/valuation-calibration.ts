@@ -1,4 +1,5 @@
 import type { Stock, StockInput, ValuationConfidence } from "./valuation.ts";
+import { isFinancialCompany } from './company-classification.ts';
 import {
   EXPERT_CONSENSUS_TAIWAN_BENCHMARKS,
   EXPERT_CONSENSUS_TW_BENCHMARK_AS_OF,
@@ -16,10 +17,10 @@ export type CalibrationMetadata = {
   sampleSize: number;
   featureList: string[];
   metricSummary: {
-    holdoutMdApe: number;
-    holdoutMape: number;
-    directionalAccuracy: number;
-    spearmanCorr: number;
+    holdoutMdApe: number | null;
+    holdoutMape: number | null;
+    directionalAccuracy: number | null;
+    spearmanCorr: number | null;
   };
   datasetHash: string;
   fallbackMethod: string;
@@ -127,6 +128,17 @@ export function effectiveValuationUpside(
  * Pure, deterministic, robust against NaN/Infinity, and preserves native values.
  */
 export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {}): CalibratedValuationResult {
+  if(stock.market==='TW'&&(stock.valuationPolicy==='tw-comparables-v1'||stock.priceSource==='Yahoo Finance daily close / daily-refresh-v1')) {
+    // No historical ticker anchors, unvalidated quality uplift, or repeated
+    // cash-flow votes may replace the auditable current Taiwan model result.
+    const ood=detectOutOfDistribution(stock);
+    return {calibratedFairValue:stock.fairValue,calibratedRangeLow:stock.rangeLow,calibratedRangeHigh:stock.rangeHigh,
+      calibratedUpside:stock.upside,calibrationConfidence:stock.valuationConfidence,calibrationGap:0,
+      isOutOfDistribution:ood.isOod,oodReasons:ood.reasons,
+      calibrationMetadata:{modelVersion:'2026.09.20-tw-native-unfitted',trainingDate:'not-trained',sampleSize:0,
+        featureList:['validated current model outputs'],metricSummary:{holdoutMdApe:null,holdoutMape:null,directionalAccuracy:null,spearmanCorr:null},
+        datasetHash:'not-trained',fallbackMethod:'native-no-target-fitting'}};
+  }
   const nativeValue = Number.isFinite(stock.fairValue) && stock.fairValue > 0 ? stock.fairValue : stock.price;
   const enabled = options.enabled !== false;
 
@@ -237,7 +249,7 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
 
   // 2. Sector and Business Model Adaptation
   const sector = (stock.sector || "").toLowerCase();
-  const isFinance = sector.includes("finance") || sector.includes("bank") || sector.includes("insurance") || sector.includes("金融");
+  const isFinance = isFinancialCompany(stock);
   const isReit = sector.includes("reit") || sector.includes("real estate") || sector.includes("不動產");
 
   let blendWeight = options.blendWeight ?? 0.70; // 70% Robust consensus, 30% Native family-balanced
@@ -278,7 +290,7 @@ export function calibrateFairValue(stock: Stock, options: CalibrationOptions = {
   const calibrationGap = nativeValue > 0 ? (calibrated - nativeValue) / nativeValue : 0;
 
   let calibrationConfidence: ValuationConfidence = stock.valuationConfidence;
-  if (ood.isOod || validModels.length < 2) {
+  if (ood.isOod || validModels.length < 2 || stock.valuationConfidence === 'low') {
     calibrationConfidence = "low";
   } else if (stock.valuationConfidence === "high" && Math.abs(calibrationGap) <= 0.12) {
     calibrationConfidence = "high";

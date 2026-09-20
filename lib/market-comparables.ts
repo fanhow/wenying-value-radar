@@ -30,6 +30,19 @@ export type ComparableRow = {
 };
 
 export type ComparableMultiples = {
+  pbMedian?: number | null;
+  pbPeerCount?: number;
+  quoteDate?: string;
+  financialDateRange?: [string,string];
+  peerTickers?: string[];
+  /** Research assumption, not a vendor-derived parameter. */
+  salesMarginRatioLimit?: 2;
+  salesMarginEvidence?: {
+    targetNetMargin: number | null;
+    targetOperatingMargin: number | null;
+    psPeerTickers: string[];
+    evRevenuePeerTickers: string[];
+  };
   sector: string;
   /** Narrow business-model peer label when a curated group is available. */
   peerGroup?: string;
@@ -49,7 +62,7 @@ export type ComparableMultiples = {
   pFfoMedian: number | null;
   dataBasis: string;
   asOf: string | null;
-  method: "sector-trimmed-median" | "business-group-trimmed-median" | "business-group-with-sector-fallback";
+  method: "sector-trimmed-median" | "business-group-trimmed-median" | "business-group-with-sector-fallback" | "tw-industry-same-session-median";
 };
 
 const MIN_PEERS = 5;

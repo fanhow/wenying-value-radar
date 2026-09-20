@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.20.2";
+const SITE_REVISION = "Rev. 2026.09.20.3";
 
 const REVISION_ENTRIES = [
+  ['2026.09.20.3', '台股資料校驗與估值研究：修正產業分類、百分比單位、年度盈餘期間、平均權益 ROE、營業 EBITDA 與每股資料一致性；台股原生估值不再套用未驗證校準溢價。新增同日同業相對估值研究原型、利潤率可比性及非控制權益檢查，仍為稽核用途，尚未接入正式排行榜；前瞻模型與外部數值對齊未完成。', 'Taiwan valuation data audit: correct industry classification, margin units, annual earnings periods, average-equity ROE, operating EBITDA and per-share reconciliation. Remove unvalidated calibration uplifts from current Taiwan inputs. Add an audit-only same-session relative-valuation prototype with margin-comparability and minority-interest checks; it is not yet connected to production rankings and forward-model alignment remains incomplete.'],
   ['2026.09.20.2', '四因子研究榜新增科技分類／全部合格非金融股票範圍切換，預設科技；兩個市場內重新計算百分位，不改變二十檔估值比較、原排行榜或估值引擎。未知科技分類排除，不冒充原廠完整股票池。', 'Added technology/all-eligible non-financial universe selection to the four-factor research screen, defaulting to technology. Recompute within-market percentiles without changing reference comparisons, existing valuation rankings or the engine. Exclude unknown technology classifications rather than claiming a verified vendor universe.'],
   ['2026.09.20.1', '新增台美二十檔外部公允價值差異檢查：同日同價才計入統計，缺資料不算零；既有輪動頁加入現行資料四因子研究候選與完整公式，明示不是原廠 AI、未回測。重新核對策略持股數、頻率及美股價值策略門檻矛盾。每日管線接受同截止日 TTM、補入 EBITDA、排除交易日上限以後的異常 K 線；原估值引擎與私人網址保留，不用外部目標價固定本站估值。', 'Added a 20-stock Taiwan/US fair-value comparison with matched-date/price statistics and explicit missing values. Added a live four-factor research baseline and transparent formulas to rotation research, without claiming proprietary AI replication or backtested results. Rechecked basket sizes, frequencies and conflicting value-strategy thresholds. Daily ingestion accepts aligned TTM, supplies EBITDA and rejects candles beyond the verified completed session. Preserve the valuation engine, private URL and independent valuations.'],
   ['2026.09.18.3', '大型案例圖改以完整尺寸、像素一致的無損 WebP 提供，原始 PNG 留在專案；舊案例圖連結自動導向對應圖片，型態圖庫的 PNG 下載保留。', 'Serve large case charts as full-size, pixel-identical lossless WebP while retaining source PNGs. Redirect historical case-image links and preserve setup-library PNG downloads.'],

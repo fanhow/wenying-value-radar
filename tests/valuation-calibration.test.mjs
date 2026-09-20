@@ -169,7 +169,8 @@ test("supports Taiwan market stocks with verified currency and sanity bounds", (
   assert.ok(tsmc.calibratedFairValue > 800);
   assert.ok(tsmc.calibratedFairValue < 2000);
   assert.ok(Number.isFinite(tsmc.calibratedFairValue));
-  assert.ok(tsmc.calibrationConfidence === "medium" || tsmc.calibrationConfidence === "high");
+  // A calibration transform cannot upgrade low-confidence source assumptions.
+  assert.equal(tsmc.calibrationConfidence, tsmc.valuationConfidence);
 });
 
 test("calibration output is 100% deterministic and reproducible", () => {
