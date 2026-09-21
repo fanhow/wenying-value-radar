@@ -1,6 +1,12 @@
 # 穩盈價值雷達（WenYing Value Radar）估值校準實驗與 Benchmark 報告
 **Valuation Calibration Experiments, Holdout Benchmark & Model Selection Report**
 
+> **2026-09-21 更正：以下保留的是舊報告，不能作為外部估值準確率或目前台股模型驗證。**
+> 原產生器在缺少外部答案時採用本站模型自產 proxy；市場／產業統計取全樣本，並非 holdout；缺值或零值曾被固定百分比取代。Method O 是固定 heuristic，不等同現行 production，更沒有在 train slice 擬合。
+> 舊 importer 未把台股實際財務表接入計算，缺值採 EPS 5／BVPS 30／FCF 4 等預設。本 checkout 沒有原工作簿與 dataset，因此無法重現歷史 110 筆答案來源比例；不可斷言全部是合成資料。
+> 原文「1.93% → 3.29%／2.74% → 4.58% 是改善」及「100% → 81.8% 是提升」均方向錯誤；台股 0.4%、最佳模型、零風險等結論不獲本次驗證支持。以下數字只作歷史追溯，**尚未重新執行舊實驗或重建原工作簿**。
+> 產生器現已改為 diagnostic-only、保留真零／缺值及答案來源計數；本次沒有修改正式估值公式。當前研究狀態見 [台股對齊紀錄](taiwan-valuation-alignment-20260920.md)。
+
 ---
 
 ## 摘要與核心結論 (Executive Summary)

@@ -2,9 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { calculateStock } from "../lib/valuation.ts";
 import { importExpertConsensusTrainingData } from "./import-expert-consensus-training-data.mjs";
+import { selectLegacyBenchmarkTarget, summarizeLegacyTargets, formatLegacyMetric, renderLegacyBenchmarkReport } from "./legacy-benchmark-report.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const benchmarkOutputPath = path.join(repoRoot, "docs/valuation-benchmark.md");
+const benchmarkOutputPath = path.join(repoRoot, "outputs/legacy-valuation-benchmark-diagnostic.md");
 
 // Helper functions for statistics
 function median(values) {
@@ -109,6 +110,7 @@ function evaluatePredictions(records) {
 
 // Generate cross-validation / benchmark splits and run all methods
 export async function runValuationBenchmark() {
+  console.warn("LEGACY_DIAGNOSTIC_ONLY: mixed unverified workbook/self-model targets; defaults in inputs; no fitted training, independent external holdout, or production accuracy claim.");
   console.log("===============================================================");
   console.log("   WENYING VALUE RADAR × EXPERT CONSENSUS VALUATION BENCHMARK LAB   ");
   console.log("===============================================================");
@@ -117,8 +119,8 @@ export async function runValuationBenchmark() {
   const universe = dataset.universe;
   const usSnapshot = JSON.parse(await fs.readFile(path.join(repoRoot, "lib/us-market-snapshot.json"), "utf8"));
 
-  // Build a comprehensive benchmark evaluation sample
-  // We use the 77 universe stocks + extended benchmark stocks with known financials and Expert Consensus model targets
+  // Legacy mixed sample: workbook numbers and self-model proxies are not an
+  // independently verified external benchmark; financial inputs include defaults.
   const sampleItems = [];
 
   for (const item of universe) {
@@ -146,20 +148,8 @@ export async function runValuationBenchmark() {
       debtPerShare: item.financials.debtPerShare,
     });
 
-    // Determine target (ground truth)
-    // If exact snapshot target exists, use it. Otherwise use proxy teacher target from verified multi-model Expert Consensus baseline
-    let target = item.expertConsensus.fairValue;
-    if (!target || target <= 0) {
-      // High-precision Expert Consensus Multi-Model Consensus Proxy:
-      // Expert Consensus is documented as an average of valid models (growth exit DCF, EBITDA exit DCF, peer multiples, EPV, etc.)
-      const validModels = stock.models.filter((m) => m.value > 0);
-      if (validModels.length > 0) {
-        // Expert Consensus average of valid models with model-specific weighting
-        target = mean(validModels.map((m) => m.value));
-      } else {
-        target = stock.fairValue;
-      }
-    }
+    // Workbook numbers are not source/date verified here; proxies stay labelled.
+    const targetSelection = selectLegacyBenchmarkTarget(stock, item.expertConsensus.fairValue);
 
     sampleItems.push({
       market: item.market,
@@ -168,14 +158,13 @@ export async function runValuationBenchmark() {
       sector: item.sector,
       price: stock.price,
       stock,
-      target,
+      ...targetSelection,
       models: stock.models,
       financials: item.financials,
-      isRealTarget: Boolean(item.expertConsensus.fairValue),
     });
   }
 
-  // Also add top 50 diversified US large & mid caps from usSnapshot for out-of-sample testing
+  // Additional legacy US rows use self-model proxy answers, not external holdout.
   const additionalTickers = ["NVDA", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO", "JPM", "V", "UNH", "PG", "HD", "JNJ", "COST", "ABBV", "BAC", "KO", "PEP", "MRK", "AMD", "PLTR", "GE", "CAT", "IBM", "QCOM", "TXN", "INTU", "NOW", "AMAT", "ISRG", "PFE", "SYK", "LOW", "BKNG", "T", "VZ", "NEE", "SCHW", "RTX", "LMT", "DE", "UNP", "SPGI", "GS", "MS", "BLK", "PGR", "C", "AXP", "MCO"];
   
   for (const t of additionalTickers) {
@@ -207,8 +196,7 @@ export async function runValuationBenchmark() {
       dividendPerShare: usRow.dividendPerShare,
     });
 
-    const validModels = stock.models.filter((m) => m.value > 0);
-    const target = validModels.length > 0 ? mean(validModels.map((m) => m.value)) : stock.fairValue;
+    const targetSelection = selectLegacyBenchmarkTarget(stock);
 
     sampleItems.push({
       market: "US",
@@ -217,7 +205,7 @@ export async function runValuationBenchmark() {
       sector: stock.sector,
       price: stock.price,
       stock,
-      target,
+      ...targetSelection,
       models: stock.models,
       financials: {
         eps: usRow.eps,
@@ -227,7 +215,6 @@ export async function runValuationBenchmark() {
         roe: 18,
         debtRatio: usRow.debtRatio,
       },
-      isRealTarget: false,
     });
   }
 
@@ -237,7 +224,7 @@ export async function runValuationBenchmark() {
   const trainItems = sampleItems.slice(0, Math.floor(sampleItems.length * 0.8));
   const holdoutItems = sampleItems.slice(Math.floor(sampleItems.length * 0.8));
 
-  console.log(`[Splits] Train Set: ${trainItems.length} stocks | Holdout Set: ${holdoutItems.length} stocks`);
+  console.log(`[Slices] First 80% (not fitted): ${trainItems.length} | Last 20% (not independent holdout): ${holdoutItems.length}`);
 
   // -------------------------------------------------------------
   // EXPERIMENT DEFINITIONS (Methods A through P)
@@ -261,7 +248,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "C",
-      name: "Method C: Inverse Historical Error Weighted Models",
+      name: "Method C: Legacy Fixed Model Weights (not measured historical errors)",
       predict: (item) => {
         const valid = item.models.filter((m) => m.value > 0);
         if (valid.length === 0) return item.stock.fairValue;
@@ -297,7 +284,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "D",
-      name: "Method D: Model Family Historical Error Weighting",
+      name: "Method D: Legacy Fixed Family Weights (not measured historical errors)",
       predict: (item) => {
         const valid = item.models.filter((m) => m.value > 0);
         if (valid.length === 0) return item.stock.fairValue;
@@ -421,7 +408,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "K",
-      name: "Method K: Regularized Ridge Regression",
+      name: "Method K: Legacy Linear Heuristic (not fitted ridge regression)",
       predict: (item) => {
         const dcf = item.models.find((m) => m.id.startsWith("dcf-fcf"))?.value ?? item.stock.fairValue;
         const pe = item.models.find((m) => m.id === "pe" || m.id === "pe-peer")?.value ?? item.stock.fairValue;
@@ -433,7 +420,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "L",
-      name: "Method L: Robust Huber Loss Regression",
+      name: "Method L: Robust Huber-Style Aggregation (not fitted regression)",
       predict: (item) => {
         const valid = item.models.filter((m) => m.value > 0);
         if (valid.length === 0) return item.stock.fairValue;
@@ -454,9 +441,9 @@ export async function runValuationBenchmark() {
     },
     {
       id: "M",
-      name: "Method M: Non-Negative Simplex Convex Combination (NNLS)",
+      name: "Method M: Legacy Fixed Non-Negative Blend (not fitted NNLS)",
       predict: (item) => {
-        // Optimal simplex weights learned across holdout
+        // Legacy fixed weights; no training or optimization is performed.
         const valid = item.models.filter((m) => m.value > 0);
         if (valid.length === 0) return item.stock.fairValue;
         const weights = {
@@ -482,7 +469,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "N",
-      name: "Method N: Non-Linear Gradient Boosted Ensemble Surrogate",
+      name: "Method N: Legacy Fixed Non-Linear Heuristic (not trained boosting)",
       predict: (item) => {
         const native = item.stock.fairValue;
         const growth = item.financials?.revenueGrowth ?? 10;
@@ -498,7 +485,7 @@ export async function runValuationBenchmark() {
     },
     {
       id: "O",
-      name: "Method O: Multi-Feature Post-Hoc Calibration Layer (Production Design)",
+      name: "Method O: Legacy Median/Native Heuristic (not production)",
       predict: (item) => {
         const native = item.stock.fairValue;
         const valid = item.models.filter((m) => m.value > 0);
@@ -526,7 +513,7 @@ export async function runValuationBenchmark() {
       id: "P",
       name: "Method P: Two-Stage Model Filter + Calibrated Aggregation",
       predict: (item) => {
-        // Stage 1: Filter models by Expert Consensus eligibility rules
+        // Stage 1: Legacy local eligibility assumptions, not external AI rules.
         const sector = (item.sector || "").toLowerCase();
         const growth = item.financials?.revenueGrowth ?? 10;
         let stage1 = item.models.filter((m) => m.value > 0);
@@ -613,26 +600,26 @@ export async function runValuationBenchmark() {
     {
       Method: "Baseline Native (Method A)",
       "Price Dependent": "No",
-      "Holdout MdAPE": `${(priceAblationComparison.baselineNative.mdape * 100).toFixed(2)}%`,
-      "Holdout MAPE": `${(priceAblationComparison.baselineNative.mape * 100).toFixed(2)}%`,
-      "Direction Acc": `${(priceAblationComparison.baselineNative.directionAccuracy * 100).toFixed(1)}%`,
-      "Spearman Corr": priceAblationComparison.baselineNative.spearmanCorr.toFixed(3),
+      "Holdout MdAPE": `${formatLegacyMetric(priceAblationComparison.baselineNative.mdape, {percent:true})}`,
+      "Holdout MAPE": `${formatLegacyMetric(priceAblationComparison.baselineNative.mape, {percent:true})}`,
+      "Direction Acc": `${formatLegacyMetric(priceAblationComparison.baselineNative.directionAccuracy, {percent:true})}`,
+      "Spearman Corr": formatLegacyMetric(priceAblationComparison.baselineNative.spearmanCorr),
     },
     {
-      Method: "Production Calibrated (Method O)",
+      Method: "Legacy heuristic (Method O, not production)",
       "Price Dependent": "No",
-      "Holdout MdAPE": `${(priceAblationComparison.priceIndependent.mdape * 100).toFixed(2)}%`,
-      "Holdout MAPE": `${(priceAblationComparison.priceIndependent.mape * 100).toFixed(2)}%`,
-      "Direction Acc": `${(priceAblationComparison.priceIndependent.directionAccuracy * 100).toFixed(1)}%`,
-      "Spearman Corr": priceAblationComparison.priceIndependent.spearmanCorr.toFixed(3),
+      "Holdout MdAPE": `${formatLegacyMetric(priceAblationComparison.priceIndependent.mdape, {percent:true})}`,
+      "Holdout MAPE": `${formatLegacyMetric(priceAblationComparison.priceIndependent.mape, {percent:true})}`,
+      "Direction Acc": `${formatLegacyMetric(priceAblationComparison.priceIndependent.directionAccuracy, {percent:true})}`,
+      "Spearman Corr": formatLegacyMetric(priceAblationComparison.priceIndependent.spearmanCorr),
     },
     {
       Method: "Price Bound Filtered (Method I)",
       "Price Dependent": "Yes",
-      "Holdout MdAPE": `${(priceAblationComparison.priceDependent.mdape * 100).toFixed(2)}%`,
-      "Holdout MAPE": `${(priceAblationComparison.priceDependent.mape * 100).toFixed(2)}%`,
-      "Direction Acc": `${(priceAblationComparison.priceDependent.directionAccuracy * 100).toFixed(1)}%`,
-      "Spearman Corr": priceAblationComparison.priceDependent.spearmanCorr.toFixed(3),
+      "Holdout MdAPE": `${formatLegacyMetric(priceAblationComparison.priceDependent.mdape, {percent:true})}`,
+      "Holdout MAPE": `${formatLegacyMetric(priceAblationComparison.priceDependent.mape, {percent:true})}`,
+      "Direction Acc": `${formatLegacyMetric(priceAblationComparison.priceDependent.directionAccuracy, {percent:true})}`,
+      "Spearman Corr": formatLegacyMetric(priceAblationComparison.priceDependent.spearmanCorr),
     },
   ]);
 
@@ -642,16 +629,16 @@ export async function runValuationBenchmark() {
       ID: r.id,
       Method: r.name.split(":")[1]?.trim() || r.name,
       "Price Dep": r.isPriceDependent ? "Yes" : "No",
-      "Holdout MdAPE": `${(r.mdape * 100).toFixed(2)}%`,
-      "Holdout MAPE": `${(r.mape * 100).toFixed(2)}%`,
-      "Med Signed Err": `${(r.medianSignedError * 100).toFixed(2)}%`,
-      "Dir Acc": `${(r.directionAccuracy * 100).toFixed(1)}%`,
-      "Rank Corr": r.spearmanCorr.toFixed(3),
-      "±10% Hit": `${(r.within10Pct * 100).toFixed(1)}%`,
+      "Holdout MdAPE": `${formatLegacyMetric(r.mdape, {percent:true})}`,
+      "Holdout MAPE": `${formatLegacyMetric(r.mape, {percent:true})}`,
+      "Med Signed Err": `${formatLegacyMetric(r.medianSignedError, {percent:true})}`,
+      "Dir Acc": `${formatLegacyMetric(r.directionAccuracy, {percent:true})}`,
+      "Rank Corr": formatLegacyMetric(r.spearmanCorr),
+      "±10% Hit": `${formatLegacyMetric(r.within10Pct, {percent:true})}`,
     })),
   );
 
-  // Generate docs/valuation-benchmark.md
+  // Write a private diagnostic without overwriting the historical report.
   await generateBenchmarkMarkdown({
     overallResults,
     holdoutResults,
@@ -662,6 +649,7 @@ export async function runValuationBenchmark() {
     sampleCount: sampleItems.length,
     trainCount: trainItems.length,
     holdoutCount: holdoutItems.length,
+    targetProvenance: { overall: summarizeLegacyTargets(sampleItems), holdout: summarizeLegacyTargets(holdoutItems) },
   });
 
   console.log(`\n[Benchmark Report] Successfully generated: ${benchmarkOutputPath}`);
@@ -669,95 +657,7 @@ export async function runValuationBenchmark() {
 }
 
 async function generateBenchmarkMarkdown(data) {
-  const { overallResults, holdoutResults, sectorBreakdowns, marketBreakdowns, fileHash, datasetHash, sampleCount, trainCount, holdoutCount } = data;
-
-  const content = `# 穩盈價值雷達（WenYing Value Radar）估值校準實驗與 Benchmark 報告
-**Valuation Calibration Experiments, Holdout Benchmark & Model Selection Report**
-
----
-
-## 摘要與核心結論 (Executive Summary)
-
-本研究針對 WenYing Value Radar 估值引擎進行了全面性的量化校準實驗（涵蓋 Method A 到 Method P 共 16 種架構），旨在使公允價值在跨產業、跨市場（台股與美股）及未見過的 Holdout 測試集上，最大程度逼近 **Expert Consensus Fair Value**，同時嚴格維護估值架構的數學穩定性、可解釋性與防禦性。
-
-### 核心量化指標改善對比 (Key Results Summary)
-- **Holdout MdAPE（中位數絕對百分比誤差）**：從 Native 基線的 **${(holdoutResults[0].mdape * 100).toFixed(2)}%** 大幅下降至 Method O（多特徵強健校準層）的 **${(holdoutResults.find((r) => r.id === "O").mdape * 100).toFixed(2)}%**（改善幅度達 **${(((holdoutResults[0].mdape - holdoutResults.find((r) => r.id === "O").mdape) / holdoutResults[0].mdape) * 100).toFixed(1)}%**）。
-- **Holdout MAPE（平均絕對百分比誤差）**：從 **${(holdoutResults[0].mape * 100).toFixed(2)}%** 下降至 **${(holdoutResults.find((r) => r.id === "O").mape * 100).toFixed(2)}%**。
-- **誤差落在 $\pm 10\%$ 內的比例**：從 **${(holdoutResults[0].within10Pct * 100).toFixed(1)}%** 提升至 **${(holdoutResults.find((r) => r.id === "O").within10Pct * 100).toFixed(1)}%**。
-- **方向一致率（Directional Alignment）**：達到 **${(holdoutResults.find((r) => r.id === "O").directionAccuracy * 100).toFixed(1)}%**。
-- **價格特徵消融（Price Ablation）結論**：在嚴格的 Holdout 驗證下，**不依賴當前股價的純內在校準層（Method O）** 表現出與價格約束模型（Method I）同等甚至更優的泛化能力，同時徹底避免了「用市價決定公允價值」的循環依賴。
-
----
-
-## 一、實驗資料集與劃分 (Dataset & Split)
-
-| 項目 | 數值 / 說明 |
-|---|---|
-| **來源活頁簿** | \`outputs/expert-consensus-training-20260817/WenYing-Expert-Consensus-Training-Template-2026-08-17.xlsx\` |
-| **來源檔 SHA-256** | \`${fileHash}\` |
-| **生成 Benchmark Dataset Hash** | \`${datasetHash}\` |
-| **評估樣本總數** | ${sampleCount} 檔股票 (台股 + 美股大型/中型/成長/防禦/金融/REIT 全光譜) |
-| **訓練集 (Train Split, 80%)** | ${trainCount} 檔股票 |
-| **獨立驗證集 (Holdout Test Split, 20%)** | ${holdoutCount} 檔股票 |
-| **涵蓋產業** | 科技硬體、半導體、軟體、金融保險、醫療保健、民生消費、工業製造、能源、原物料、公用事業、不動產 (REIT) |
-
----
-
-## 二、所有量化實驗方法 (Methods A to P) 比較
-
-| ID | 實驗方法名稱 | 是否依賴市價 | Holdout MdAPE | Holdout MAPE | 中位偏差 (Signed) | 方向一致率 | Spearman 相關 | $\pm 10\%$ 命中率 |
-|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-${holdoutResults
-  .map(
-    (r) =>
-      `| **${r.id}** | ${r.name.split(":")[1]?.trim() || r.name} | ${r.isPriceDependent ? "是" : "否"} | **${(r.mdape * 100).toFixed(2)}%** | ${(r.mape * 100).toFixed(2)}% | ${(r.medianSignedError * 100).toFixed(2)}% | ${(r.directionAccuracy * 100).toFixed(1)}% | ${r.spearmanCorr.toFixed(3)} | ${(r.within10Pct * 100).toFixed(1)}% |`,
-  )
-  .join("\n")}
-
----
-
-## 三、價格特徵消融實驗 (Price Feature Ablation)
-
-> [!NOTE]
-> **消融實驗目的**：驗證「納入當前股價」是否會帶來循環依賴（Circularity），以及在「完全不使用當前股價」的情況下，系統能否依然高度逼近 Expert Consensus Fair Value。
-
-| 實驗組別 | 代表方法 | 使用特徵 | Holdout MdAPE | Holdout MAPE | 系統循環依賴風險 | 推薦等級 |
-|---|---|---|:---:|:---:|:---:|:---:|
-| **基準組 (Baseline)** | Method A (現有原生家族平衡) | 純基本面財報與倍數 | ${(holdoutResults[0].mdape * 100).toFixed(2)}% | ${(holdoutResults[0].mape * 100).toFixed(2)}% | 無 | 基準 |
-| **無價格純內在校準組** | **Method O (多特徵強健校準層)** | 財報、成長、ROE、槓桿、模型分歧 | **${(holdoutResults.find((r) => r.id === "O").mdape * 100).toFixed(2)}%** | **${(holdoutResults.find((r) => r.id === "O").mape * 100).toFixed(2)}%** | **零風險 (100% 獨立)** | **最優推薦 (Production Default)** |
-| **有價格約束對照組** | Method I (股價區間排除) | 包含當前股價 $[0.25P, 4.0P]$ | ${(holdoutResults.find((r) => r.id === "I").mdape * 100).toFixed(2)}% | ${(holdoutResults.find((r) => r.id === "I").mape * 100).toFixed(2)}% | 高（股價暴跌會縮減估值） | 僅作對照參考 |
-
----
-
-## 四、主要產業與市場別誤差細分 (Breakdown Analysis)
-
-### 1. 各主要產業 MdAPE 比較
-| 產業類別 (Sector) | Method A (原生基線) | Method B (簡單平均) | Method L (Huber 損失) | Method O (正式校準層) | 改善幅度 |
-|---|:---:|:---:|:---:|:---:|:---:|
-| **科技與半導體 (Technology)** | ${(sectorBreakdowns.A?.Technology?.mdape * 100 || 14.2).toFixed(1)}% | ${(sectorBreakdowns.B?.Technology?.mdape * 100 || 11.5).toFixed(1)}% | ${(sectorBreakdowns.L?.Technology?.mdape * 100 || 8.9).toFixed(1)}% | **${(sectorBreakdowns.O?.Technology?.mdape * 100 || 7.4).toFixed(1)}%** | 顯著改善 |
-| **金融與保險 (Financials)** | ${(sectorBreakdowns.A?.Financials?.mdape * 100 || 16.8).toFixed(1)}% | ${(sectorBreakdowns.B?.Financials?.mdape * 100 || 13.2).toFixed(1)}% | ${(sectorBreakdowns.L?.Financials?.mdape * 100 || 9.8).toFixed(1)}% | **${(sectorBreakdowns.O?.Financials?.mdape * 100 || 8.1).toFixed(1)}%** | 顯著改善 |
-| **醫療保健 (Health Care)** | ${(sectorBreakdowns.A?.["Health Care"]?.mdape * 100 || 15.5).toFixed(1)}% | ${(sectorBreakdowns.B?.["Health Care"]?.mdape * 100 || 12.4).toFixed(1)}% | ${(sectorBreakdowns.L?.["Health Care"]?.mdape * 100 || 9.1).toFixed(1)}% | **${(sectorBreakdowns.O?.["Health Care"]?.mdape * 100 || 7.9).toFixed(1)}%** | 顯著改善 |
-| **工業製造 (Industrials)** | ${(sectorBreakdowns.A?.Industrials?.mdape * 100 || 13.9).toFixed(1)}% | ${(sectorBreakdowns.B?.Industrials?.mdape * 100 || 10.8).toFixed(1)}% | ${(sectorBreakdowns.L?.Industrials?.mdape * 100 || 8.4).toFixed(1)}% | **${(sectorBreakdowns.O?.Industrials?.mdape * 100 || 7.1).toFixed(1)}%** | 顯著改善 |
-| **不動產 (Real Estate / REIT)** | ${(sectorBreakdowns.A?.["Real Estate"]?.mdape * 100 || 18.2).toFixed(1)}% | ${(sectorBreakdowns.B?.["Real Estate"]?.mdape * 100 || 14.5).toFixed(1)}% | ${(sectorBreakdowns.L?.["Real Estate"]?.mdape * 100 || 10.2).toFixed(1)}% | **${(sectorBreakdowns.O?.["Real Estate"]?.mdape * 100 || 8.6).toFixed(1)}%** | 顯著改善 |
-
-### 2. 市場別 MdAPE 比較 (TW vs US)
-| 市場 (Market) | Method A (原生基線) | Method O (正式校準層) | 樣本數 |
-|---|:---:|:---:|:---:|
-| **台股 (TW Market)** | ${(marketBreakdowns.A?.TW?.mdape * 100 || 15.1).toFixed(1)}% | **${(marketBreakdowns.O?.TW?.mdape * 100 || 8.2).toFixed(1)}%** | 20+ 檔 |
-| **美股 (US Market)** | ${(marketBreakdowns.A?.US?.mdape * 100 || 13.8).toFixed(1)}% | **${(marketBreakdowns.O?.US?.mdape * 100 || 7.2).toFixed(1)}%** | 60+ 檔 |
-
----
-
-## 五、最終生產環境模型選擇 (Production Model Selection)
-
-基於上述數據，**Method O（多特徵強健校準層，結合 Huber Loss 凸組合與產業/獲利彈性調節）** 被選定為生產環境的正式校準架構，理由如下：
-1. **Holdout MdAPE 最低**（約 ${(holdoutResults.find((r) => r.id === "O").mdape * 100).toFixed(1)}%），顯著優於純單一平均或單一模型。
-2. **完全獨立於市價**，具備真實內在估值防禦力，符合價值投資哲學。
-3. **具備數學保證**：所有權重非負且加總有界，杜絕除以零、NaN、Infinity 及負數輸出。
-4. **雙軌可解釋架構**：保留原生 Native Fair Value 作為底層審查，使用者可在前端同時查看原生值、校準值及差異百分比。
-`;
-
-  await fs.writeFile(benchmarkOutputPath, content, "utf8");
+  await fs.writeFile(benchmarkOutputPath, renderLegacyBenchmarkReport(data), "utf8");
 }
 
 if (process.argv[1] && process.argv[1].endsWith("benchmark-expert-consensus-calibration.mjs")) {
