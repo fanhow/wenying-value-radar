@@ -106,14 +106,16 @@ function median(values) {
   const a=[...values].sort((x,y)=>x-y),i=Math.floor(a.length/2);
   return a.length%2?a[i]:a[i-1]+(a[i]-a[i-1])/2;
 }
-export function studyHistoricalMultiples(captures) {
-  if(!Array.isArray(captures))throw new Error('INVALID_CAPTURES');
-  const sources=captures.map(parseHistoricalCapture),byKey=new Map();
+// Shared arithmetic only; each board's adapter must validate its own raw source.
+export function summarizeOwnHistorySources(sources,issuers,board) {
+  if(!['TWSE','TPEx'].includes(board)||!Array.isArray(issuers)||new Set(issuers.map(i=>i.ticker)).size!==issuers.length)throw new Error('INVALID_SUMMARY_SCOPE');
+  const byKey=new Map();
   for(const source of sources) {
+    if(source.board!==board||!issuers.some(i=>i.ticker===source.ticker)||!HISTORY_YEARS.includes(source.year))throw new Error('SUMMARY_SOURCE_SCOPE_MISMATCH');
     const key=`${source.ticker}|${source.year}`;
     if(byKey.has(key))throw new Error('DUPLICATE_CAPTURE');byKey.set(key,source);
   }
-  const rows=HISTORY_ISSUERS.map(issuer=>{
+  return issuers.map(issuer=>{
     const years=HISTORY_YEARS.map(year=>{
       const source=byKey.get(`${issuer.ticker}|${year}`),selected=source?.selected;
       return {year,observationDate:selected?.observationDate??null,financialPeriodEnd:selected?.financialPeriodEnd??null,
@@ -128,8 +130,12 @@ export function studyHistoricalMultiples(captures) {
         positiveYearsDescriptiveMedian:median(values),completeFiveYearMedian:eligible.length===HISTORY_YEARS.length?median(values):null,
         status:eligible.length===HISTORY_YEARS.length?'complete-five-observations':eligible.length?'partial-positive-years':'unavailable'};
     };
-    return {...issuer,board:'TWSE',years,pe:summary('pe'),pb:summary('pb')};
+    return {...issuer,board,years,pe:summary('pe'),pb:summary('pb')};
   });
+}
+export function studyHistoricalMultiples(captures) {
+  if(!Array.isArray(captures))throw new Error('INVALID_CAPTURES');
+  const rows=summarizeOwnHistorySources(captures.map(parseHistoricalCapture),HISTORY_ISSUERS,'TWSE');
   return {version:'twse-own-history-reference-multiples-v1',researchOnly:true,protocolSha256:HISTORY_PROTOCOL_SHA,
     method:'For each fixed issuer/year, select the latest December observation before validating its ratios; no fallback day or month.',
     methodSource:'https://accessibility.twse.com.tw/zh/trading/historical/bwibbu.html',
