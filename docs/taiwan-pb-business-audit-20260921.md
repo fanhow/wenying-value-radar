@@ -16,6 +16,16 @@
 
 「PB peers 的 ROE 太高」可以是志超的可比性疑慮，卻不是五檔共通結論。精星 ROE 接近同行中位數，瑞鼎主要差異是銷售倍數，瑞儀與新麥則高於各自 peers ROE。不能用统一折扣或把全部 PB 調低解決。
 
+### 瑞儀追加 PE 核對：不能把股數差異誤當全部估值差異
+
+2026-09-21 01:21:38–01:28:57 UTC 的觀察時窗內唯讀[外部 PE 模板](https://hk.investing.com/pro/TWSE:6176/models/pe-multiples)，必要觀察保存在私人 ignored `outputs/taiwan-model-audit/radiant-6176-pe-observations-20260921.json`。模板內 Market Price 為91.90，但頁首已95.90，先前綜觀96.10；日期未驗證，因此不算同日同價驗證樣本，也不能直接比較 upside。
+
+- 本站 PE 分支256.293085＝供應商稀釋EPS10.896742 × 同日廣義光電業47家PE中位數23.520157。外部 benchmark median 顯示23.5x，**本例兩邊同行基準中位數很接近，但它另選9.3x，歷史中位數10.3x**。選定倍數不是 benchmark median，未知的選擇規則不能以折扣反推後硬接入。
+- 外部 LTM 分支顯示淨利3,825m、流通股345.2m、權益值35,529m及每股值102.93；其公式是總淨利乘選定PE，再除普通股數。它不是直接用綜觀稀釋EPS10.96乘9.3。資料均經顯示四捨五入，不能要求顯示值乘除與隱藏精度完全一致。
+- 本站凍結淨利／provider shares＝11.079769，與reported diluted EPS相差約1.68%（按price/EPS與price/net-per-share比值）。就這個凍結輸入而言，這種分母差異不足以解釋256.29與102.93的倍數差；也不是把兩種EPS互換的授權。
+- 外部前瞻分支淨利3,446m對應Supporting Financials的 **Two Fiscal Years Forward**，最新FY為Dec-25、LTM為Jun-26；不是未來12個月。顯示前瞻PE10.9x及109.12，與LTM102.93的均值在四捨五入範圍內吻合合成106.02。不能把FY+2改名NTM或捏造共識。
+- 股數與公司行動的官方補證見 `taiwan-official-book-audit-20260921.md`；目前只更正來源語意，不替換原始EPS/BVPS，不把外部selected multiples或FV存入production。
+
 現行 PB peers 只要求有效正淨值、PB<=30、至少五家與 IQR 範圍，沒有獲利能力／資產品質相容性。這是模型假設缺口，不是已證明乘法公式錯誤。
 
 ## 志超：外部 selected 倍數不等於 benchmark median

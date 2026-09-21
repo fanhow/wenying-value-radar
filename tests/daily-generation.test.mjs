@@ -44,6 +44,45 @@ test('complete-cohort peers are order independent, retain 400 bars and pure tech
   input[0].stock.updatedAt='2020-01-01';assert.throws(()=>prepareTaiwanRefreshGeneration(input,runId),/MIXED_TAIWAN/);
 });
 
+function providerShareRecords() {
+  return records().map(r=>({...r,stock:{...r.stock,financialMetrics:{...r.stock.financialMetrics,
+    shareBasis:'provider-as-of-ordinary',shareAsOfDate:r.stock.financialDataDate,shareSourceField:'quarterlyOrdinarySharesNumber'}}}));
+}
+test('unverified provider share metadata preserves ready, ranking and technical data through atomic generation',async()=>{
+  const legacy=prepareTaiwanRefreshGeneration(records(),runId),rows=prepareTaiwanRefreshGeneration(providerShareRecords(),runId);
+  for(let i=0;i<rows.length;i++) {
+    assert.equal(rows[i].status,'ready');assert.deepEqual(rows[i].history,legacy[i].history);
+    assert.deepEqual(rows[i].stock.comparableMultiples,legacy[i].stock.comparableMultiples);
+    const state=dailyValuationState(rows[i].stock,runId),before=dailyValuationState(legacy[i].stock,runId);
+    assert.equal(state.rankingEligible,before.rankingEligible);assert.equal(state.upside,before.upside);
+    assert.deepEqual(state.stock.models,before.stock.models);assert.equal(rows[i].history.candles.length,400);
+    assert.doesNotThrow(()=>validateRecord(rows[i],manifest(rows),runId));
+  }
+  const db=database();await upload(db,rows);assert.equal((await write(db,{action:'finalize'})).status,200);
+  const stored=JSON.parse(db.raw.prepare('SELECT stock FROM daily_refresh_records WHERE ticker=?').get(rows[0].ticker).stock);
+  assert.deepEqual(stored.financialMetrics,rows[0].stock.financialMetrics);
+});
+test('malformed new share metadata is rejected by generation and batch validation, not silently downgraded',()=>{
+  for(const patch of [{shareAsOfDate:'2000-01-01'},{shareAsOfDate:undefined},{shareSourceField:'wrong'},
+    {shareBasis:'period-end-ordinary'},{shareBasis:'verified-current-action-ordinary'}]) {
+    const rows=providerShareRecords();Object.assign(rows[0].stock.financialMetrics,patch);
+    assert.throws(()=>prepareTaiwanRefreshGeneration(rows,runId),/INVALID_TAIWAN_SHARE_METADATA/);
+    const prepared=prepareTaiwanRefreshGeneration(providerShareRecords(),runId);Object.assign(prepared[0].stock.financialMetrics,patch);
+    assert.throws(()=>validateRecord(prepared[0],manifest(prepared),runId),/INVALID_TAIWAN_SHARE_METADATA/);
+  }
+  const us=prepareTaiwanRefreshGeneration(providerShareRecords(),runId)[0];
+  us.market='US';us.stock.market='US';us.history.market='US';us.stock.financialMetrics.shareAsOfDate='not-a-date';
+  assert.doesNotThrow(()=>validateRecord(us,manifest([us]),runId));
+});
+test('finalize independently rejects contradictory share metadata already in the sealed generation',async()=>{
+  const rows=prepareTaiwanRefreshGeneration(providerShareRecords(),runId),db=database();await upload(db,rows);
+  const changed=structuredClone(rows[0].stock);changed.financialMetrics.shareAsOfDate='2000-01-01';
+  db.raw.prepare('UPDATE daily_refresh_records SET stock=? WHERE run_id=? AND ticker=?').run(JSON.stringify(changed),runId,rows[0].ticker);
+  const response=await write(db,{action:'finalize'});assert.equal(response.status,400);
+  assert.equal((await response.json()).error,'INVALID_TAIWAN_SHARE_METADATA');
+  assert.equal(db.raw.prepare('SELECT COUNT(*) n FROM daily_refresh_head').get().n,0);
+});
+
 test('uncertified EV totals retain raw financials, non-EV models and full daily history',()=>{
   const input=records(),rows=prepareTaiwanRefreshGeneration(input,runId);
   for(let i=0;i<rows.length;i++) {

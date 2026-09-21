@@ -5,6 +5,7 @@ import {buildTaiwanComparableMap,taiwanEnterpriseAdjustment} from '../lib/taiwan
 import {calculateStock} from '../lib/valuation.ts';
 import {isFinancialCompany} from '../lib/company-classification.ts';
 import {taiwanAnnualEarnings,validTaiwanEnterpriseBridgeEvidence} from '../lib/taiwan-valuation-evidence.ts';
+import {validTaiwanShareMetadata} from '../lib/taiwan-share-metadata.ts';
 
 const now=new Date('2026-09-20T00:00:00Z');
 const point=(asOfDate,value,periodType='3M',currencyCode='TWD')=>({asOfDate,periodType,currencyCode,reportedValue:{raw:value}});
@@ -25,6 +26,32 @@ test('TW ROE uses parent TTM income and average equity; keeps growth bases separ
   assert.equal(s.financialMetrics.roeBasis,'parent-income-average-equity');
   assert.equal(s.financialMetrics.revenueGrowthTtmYoY,100);assert.equal(s.financialMetrics.revenueGrowthQuarterYoY,100);
   assert.equal(s.financialMetrics.growthBasis,'ttm-yoy');assert.equal(s.netMarginUnit,'percent');
+});
+test('TW ingestion labels provider share as-of without asserting an effective period-end date or changing values',()=>{
+  const s=quarterlyInputs(payload(),'TWD',now);
+  assert.equal(s.financialMetrics.shareBasis,'provider-as-of-ordinary');
+  assert.equal(s.financialMetrics.shareAsOfDate,'2026-06-30');
+  assert.equal(s.financialMetrics.shareSourceField,'quarterlyOrdinarySharesNumber');
+  assert.equal(s.financialMetrics.sharesOutstanding,10);assert.equal(s.eps,4);assert.equal(s.bvps,20);
+  assert.equal(s.revenuePerShare,20);assert.equal(s.fcfPerShare,3.2);assert.equal(s.financialMetrics.netIncomePerShare,4);
+  assert.equal(s.financialMetrics.nonControllingBookPerShare,0);assert.equal(s.roe,40/150*100);
+  assert.equal(s.financialMetrics.enterpriseBridgeEvidence,undefined);assert.equal(validTaiwanShareMetadata(s),true);
+  assert.match(s.sourceNote,/as-of 日期不是已核證生效日/);assert.match(s.sourceNote,/尚未核證為期末或公司行動調整後基礎/);
+  assert.doesNotMatch(s.sourceNote,/每股流量採期末普通股/);
+});
+test('share metadata validates only the new provider contract while preserving legacy read compatibility',()=>{
+  const raw=quarterlyInputs(payload(),'TWD',now),metrics=raw.financialMetrics;
+  assert.equal(validTaiwanShareMetadata({...raw,financialMetrics:undefined}),true);
+  for(const basis of [undefined,'period-end-ordinary']) {
+    const legacy={...metrics,shareBasis:basis};delete legacy.shareAsOfDate;delete legacy.shareSourceField;
+    assert.equal(validTaiwanShareMetadata({...raw,financialMetrics:legacy}),true);
+  }
+  for(const patch of [{shareAsOfDate:undefined},{shareAsOfDate:null},{shareAsOfDate:'2026-03-31'},{shareAsOfDate:'2026-02-30'},
+    {shareSourceField:undefined},{shareSourceField:null},{shareSourceField:'annualOrdinarySharesNumber'},
+    {shareBasis:'period-end-ordinary'},{shareBasis:undefined},{shareBasis:'verified-period-end-ordinary'},
+    {sharesOutstanding:0},{sharesOutstanding:NaN},{currency:'USD'},{periodBasis:'annual'}]) {
+    assert.equal(validTaiwanShareMetadata({...raw,financialMetrics:{...metrics,...patch}}),false,JSON.stringify(patch));
+  }
 });
 test('annual series are merged, retain losses/zero, reject wrong currency/period/future/shifted year',()=>{
   const a=series('annualDilutedEPS',[point('2022-12-31',-3,'12M'),point('2023-12-31',0,'12M')]);
@@ -77,6 +104,43 @@ const stock=(ticker,price=100)=>({ticker,name:'測試公司',market:'TW',sector:
   dataBasis:'ltm',dataCompleteness:'historical',financialDataDate:'2026-06-30',updatedAt:'2026-09-18',priceSource:'Yahoo Finance daily close / daily-refresh-v1',
   financialMetrics:{currency:'TWD',periodBasis:'ltm',shareBasis:'period-end-ordinary',roeBasis:'parent-income-average-equity',growthBasis:'ttm-yoy',sharesOutstanding:1e8,netIncomePerShare:5,nonControllingBookPerShare:0,ebitdaBasis:'operating-income-plus-cashflow-da',enterpriseBridgeEvidence:bridgeEvidence()}});
 const group=()=>Array.from({length:7},(_,i)=>stock(String(1000+i),100+i));
+const providerShares=s=>({...s,financialMetrics:{...s.financialMetrics,shareBasis:'provider-as-of-ordinary',
+  shareAsOfDate:s.financialDataDate,shareSourceField:'quarterlyOrdinarySharesNumber'}});
+test('provider share disclosure preserves non-EV peers, PE/PB/PS and valuation eligibility inputs',()=>{
+  const legacy=group().map(s=>({...s,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:undefined}}));
+  const provider=legacy.map(providerShares),a=buildTaiwanComparableMap(legacy),b=buildTaiwanComparableMap(provider);
+  assert.deepEqual(a,b);
+  for(let i=0;i<legacy.length;i++) {
+    const before=calculateStock({...legacy[i],comparableMultiples:a.get(legacy[i].ticker),valuationPolicy:'tw-comparables-v1'});
+    const after=calculateStock({...provider[i],comparableMultiples:b.get(provider[i].ticker),valuationPolicy:'tw-comparables-v1'});
+    assert.deepEqual(after.models,before.models);assert.equal(after.fairValue,before.fairValue);
+    assert.equal(after.upside,before.upside);assert.equal(after.valuationReviewRequired,before.valuationReviewRequired);
+    assert.deepEqual(after.models.map(m=>m.id),['pe','pb','p-sales']);
+    for(const field of ['eps','bvps','revenuePerShare','fcfPerShare','roe','debtRatio'])assert.equal(provider[i][field],legacy[i][field]);
+  }
+});
+test('provider as-of label cannot satisfy the strict period-end EV bridge even with matching numeric evidence',()=>{
+  const legacy=stock('1000'),provider=providerShares(legacy);
+  assert.equal(validTaiwanEnterpriseBridgeEvidence(legacy),true);
+  assert.equal(validTaiwanShareMetadata(provider),true);assert.equal(validTaiwanEnterpriseBridgeEvidence(provider),false);
+  assert.equal(taiwanEnterpriseAdjustment(provider),null);
+  const peers=buildTaiwanComparableMap(group().map(providerShares)).get('1000');
+  assert.equal(peers.evEbitdaMedian,null);assert.ok(peers.peMedian>0);assert.ok(peers.pbMedian>0);assert.ok(peers.psMedian>0);
+});
+test('share metadata conflicts participate in typed duplicate signatures independent of ordering',()=>{
+  const rows=group().map(providerShares);
+  for(const patch of [{shareAsOfDate:'2026-03-31'},{shareSourceField:'annualOrdinarySharesNumber'},
+    {shareAsOfDate:undefined},{shareAsOfDate:null},{shareSourceField:undefined},{shareSourceField:null}]) {
+    const conflict={...rows[6],financialMetrics:{...rows[6].financialMetrics,...patch}};
+    const a=buildTaiwanComparableMap([...rows,conflict]),b=buildTaiwanComparableMap([conflict,...rows]);
+    assert.deepEqual(a,b);assert.equal(a.has('1006'),false);assert.equal(a.get('1000').peerCount,5);
+  }
+  const legacy=group(),missing={...legacy[6],financialMetrics:{...legacy[6].financialMetrics,shareAsOfDate:null}};
+  assert.deepEqual(buildTaiwanComparableMap([...legacy,missing]),buildTaiwanComparableMap([missing,...legacy]));
+  assert.equal(buildTaiwanComparableMap([...legacy,missing]).has('1006'),false);
+  const reordered={...rows[6],financialMetrics:Object.fromEntries(Object.entries(rows[6].financialMetrics).reverse())};
+  assert.deepEqual(buildTaiwanComparableMap([...rows,reordered]),buildTaiwanComparableMap(rows));
+});
 test('Taiwan peers exclude self, cross-industry/session, malformed/stale dates and unknown basis',()=>{
   const rows=group(),map=buildTaiwanComparableMap(rows),s=map.get('1000');assert.equal(s.peerCount,6);assert.ok(!s.peerTickers.includes('1000'));
   for(const patch of [{industry:'金融業'},{updatedAt:'2026-09-17'},{financialDataDate:'2026-02-31'},{financialDataDate:'2025-12-31'},{dataBasis:undefined}]) {

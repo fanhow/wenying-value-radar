@@ -3,6 +3,7 @@ import type { ComparableMultiples } from './market-comparables.ts';
 import { isFinancialCompany } from './company-classification.ts';
 import { taiwanEarningsOperationsDivergence, taiwanMaterialMinorityClaims, validTaiwanEnterpriseBridgeEvidence } from './taiwan-valuation-evidence.ts';
 import { validTaiwanBusinessGroupReference, taiwanBusinessGroupHasMember } from './taiwan-business-groups.ts';
+import { validTaiwanShareMetadata } from './taiwan-share-metadata.ts';
 
 const DAY=86400000;
 const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
@@ -57,7 +58,7 @@ function industryKey(s:StockInput) {
   return industry;
 }
 function dated(s:StockInput) {
-  if(s.market!=='TW'||s.dataBasis!=='ltm'||s.financialMetrics?.periodBasis!=='ltm'||s.financialMetrics?.currency!=='TWD'||!validDate(s.updatedAt)||!validDate(s.financialDataDate))return false;
+  if(s.market!=='TW'||s.dataBasis!=='ltm'||s.financialMetrics?.periodBasis!=='ltm'||s.financialMetrics?.currency!=='TWD'||!validDate(s.updatedAt)||!validDate(s.financialDataDate)||!validTaiwanShareMetadata(s))return false;
   const age=(Date.parse(s.updatedAt!)-Date.parse(s.financialDataDate!))/DAY;
   return Number.isFinite(age)&&age>=0&&age<=180&&positive(s.price)&&positive(s.financialMetrics.sharesOutstanding)
     &&s.price*s.financialMetrics.sharesOutstanding>=1e9;
@@ -72,7 +73,7 @@ export function buildTaiwanComparableMap(stocks:StockInput[]) {
     const e=s.financialMetrics?.enterpriseBridgeEvidence;
     return [e!==undefined,e?.sourceType,e?.sourceUrl,e?.publishedDate,e?.periodEnd,e?.currency,e?.sharesOutstanding,e?.cashAndInvestments,e?.debtIncludingLeases,e?.cashScope,e?.debtScope];
   };
-  const signature=(s:StockInput)=>JSON.stringify([s.name,s.industry,s.market,s.updatedAt,s.financialDataDate,s.dataBasis,s.price,s.eps,s.bvps,s.revenuePerShare,s.ebitdaPerShare,s.ebitPerShare,s.debtPerShare,s.cashPerShare,s.financialMetrics?.currency,s.financialMetrics?.sharesOutstanding,s.financialMetrics?.periodBasis,s.financialMetrics?.shareBasis,s.financialMetrics?.nonControllingBookPerShare,s.financialMetrics?.ebitdaBasis,s.financialMetrics?.netIncomePerShare,bridgeSignature(s),s.taiwanBusinessGroup!==undefined,s.taiwanBusinessGroup?.id,s.taiwanBusinessGroup?.registryVersion]);
+  const signature=(s:StockInput)=>JSON.stringify([s.name,s.industry,s.market,s.updatedAt,s.financialDataDate,s.dataBasis,s.price,s.eps,s.bvps,s.revenuePerShare,s.ebitdaPerShare,s.ebitPerShare,s.debtPerShare,s.cashPerShare,s.financialMetrics?.currency,s.financialMetrics?.sharesOutstanding,s.financialMetrics?.periodBasis,typeof s.financialMetrics?.shareBasis,s.financialMetrics?.shareBasis,typeof s.financialMetrics?.shareAsOfDate,s.financialMetrics?.shareAsOfDate,typeof s.financialMetrics?.shareSourceField,s.financialMetrics?.shareSourceField,s.financialMetrics?.nonControllingBookPerShare,s.financialMetrics?.ebitdaBasis,s.financialMetrics?.netIncomePerShare,bridgeSignature(s),s.taiwanBusinessGroup!==undefined,s.taiwanBusinessGroup?.id,s.taiwanBusinessGroup?.registryVersion]);
   for(const stock of stocks) {
     const previous=unique.get(stock.ticker);
     if(previous&&signature(previous)!==signature(stock))conflicts.add(stock.ticker);

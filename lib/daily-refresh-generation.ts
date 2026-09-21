@@ -4,6 +4,7 @@ import {buildTaiwanComparableMap} from './taiwan-comparables.ts';
 import {withTaiwanBusinessGroup} from './taiwan-business-groups.ts';
 import {DAILY_VALUATION_VERSION,dailyValuationState} from './daily-valuation-state.ts';
 import {detectValueTrendResonance} from './technical-analysis.ts';
+import {validTaiwanShareMetadata} from './taiwan-share-metadata.ts';
 
 /** Complete cohort first, then same-session peers. Upload chunk order is irrelevant. */
 export function prepareTaiwanRefreshGeneration(records:RefreshRecord[],runId:string) {
@@ -13,6 +14,7 @@ export function prepareTaiwanRefreshGeneration(records:RefreshRecord[],runId:str
   const prepared=records.map(r=>{
     if(r.market!=='TW'||r.status!=='ready')return r;
     if(!r.stock||r.stock.ticker!==r.ticker||r.stock.market!==r.market)throw new Error('GENERATION_STOCK_IDENTITY');
+    if(!validTaiwanShareMetadata(r.stock))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
     const issue=taiwanPerShareIssue(r.stock);
     if(issue)throw new Error(issue);
     return {...r,stock:withTaiwanBusinessGroup({...r.stock,valuationPolicy:'tw-comparables-v1',

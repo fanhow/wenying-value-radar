@@ -43,6 +43,26 @@ test('comparison preserves signed differences and explicitly derived equity with
   assert.equal(Object.keys(c).some(k=>/shares/i.test(k)),false);
   assert.ok(audit(d=>{d.records[0].stock.bvps=18;}).rows[0].comparison.bvpsRelativeDifferencePct<0);
 });
+test('legacy share metadata stays raw and missing dates or source fields are not synthesized',()=>{
+  const absent=audit(),row=absent.rows[0];
+  assert.deepEqual(row.vendorShareMetadata,{shareBasis:null,shareAsOfDate:null,shareSourceField:null});
+  const legacy=audit(d=>{d.records[0].stock.financialMetrics.shareBasis='period-end-ordinary';});
+  assert.deepEqual(legacy.rows[0].vendorShareMetadata,{shareBasis:'period-end-ordinary',shareAsOfDate:null,shareSourceField:null});
+  assert.match(legacy.rows[0].comparison.vendorParentEquityBasis,/provider-as-of ordinary shares/);
+  assert.doesNotMatch(legacy.rows[0].comparison.vendorParentEquityBasis,/vendor period-end shares/);
+  assert.match(legacy.limitations.join(' '),/neither the legacy period-end-ordinary label nor a provider as-of date independently verifies/);
+  assert.deepEqual(summarizeOfficialBookAudit(legacy).rows[0].vendorShareMetadata,legacy.rows[0].vendorShareMetadata);
+});
+test('supplied share provenance is carried without changing comparison values or eligibility',()=>{
+  const before=audit(),metadata={shareBasis:'provider-as-of-ordinary',shareAsOfDate:'2026-06-30',shareSourceField:'quarterlyOrdinarySharesNumber'};
+  const after=audit(d=>Object.assign(d.records[0].stock.financialMetrics,metadata));
+  assert.deepEqual(after.rows[0].vendorShareMetadata,metadata);
+  assert.deepEqual(after.coverage,before.coverage);assert.deepEqual(after.rows[0].comparison,before.rows[0].comparison);
+  assert.deepEqual(after.rows[0].reasons,before.rows[0].reasons);
+  assert.deepEqual(summarizeOfficialBookAudit(after).rows[0].vendorShareMetadata,metadata);
+  const unmatched=audit(d=>{Object.assign(d.records[0].stock.financialMetrics,metadata);d.records[0].status='unavailable';});
+  assert.equal(unmatched.rows[0].comparison,null);assert.deepEqual(unmatched.rows[0].vendorShareMetadata,metadata);
+});
 test('source namespace and retrieved instant fail closed',()=>{
   for(const patch of [{board:'US'},{sourceURL:OFFICIAL_BOOK_SOURCES.TPEx},{retrievedAt:'2026-02-30T00:00:00Z'},
     {retrievedAt:'not-a-date'},{retrievedAt:'2026-09-21'}, {rawBody:'{}'}])assert.throws(()=>parseOfficialBookCapture(capture('TWSE',undefined,patch)));

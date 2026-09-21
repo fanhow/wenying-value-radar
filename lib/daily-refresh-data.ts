@@ -4,6 +4,7 @@ import { aggregateCandles, analyzeTechnicalSetup } from './technical-analysis.ts
 import { calibrateFairValue } from './valuation-calibration.ts';
 import { officialSession } from './refresh-calendar.ts';
 import { taiwanAnnualEarnings } from './taiwan-valuation-evidence.ts';
+import { validTaiwanShareMetadata } from './taiwan-share-metadata.ts';
 
 export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string };
 export type RefreshRecord = {
@@ -113,7 +114,8 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     result.roe=net!==undefined?net/(averageEquity??equity)*100:roe;
     Object.assign(result,valuationTargets(revenueGrowth,result.roe,debtRatio));
     result.netMarginUnit='percent';
-    result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'period-end-ordinary',
+    result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
+      shareAsOfDate:end,shareSourceField:'quarterlyOrdinarySharesNumber',
       roeBasis:net===undefined?'eps-ending-bvps':averageEquity===undefined?'parent-income-ending-equity':'parent-income-average-equity',
       growthBasis:priorTtm&&priorTtm>0?'ttm-yoy':'quarter-yoy',
       revenueGrowthTtmYoY:priorTtm&&priorTtm>0?(revenue/priorTtm-1)*100:undefined,
@@ -124,7 +126,8 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
       depreciationPerShare:depreciation===undefined?undefined:depreciation/shares,
       providerEbitPerShare:sum('EBIT')===undefined?undefined:sum('EBIT')!/shares,
       providerEbitdaPerShare:sum('EBITDA')===undefined?undefined:sum('EBITDA')!/shares};
-    result.sourceNote+=`；ROE：${result.financialMetrics.roeBasis}；EBITDA：${result.financialMetrics.ebitdaBasis}；每股流量採期末普通股，EPS 保留供應商稀釋口徑；年度 EPS ${result.epsHistory.length} 期；現金與總負債保留供應商原值，尚未核證受限資產／應收帳款讓售分類及完整租賃，不用於 EV 橋接`;
+    if(!validTaiwanShareMetadata(result))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
+    result.sourceNote+=`；ROE：${result.financialMetrics.roeBasis}；EBITDA：${result.financialMetrics.ebitdaBasis}；每股流量及淨值採 Yahoo 標示於 ${end} 的普通股數；此 as-of 日期不是已核證生效日，尚未核證為期末或公司行動調整後基礎；EPS 保留供應商稀釋口徑；年度 EPS ${result.epsHistory.length} 期；現金與總負債保留供應商原值，尚未核證受限資產／應收帳款讓售分類及完整租賃，不用於 EV 橋接`;
   }
   result.assetTurnover=revenue/assets; if(equity!==0) result.financialLeverage=assets/equity;
   return result;

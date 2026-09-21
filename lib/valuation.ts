@@ -122,7 +122,11 @@ export type StockInput = {
   financialMetrics?: {
     currency: string;
     periodBasis: "ltm";
-    shareBasis: "period-end-ordinary";
+    /** Legacy period-end label is read-compatible, not independent verification. */
+    shareBasis: "period-end-ordinary" | "provider-as-of-ordinary";
+    /** Date assigned by the provider; not a verified share-count effective date. */
+    shareAsOfDate?: string;
+    shareSourceField?: "quarterlyOrdinarySharesNumber";
     roeBasis: "parent-income-average-equity" | "parent-income-ending-equity" | "eps-ending-bvps";
     growthBasis: "ttm-yoy" | "quarter-yoy";
     revenueGrowthTtmYoY?: number;

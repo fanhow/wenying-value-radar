@@ -14,6 +14,7 @@ import { SiteFooter } from "./site-footer";
 import { DailyDataStatus } from './daily-data-status';
 import {currentClientInput,isDailyInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs,type DailyClientStatus} from '../lib/daily-client-state';
 import { UsEarningsPanel } from "./us-earnings-panel";
+import { valuationSourceNote } from '../lib/valuation-source-note';
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
 type SortKey = "recommended" | "upside" | "quality" | "price";
@@ -1079,7 +1080,7 @@ export default function Home() {
               </div>
               {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
               {selected.valuationConfidence === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.historicalCaution ? t("目前主要依據公開歷史財報；資料日期、模型數量或模型分歧使結果的不確定性較高。畫面保留計算結果供研究，但不做強烈高低估判定。", "The estimate mainly uses public historical filings. Data age, model count, or model dispersion increases uncertainty, so the result remains visible for research without a strong valuation call.") : t("目前公開資料缺少足夠的現金流、成長或負債資訊，因此只能提供初步參考。", "Public cash-flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
-              <div className="detail-note"><span>i</span><p>{language === "zh" ? (selected.sourceNote || (selected.source === "手動輸入" ? "這是你手動建立的估值，請在財報更新後重新輸入基礎數據。" : "公開資料可能延遲或不完整；模型價格是研究起點，不代表即時報價或投資建議。")) : (selected.source === "手動輸入" ? "This is a manually created valuation. Update the inputs when new financial statements are available." : "Public data may be delayed or incomplete. Model values are a research starting point, not a live quote or investment advice.")}</p></div>
+              <div className="detail-note"><span>i</span><p>{valuationSourceNote(selected, language)}</p></div>
             </aside>
           )}
           {!selected&&selectedTicker&&<aside id="valuation-detail" className="detail-panel panel" aria-label={t('個股資料狀態','Stock data status')}>

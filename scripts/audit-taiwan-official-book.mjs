@@ -154,7 +154,7 @@ export function compareTaiwanOfficialBook(input,captures) {
         comparison={vendorBVPS:s.bvps,reportedReferenceBVPS:reference,bvpsDifference: difference,bvpsRelativeDifferencePct:relativeDifferencePct,
           withinReference2dpRounding:Math.abs(difference)<=.005+Number.EPSILON*Math.max(Math.abs(s.bvps),Math.abs(reference))*4,
           roundingNote:'Tolerance ±0.005 TWD/share only; not proof of identical denominator or accounting basis',
-          vendorParentEquityTwd:equityValid?equity:null,vendorParentEquityBasis:equityValid?'derived: vendor BVPS × vendor period-end shares; not independently captured raw equity':'unavailable',
+          vendorParentEquityTwd:equityValid?equity:null,vendorParentEquityBasis:equityValid?'derived: vendor BVPS × provider-as-of ordinary shares; not independently captured raw equity':'unavailable',
           officialParentEquityTwd:officialRow.parentEquityTwd,parentEquityDifferenceTwd:finite(equityDifference)?equityDifference:null,
           parentEquityRelativeDifferencePct:finite(equityPct)?equityPct:null,
           equityIssues:[...officialRow.equityIssues,...(!equityValid?['MISSING_OR_NON_FINITE_VENDOR_EQUITY_DERIVATION']:[]),
@@ -166,6 +166,7 @@ export function compareTaiwanOfficialBook(input,captures) {
     }
     return {index,ticker,rawVendorTicker:record?.ticker??null,name:s?.name??null,market:record?.market??null,board:s?.listingBoard??null,
       status:comparison?'compared':'unmatched',financialDate:s?.financialDataDate??null,quoteDate:s?.updatedAt??null,
+      vendorShareMetadata:{shareBasis:f?.shareBasis??null,shareAsOfDate:f?.shareAsOfDate??null,shareSourceField:f?.shareSourceField??null},
       vendorFetchedAt:record?.fetchedAt??null,vendorSources:record?.sources??[],reasons:[...new Set(reasons)],comparison,
       official:officialRow??null};
   });
@@ -177,7 +178,8 @@ export function compareTaiwanOfficialBook(input,captures) {
     limitations:['Diagnostic comparison, not an ordinary-share BVPS replacement or a valuation.',
       'No inferred shares or changes to vendor financial inputs. Reference BVPS exact denominator remains unverified.',
       'Export date is not publication date; current captures do not establish point-in-time availability at the frozen quote date.',
-      'Parent equity is compared with a disclosed vendor BVPS × vendor shares reconstruction; no independent raw-equity validation.',
+      'Parent equity is compared with a disclosed vendor BVPS × provider-as-of ordinary shares reconstruction; no independent raw-equity validation.',
+      'Vendor share metadata is copied as supplied; missing fields stay null, and neither the legacy period-end-ordinary label nor a provider as-of date independently verifies financial period-end shares.',
       'Missing parent equity stays unavailable independently of reference BVPS; total equity is never substituted and statement scope is not inferred.',
       'General-industry ci endpoints only; source omissions are not proof that an issuer is financial or unavailable elsewhere.'],
     coverage:{records:rows.length,taiwan:input.records.filter(r=>r?.market==='TW').length,ready:input.records.filter(r=>r?.market==='TW'&&r?.status==='ready').length,
@@ -209,7 +211,7 @@ export function summarizeOfficialBookAudit(audit) {
   return {auditVersion:audit.auditVersion,researchOnly:audit.researchOnly,unitBasis:audit.unitBasis,
     provenance:audit.provenance,limitations:audit.limitations,coverage:audit.coverage,coverageDefinitions:audit.coverageDefinitions,
     unmatchedReasonCounts:audit.unmatchedReasonCounts,equityIssueCounts:audit.equityIssueCounts,sources:audit.sources,
-    rows:audit.rows.map(r=>({ticker:r.ticker,board:r.board,status:r.status,financialDate:r.financialDate,
+    rows:audit.rows.map(r=>({ticker:r.ticker,board:r.board,status:r.status,financialDate:r.financialDate,vendorShareMetadata:r.vendorShareMetadata,
       reasons:r.reasons,bvpsRelativeDifferencePct:r.comparison?.bvpsRelativeDifferencePct??null,
       parentEquityRelativeDifferencePct:r.comparison?.parentEquityRelativeDifferencePct??null,equityIssues:r.comparison?.equityIssues??[]}))};
 }

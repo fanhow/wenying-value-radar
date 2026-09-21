@@ -7,6 +7,7 @@ import { rotationAudit } from './rotation-audit-store.ts';
 import {buildTaiwanComparableMap} from './taiwan-comparables.ts';
 import {withTaiwanBusinessGroup} from './taiwan-business-groups.ts';
 import type {StockInput} from './valuation.ts';
+import {validTaiwanShareMetadata} from './taiwan-share-metadata.ts';
 
 export const REFRESH_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS daily_refresh_runs (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, completed_at TEXT, state TEXT NOT NULL, manifest TEXT NOT NULL, summary TEXT, error TEXT)`,
@@ -43,6 +44,7 @@ export function validateRecord(record:RefreshRecord,manifest:Manifest,runId?:str
   if(!isoDate(s.financialDataDate)||s.priceSource!=='Yahoo Finance daily close / daily-refresh-v1'||s.price<=0||!['price','eps','bvps','fcfPerShare','revenueGrowth','roe','debtRatio'].every(k=>Number.isFinite(s[k as keyof typeof s]))) throw new Error('INVALID_FINANCIAL_INPUT');
   if(s.price!==h.candles.at(-1)?.close)throw new Error('PRICE_HISTORY_MISMATCH');
   if(s.financialDataDate!>s.updatedAt!||record.financialDate!==s.financialDataDate)throw new Error('FINANCIAL_DATE_MISMATCH');
+  if(record.market==='TW'&&!validTaiwanShareMetadata(s))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
   if(record.market==='TW'&&taiwanPerShareIssue(s))throw new Error('EPS_SHARE_BASIS_RECONCILIATION_REQUIRED');
   if(record.market==='TW'&&(manifest.valuationVersion!==DAILY_VALUATION_VERSION
     ||s.valuationPolicy!=='tw-comparables-v1'||s.dailyValuationVersion!==DAILY_VALUATION_VERSION
@@ -211,6 +213,7 @@ export async function handleRefreshWrite(request:Request,db:D1Database|undefined
         if(!page.results?.length||page.results.length<500)break;
         afterTicker=page.results.at(-1)!.ticker;
       }
+      if(stocks.some(stock=>!validTaiwanShareMetadata(stock)))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
       const peers=buildTaiwanComparableMap(stocks);
       for(const stock of stocks) {
         if(stock.dailyRunId!==id||stock.dailyValuationVersion!==DAILY_VALUATION_VERSION
