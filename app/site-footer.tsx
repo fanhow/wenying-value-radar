@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.21.2";
+const SITE_REVISION = "Rev. 2026.09.21.3";
 
 const REVISION_ENTRIES = [
+  ['2026.09.21.3', '台股舊快取防護：本機舊自動估值與來源不明資料不得混入當代排行榜、搜尋結果及估值詳情；保留原始本機紀錄、手動輸入、明確方舟截圖與觀察清單。台股自動估值須通過目前每日批次與版本檢查；美股既有 SEC 查詢及所有估值公式不變。', 'Taiwan legacy-cache safeguard: exclude old automatic and unclassified local inputs from current rankings, search results and valuation details. Retain original local records, manual inputs, explicit ARKER captures and watchlists. Taiwan automatic valuations must pass current daily-generation and version checks; preserve the existing US SEC lookup path and all valuation formulas.'],
   ['2026.09.21.2', '台股股數來源揭露：供應商標示的財報日期不再視為期末股數核證，保留 as-of 日期及欄位來源；新版與舊版資料均提示公司行動與稀釋 EPS 的口徑差異。保留所有原始數值、PE／PB／PS 公式及資格，EV 核證條件不放寬；不以外部估值或官方舊股數強行覆寫資料。', 'Taiwan share provenance: no longer treat a vendor financial-date label as verification of period-end shares; retain the provider as-of date and source field. Explain corporate-action and diluted-EPS basis differences for new and legacy records. Preserve raw values, PE/PB/PS formulas and eligibility, and strict EV evidence requirements. Do not overwrite inputs to fit external valuations or stale official share counts.'],
   ['2026.09.21.1', '台股 EV 資料品質防護：公司申報證實供應商現金總額可能混入應收帳款讓售／受限存款，總負債可能漏列流動租賃。EV 目標及同行均須同期間、幣別、股數與金額一致的申報口徑證據；未核證即停用 EV，保留原始財報、其他合格模型與 K 線。未調整外部倍數、未完成估值對齊，亦未改動美股。', 'Taiwan EV input safeguards: issuer filings show that vendor cash aggregates may contain factored receivables/restricted deposits and debt may omit current leases. Require filing-scope evidence with matching period, currency, shares and amounts for both targets and peers; disable unverified EV branches while retaining raw financials, other eligible models and charts. No fitting to external multiples, no claim of completed alignment, and no US-model change.'],
   ['2026.09.20.8', '正式更新驗證修補：採集端與儲存端共用同一套完成日 OHLC 檢查。價格越出當日高低區間、非正價格或重複日期的資料列單獨標記不可用，不修造 K 線、不放寬伺服器規則，也不讓單檔異常阻斷其他合格股票的整批更新。', 'Production refresh validation fix: share completed-session OHLC checks between collection and storage. Mark an invalid series unavailable when prices fall outside its high/low, are non-positive, or have duplicate dates. Do not fabricate candles or weaken server validation; one bad instrument no longer prevents a complete generation of valid records.'],

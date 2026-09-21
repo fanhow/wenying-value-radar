@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts';
 import {dailyValuationState,DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
-import {currentClientInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs} from '../lib/daily-client-state.ts';
+import {currentClientInput,isDailyInput,isUserManagedInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs} from '../lib/daily-client-state.ts';
 import {refreshUploadBatches} from '../scripts/daily-refresh.mjs';
 import {handleRefreshWrite,handleDailyRead,validateRecord} from '../lib/daily-refresh-store.ts';
 import {analyzeTechnicalSetup} from '../lib/technical-analysis.ts';
@@ -202,4 +202,76 @@ test('browser persistence preserves manual inputs while rejecting old/changed da
   assert.deepEqual(mergeCurrentInputs([s],[manual,s],status),[manual]);
   assert.deepEqual(mergeCurrentInputs([s,s],[s,s],status),[s]);
   assert.deepEqual(mergeCurrentInputs([],[s,manual,manual],status),[manual]);
+});
+
+test('retained legacy TW automatic inputs never become current through storage or relabelled price sources',()=>{
+  const daily=prepareTaiwanRefreshGeneration(records(),runId)[0].stock;
+  const status={state:'partial',runId,valuationVersion:DAILY_VALUATION_VERSION,taiwanValuationCurrent:true};
+  const legacy=[{...daily,priceSource:'Yahoo Finance'},
+    {...daily,priceSource:'User imported file'},
+    {...daily,priceSource:undefined,source:undefined},
+    {...daily,priceSource:undefined,source:'示範資料'}];
+  const originals=structuredClone(legacy);
+  // Keep raw records for recovery, not as active valuations. Watchlist IDs and
+  // the separate ARKER import log are not migrated or deleted by this gate.
+  const restored=persistableInputs(JSON.parse(JSON.stringify(legacy)));
+  assert.equal(restored.length,legacy.length);
+  for(const state of [null,status,{...status,state:'stale'},{...status,runId:'next-run'}]) {
+    for(const stock of restored)assert.equal(currentClientInput(stock,state),false);
+    assert.deepEqual(mergeCurrentInputs([],restored,state),[]);
+    assert.deepEqual(mergeCurrentInputs(restored,[],state),[]);
+  }
+  assert.deepEqual(mergeCurrentInputs([daily],restored,status),[daily]);
+  // A failed lookup removes its daily result; retained legacy records cannot
+  // resurface through search, selection or watch-card sources after that.
+  const afterFailure=withoutDailyInstrument([...restored,daily],daily.ticker,daily.market);
+  assert.deepEqual(mergeCurrentInputs([],afterFailure,status),[]);
+  assert.deepEqual(legacy,originals);
+});
+
+test('manual inputs and explicit ARKER captures survive daily status changes and invalidation',()=>{
+  const daily=prepareTaiwanRefreshGeneration(records(),runId)[0].stock;
+  const manual={...daily,source:'手動輸入'},capture={...daily,source:'方舟截圖'};
+  const status={state:'complete',runId,valuationVersion:DAILY_VALUATION_VERSION,taiwanValuationCurrent:true};
+  for(const owned of [manual,capture]) {
+    assert.equal(isUserManagedInput(owned),true);assert.equal(isDailyInput(owned),false);
+    assert.deepEqual(persistableInputs([daily,owned]),[owned]);
+    assert.deepEqual(withoutDailyInstrument([daily,owned],daily.ticker,daily.market),[owned]);
+    for(const state of [null,status,{...status,state:'stale'}]) {
+      assert.equal(currentClientInput(owned,state),true);
+      assert.deepEqual(mergeCurrentInputs([],[owned],state),[owned]);
+    }
+  }
+  // Existing precedence: manual edits override the scan; an explicit capture
+  // remains a fallback and does not replace the current automatic scan result.
+  assert.deepEqual(mergeCurrentInputs([daily],[manual],status),[manual]);
+  assert.deepEqual(mergeCurrentInputs([daily],[capture],status),[daily]);
+});
+
+test('TW daily metadata must remain current and eligible even when restored beside legacy records',()=>{
+  const daily=prepareTaiwanRefreshGeneration(records(),runId)[0].stock;
+  const status={state:'complete',runId,valuationVersion:DAILY_VALUATION_VERSION,taiwanValuationCurrent:true};
+  const legacy={...daily,priceSource:'Yahoo Finance'};
+  for(const patch of [{dailyRunId:undefined},{dailyRunId:'old-run'},
+    {dailyValuationVersion:undefined},{valuationPolicy:undefined},{comparableMultiples:undefined},
+    {financialMetrics:{...daily.financialMetrics,nonControllingBookPerShare:100}}]) {
+    const stale={...daily,...patch};
+    assert.equal(currentClientInput(stale,status),false);
+    assert.deepEqual(mergeCurrentInputs([stale],[legacy],status),[]);
+  }
+  assert.equal(currentClientInput(daily,status),true);
+  assert.equal(currentClientInput(daily,{...status,state:'partial'}),true);
+});
+
+test('TW cache safeguard leaves existing US SEC and daily lookup behavior unchanged',()=>{
+  const stock={...records()[0].stock,ticker:'TEST',market:'US',priceSource:'SEC Company Facts / Yahoo Finance'};
+  assert.equal(isUserManagedInput(stock),false);
+  assert.equal(isDailyInput(stock),false);
+  assert.equal(currentClientInput(stock,null),true);
+  assert.deepEqual(persistableInputs([stock]),[stock]);
+  assert.deepEqual(mergeCurrentInputs([],[stock],null),[stock]);
+  const daily={...stock,priceSource:'Yahoo Finance daily close / daily-refresh-v1'};
+  assert.equal(currentClientInput(daily,null),false);
+  assert.equal(currentClientInput(daily,{state:'partial'}),true);
+  assert.equal(currentClientInput(daily,{state:'stale'}),false);
 });

@@ -12,7 +12,7 @@ import { SiteHeader } from "./site-header";
 import { DailyCandlestickChart } from "./daily-candlestick-chart";
 import { SiteFooter } from "./site-footer";
 import { DailyDataStatus } from './daily-data-status';
-import {currentClientInput,isDailyInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs,type DailyClientStatus} from '../lib/daily-client-state';
+import {currentClientInput,isDailyInput,isUserManagedInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs,type DailyClientStatus} from '../lib/daily-client-state';
 import { UsEarningsPanel } from "./us-earnings-panel";
 import { valuationSourceNote } from '../lib/valuation-source-note';
 
@@ -777,7 +777,7 @@ export default function Home() {
     const ticker = value.trim().toUpperCase();
     if (!ticker) return;
     const local = stocks.find((stock) => stock.ticker === ticker);
-    if (local && !isDailyInput(local) && !forceRefresh) {
+    if (local && (isUserManagedInput(local) || (local.market === 'US' && !isDailyInput(local))) && !forceRefresh) {
       selectStock(local.ticker);
       return;
     }
