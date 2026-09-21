@@ -2,7 +2,7 @@ import {calculateStock, type StockInput} from './valuation.ts';
 
 // Bump when the production TW engine or business registry changes. Legacy
 // generations may retain financials/OHLC, but cannot silently use old targets.
-export const DAILY_VALUATION_VERSION = 'tw-comparables-2026-09-20-memory-v1';
+export const DAILY_VALUATION_VERSION = 'tw-comparables-2026-09-21-bridge-v1';
 
 export function dailyValuationState(input:StockInput|null|undefined, runId?:string) {
   const current=!!input && (input.market!=='TW' ||

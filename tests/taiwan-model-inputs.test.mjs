@@ -4,7 +4,7 @@ import {quarterlyInputs,taiwanPerShareIssue} from '../lib/daily-refresh-data.ts'
 import {buildTaiwanComparableMap,taiwanEnterpriseAdjustment} from '../lib/taiwan-comparables.ts';
 import {calculateStock} from '../lib/valuation.ts';
 import {isFinancialCompany} from '../lib/company-classification.ts';
-import {taiwanAnnualEarnings} from '../lib/taiwan-valuation-evidence.ts';
+import {taiwanAnnualEarnings,validTaiwanEnterpriseBridgeEvidence} from '../lib/taiwan-valuation-evidence.ts';
 
 const now=new Date('2026-09-20T00:00:00Z');
 const point=(asOfDate,value,periodType='3M',currencyCode='TWD')=>({asOfDate,periodType,currencyCode,reportedValue:{raw:value}});
@@ -69,11 +69,13 @@ test('operating EBITDA requires aligned complete D&A and operating-income period
   for(const item of us.timeseries.result)for(const p of item[item.meta.type[0]])p.currencyCode='USD';
   assert.equal(quarterlyInputs(us,'USD',now).ebitdaPerShare,4.4);
 });
+// Explicitly synthetic evidence; never attached to captured market inputs.
+const bridgeEvidence=(cash=5,debt=10)=>({sourceType:'issuer-filing',sourceUrl:'https://example.test/synthetic-filing.pdf',publishedDate:'2026-08-15',periodEnd:'2026-06-30',currency:'TWD',sharesOutstanding:1e8,cashAndInvestments:cash*1e8,debtIncludingLeases:debt*1e8,cashScope:'unrestricted-cash-and-short-term-investments-excluding-factoring',debtScope:'interest-bearing-with-current-and-noncurrent-leases'});
 const stock=(ticker,price=100)=>({ticker,name:'測試公司',market:'TW',sector:'台灣上市公司',industry:'電子零組件業',price,
   eps:5,bvps:40,fcfPerShare:3,revenuePerShare:100,ebitPerShare:8,ebitdaPerShare:10,cashPerShare:5,debtPerShare:10,
   targetPe:36,targetPb:5,targetFcfMultiple:20,netMargin:5,netMarginUnit:'percent',revenueGrowth:10,roe:15,debtRatio:40,uncertainty:.3,
   dataBasis:'ltm',dataCompleteness:'historical',financialDataDate:'2026-06-30',updatedAt:'2026-09-18',priceSource:'Yahoo Finance daily close / daily-refresh-v1',
-  financialMetrics:{currency:'TWD',periodBasis:'ltm',shareBasis:'period-end-ordinary',roeBasis:'parent-income-average-equity',growthBasis:'ttm-yoy',sharesOutstanding:1e8,netIncomePerShare:5,nonControllingBookPerShare:0,ebitdaBasis:'operating-income-plus-cashflow-da'}});
+  financialMetrics:{currency:'TWD',periodBasis:'ltm',shareBasis:'period-end-ordinary',roeBasis:'parent-income-average-equity',growthBasis:'ttm-yoy',sharesOutstanding:1e8,netIncomePerShare:5,nonControllingBookPerShare:0,ebitdaBasis:'operating-income-plus-cashflow-da',enterpriseBridgeEvidence:bridgeEvidence()}});
 const group=()=>Array.from({length:7},(_,i)=>stock(String(1000+i),100+i));
 test('Taiwan peers exclude self, cross-industry/session, malformed/stale dates and unknown basis',()=>{
   const rows=group(),map=buildTaiwanComparableMap(rows),s=map.get('1000');assert.equal(s.peerCount,6);assert.ok(!s.peerTickers.includes('1000'));
@@ -91,7 +93,64 @@ test('EV requires known nonnegative cash/debt; zero is valid',()=>{
     const peers=buildTaiwanComparableMap(group().map(s=>({...s,debtPerShare}))).get('1000');
     assert.equal(peers.evEbitdaMedian,null);assert.ok(peers.peMedian>0);
   }
-  assert.ok(buildTaiwanComparableMap(group().map(s=>({...s,cashPerShare:0,debtPerShare:0}))).get('1000').evEbitdaMedian>0);
+  assert.ok(buildTaiwanComparableMap(group().map(s=>({...s,cashPerShare:0,debtPerShare:0,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:bridgeEvidence(0,0)}}))).get('1000').evEbitdaMedian>0);
+});
+
+test('vendor aggregate cash/debt is not certified by presence, even when positive or zero',()=>{
+  const raw=quarterlyInputs(payload([series('quarterlyCashCashEquivalentsAndShortTermInvestments',[point('2026-06-30',100)]),series('quarterlyTotalDebt',[point('2026-06-30',20)])]),'TWD',now);
+  assert.equal(raw.cashPerShare,10);assert.equal(raw.debtPerShare,2);
+  assert.equal(raw.financialMetrics.enterpriseBridgeEvidence,undefined);
+  assert.match(raw.sourceNote,/尚未核證/);
+  const rows=group(),prior=buildTaiwanComparableMap(rows).get('1000');
+  const unverified=rows.map(s=>({...s,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:undefined}}));
+  const peers=buildTaiwanComparableMap(unverified).get('1000');
+  for(const field of ['evRevenueMedian','evEbitdaMedian','evEbitMedian'])assert.equal(peers[field],null);
+  for(const field of ['peMedian','pbMedian','psMedian'])assert.equal(peers[field],prior[field]);
+  const target=calculateStock({...unverified[0],comparableMultiples:prior,valuationPolicy:'tw-comparables-v1'});
+  assert.equal(target.models.some(m=>m.id.startsWith('ev-')),false);
+  assert.equal(target.models.length,3);assert.ok(target.historicalCautionReasons.some(r=>/EV 橋接待核證/.test(r)));
+  assert.equal(taiwanEnterpriseAdjustment({...unverified[0],cashPerShare:0,debtPerShare:0}),null);
+});
+
+test('bridge evidence binds filing scope, aligned dates, currency, shares and amounts',()=>{
+  const s=stock('1000');assert.equal(validTaiwanEnterpriseBridgeEvidence(s),true);
+  for(const patch of [{sourceType:'vendor-aggregate'},{sourceUrl:'http://example.test/filing'},{sourceUrl:'https://user:secret@example.test/filing'},
+    {cashScope:'all-current-financial-assets'},{debtScope:'borrowings-only'},{periodEnd:'2026-03-31'},
+    {periodEnd:'2026-02-31'},{publishedDate:'2026-09-19'},{publishedDate:'2026-06-01'},{currency:'USD'},
+    {sharesOutstanding:1e7},{cashAndInvestments:0},{debtIncludingLeases:0},{cashAndInvestments:NaN},
+    {debtIncludingLeases:-1},{cashAndInvestments:undefined}]) {
+    assert.equal(taiwanEnterpriseAdjustment({...s,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:{...bridgeEvidence(),...patch}}}),null);
+  }
+  const zero={...s,cashPerShare:0,debtPerShare:0,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:bridgeEvidence(0,0)}};
+  assert.equal(taiwanEnterpriseAdjustment(zero),0);
+  assert.equal(taiwanEnterpriseAdjustment({...s,cashPerShare:6}),null);
+  assert.equal(taiwanEnterpriseAdjustment({...s,debtPerShare:11}),null);
+  assert.equal(taiwanEnterpriseAdjustment({...s,financialMetrics:{...s.financialMetrics,sharesOutstanding:2e8}}),null);
+  for(const shareBasis of [undefined,'diluted-average'])assert.equal(taiwanEnterpriseAdjustment({...s,financialMetrics:{...s.financialMetrics,shareBasis}}),null);
+});
+
+test('conflicting bridge proof cannot select a duplicate by ordering or re-enable a small peer pool',()=>{
+  const rows=group(),unverified={...rows[6],financialMetrics:{...rows[6].financialMetrics,enterpriseBridgeEvidence:undefined}};
+  assert.deepEqual(buildTaiwanComparableMap([...rows,unverified]),buildTaiwanComparableMap([unverified,...rows]));
+  assert.equal(buildTaiwanComparableMap([...rows,unverified]).has(rows[6].ticker),false);
+  const thin=rows.map((s,i)=>i>=5?{...s,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:undefined}}:s);
+  assert.equal(buildTaiwanComparableMap(thin).get('1000').evEbitdaMedian,null);
+  assert.equal(buildTaiwanComparableMap(thin).get('1000').evEbitdaPeerCount,4);
+  const reordered={...rows[6],financialMetrics:{...rows[6].financialMetrics,enterpriseBridgeEvidence:Object.fromEntries(Object.entries(bridgeEvidence()).reverse())}};
+  assert.deepEqual(buildTaiwanComparableMap([...rows,reordered]),buildTaiwanComparableMap(rows));
+  const wrongBasis={...rows[6],financialMetrics:{...rows[6].financialMetrics,shareBasis:'diluted-average'}};
+  assert.deepEqual(buildTaiwanComparableMap([...rows,wrongBasis]),buildTaiwanComparableMap([wrongBasis,...rows]));
+  assert.equal(buildTaiwanComparableMap([...rows,wrongBasis]).has(rows[6].ticker),false);
+});
+
+test('Taiwan bridge safeguards do not change USD ingestion or US valuation',()=>{
+  const usd=payload([series('quarterlyCashCashEquivalentsAndShortTermInvestments',[point('2026-06-30',100)]),series('quarterlyTotalDebt',[point('2026-06-30',20)])]);
+  for(const item of usd.timeseries.result)for(const p of item[item.meta.type[0]])p.currencyCode='USD';
+  const raw=quarterlyInputs(usd,'USD',now);
+  assert.equal(raw.cashPerShare,10);assert.equal(raw.debtPerShare,2);assert.equal(raw.financialMetrics,undefined);
+  const input={...stock('TEST'),market:'US',priceSource:undefined,financialMetrics:undefined};
+  const a=calculateStock(input),b=calculateStock({...input,financialMetrics:stock('1000').financialMetrics});
+  assert.deepEqual(a.models,b.models);assert.equal(a.fairValue,b.fairValue);
 });
 test('broker industry is shared by raw and calibrated valuation; no ordinary-company DCF',()=>{
   const input={...stock('6021'),name:'美好證',industry:'金融業'};

@@ -44,6 +44,23 @@ test('complete-cohort peers are order independent, retain 400 bars and pure tech
   input[0].stock.updatedAt='2020-01-01';assert.throws(()=>prepareTaiwanRefreshGeneration(input,runId),/MIXED_TAIWAN/);
 });
 
+test('uncertified EV totals retain raw financials, non-EV models and full daily history',()=>{
+  const input=records(),rows=prepareTaiwanRefreshGeneration(input,runId);
+  for(let i=0;i<rows.length;i++) {
+    const r=rows[i],state=dailyValuationState(r.stock,runId);
+    assert.equal(r.status,'ready');assert.equal(r.stock.cashPerShare,input[i].stock.cashPerShare);
+    assert.equal(r.stock.debtPerShare,input[i].stock.debtPerShare);
+    assert.equal(r.stock.financialMetrics.enterpriseBridgeEvidence,undefined);
+    assert.equal(r.stock.comparableMultiples.evEbitdaMedian,null);
+    assert.equal(state.stock.models.some(m=>m.id.startsWith('ev-')),false);
+    assert.deepEqual(state.stock.models.map(m=>m.id),['pe','pb','p-sales']);
+    assert.equal(state.hasModel,true);assert.equal(r.history.candles.length,400);
+    assert.equal(r.history.technicalAnalysis.candlestickPattern,'morning-star');
+  }
+  const old={...rows[0].stock,dailyValuationVersion:'tw-comparables-2026-09-20-memory-v1'};
+  assert.equal(dailyValuationState(old,runId).upside,null);
+});
+
 test('no model, review and old provenance never become zero or minus-100-percent rankings',()=>{
   const input=records();input[0].stock.industry='';input[1].stock.financialMetrics.nonControllingBookPerShare=100;
   const rows=prepareTaiwanRefreshGeneration(input,runId);

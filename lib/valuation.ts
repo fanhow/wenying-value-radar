@@ -136,6 +136,8 @@ export type StockInput = {
     /** Provider EBIT/EBITDA retained for reconciliation, not operating valuation. */
     providerEbitPerShare?: number;
     providerEbitdaPerShare?: number;
+    /** Vendor totals are retained for audit, never certified by their field names. */
+    enterpriseBridgeEvidence?: import('./taiwan-valuation-evidence.ts').TaiwanEnterpriseBridgeEvidence;
   };
   assetTurnover?: number;
   financialLeverage?: number;
@@ -1319,7 +1321,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       addExcluded(excludedModels,id,category,label,'缺少逐年前瞻現金流／股利與可驗證終值假設；歷史成長外推情境不計入目前同業模型中心。');return;
     }
     if(twComparables && id.startsWith('ev-') && twEnterpriseBridge===null) {
-      addExcluded(excludedModels,id,category,label,'現金／負債／非控制權益橋接不足，或非控制權益相對母公司權益過大；不可將全部合併營業利益歸給母公司股東。');return;
+      addExcluded(excludedModels,id,category,label,'現金分類、應收帳款讓售／受限資產排除、流動及非流動租賃負債尚未有同期間申報證據，或非控制權益橋接不足；EV 模型停用，缺值不當作零。');return;
     }
   if(materialMinorityClaims && id==='p-sales') {
       addExcluded(excludedModels,id,category,label,'合併營收含重大非控制權益，無法直接以母公司股價／每股合併營收比較；保留母公司盈餘與淨值供研究。');return;
@@ -2061,6 +2063,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     ?? (uncertainty >= 0.34 || debtRatio >= 80 ? "高" : uncertainty >= 0.22 ? "中" : "低");
   const historicalCautionReasons: string[] = [];
   if(twComparables)historicalCautionReasons.push('台股'+twPeerScope+'相對估值研究；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
+  if(twComparables && twEnterpriseBridge===null)historicalCautionReasons.push('EV 橋接待核證：供應商現金／短期投資與總負債欄位可能混入受限或營運資產、漏列租賃；保留原始財報與非 EV 模型，不以未核證總額計算 EV。');
   if(earningsOperationsDivergence)historicalCautionReasons.push('營業利益與報告淨利背離；盈餘型模型暫不採用，需核對投資評價及非控制權益。');
   if(twComparables && (input.financialMetrics?.nonControllingBookPerShare??0)>0)historicalCautionReasons.push('非控制權益目前僅有帳面值：小額橋接以帳面值近似並揭露；超過母公司權益 25% 時停用 EV 模型，待獨立評價。');
   if(earningsBaseShift)historicalCautionReasons.push('EARNINGS_BASE_SHIFT：當期 EPS 與年度歷史有重大基礎變化；可能是營運成長、週期或特殊損益，不直接稱為一次性。保留原值試算，待前瞻／週期基礎覆核。');
