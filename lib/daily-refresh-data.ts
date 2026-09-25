@@ -5,6 +5,7 @@ import { calibrateFairValue } from './valuation-calibration.ts';
 import { officialSession } from './refresh-calendar.ts';
 import { taiwanAnnualEarnings } from './taiwan-valuation-evidence.ts';
 import { validTaiwanShareMetadata } from './taiwan-share-metadata.ts';
+import {getUsEarningsReview} from './us-earnings-review.ts';
 
 export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string };
 export type RefreshRecord = {
@@ -163,6 +164,7 @@ function historyResult(ticker: string, market: 'TW'|'US', symbol: string, candle
     technicalAnalysis:analyzeTechnicalSetup(candles,upside)};
 }
 export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: string, now = new Date(), fetcher: typeof fetch = fetch): Promise<RefreshRecord> {
+  const review=getUsEarningsReview(target), name=review?.issuerName??target.name;
   const record: RefreshRecord={ticker:target.ticker,market:target.market,status:'unavailable',issues:[],sources:[],fetchedAt:now.toISOString()};
   const symbol=target.market==='TW'?`${target.ticker}.${target.listingBoard==='TPEx'?'TWO':'TW'}`:target.ticker;
   const chartUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y&events=div%2Csplits`;
@@ -179,7 +181,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     record.quoteDate=latest?.date;
     if(candles.length<60 || !latest || latest.date!==expectedDate) throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
     if(!validRefreshCandles(candles,expectedDate))throw new Error('INVALID_CAUSAL_HISTORY');
-    record.history=historyResult(target.ticker,target.market,symbol,candles,null,target.name);
+    record.history=historyResult(target.ticker,target.market,symbol,candles,null,name);
     // This flag is the liquidity filter shared by technical scans and rankings;
     // rankings additionally require status=ready. US size still needs shares.
     record.rankingEligible=target.market==='TW'&&latest.volume>=100000&&latest.close*latest.volume>=5000000;
@@ -189,12 +191,13 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const perShareIssue=target.market==='TW'?taiwanPerShareIssue(inputs):null;
     if(perShareIssue)throw new Error(perShareIssue);
     record.financialDate=inputs.financialDataDate;
-    const stock: StockInput={...target,price:latest.close,eps:0,bvps:0,fcfPerShare:0,revenueGrowth:0,roe:0,debtRatio:0,
+    const stock: StockInput={...target,name,price:latest.close,eps:0,bvps:0,fcfPerShare:0,revenueGrowth:0,roe:0,debtRatio:0,
       targetPe:0,targetPb:0,targetFcfMultiple:0,uncertainty:0.30,...inputs,updatedAt:latest.date,source:'自動資料',priceSource:'Yahoo Finance daily close / daily-refresh-v1',
       sourceNote:`每日雲端更新；${inputs.sourceNote}，截至 ${inputs.financialDataDate}；股價 ${latest.date}；擷取 ${now.toISOString()}。公開資料供應商，尚未逐檔與公司原始申報核對；非分析師即時目標價。`};
     // TW is capture-only until the complete same-session peer cohort exists.
-    const upside=target.market==='TW'?null:calibrateFairValue(calculateStock(stock)).calibratedUpside;
-    record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside,target.name); record.status='ready';
+    const upside=target.market==='TW'||review?null:calibrateFairValue(calculateStock(stock)).calibratedUpside;
+    if(review)record.issues.push(review.issue);
+    record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside,name); record.status='ready';
     const shares = (financial.timeseries?.result??[]).find((r: {meta?:{type?:string[]}})=>r.meta?.type?.[0]==='quarterlyOrdinarySharesNumber')?.quarterlyOrdinarySharesNumber?.find((p:Point)=>p.asOfDate===inputs.financialDataDate)?.reportedValue?.raw;
     record.rankingEligible=target.market==='TW'?latest.volume>=100000&&latest.close*latest.volume>=5000000:latest.close>=3&&latest.volume>=100000&&Number(shares)*latest.close>=500000000;
   } catch(error) { record.issues=[error instanceof Error?error.message:'UPSTREAM_UNAVAILABLE']; }

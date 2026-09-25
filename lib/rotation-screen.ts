@@ -1,6 +1,7 @@
 import type { StockInput } from './valuation.ts';
+import {getUsEarningsReview} from './us-earnings-review.ts';
 
-export const ROTATION_SCREEN_VERSION='WY-4F-2026.09.20.1';
+export const ROTATION_SCREEN_VERSION='WY-4F-2026.09.25.1';
 export type ResearchScope='all'|'technology';
 export function inResearchScope(stock:Pick<StockInput,'market'|'sector'|'industry'>,scope:ResearchScope){
   if(scope==='all')return true;
@@ -15,6 +16,7 @@ export type ResearchCandidate={ticker:string;name:string;market:'TW'|'US';sector
 // Financial firms/REITs require different accounting and are excluded explicitly.
 export function screenFeature(input:ScreenInput):Omit<ResearchCandidate,'valueScore'|'qualityScore'|'growthScore'|'momentumScore'|'score'|'rank'>|null {
   const s=input.stock;
+  if(getUsEarningsReview(s))return null;
   if(!input.eligible||input.bars<64||!s.updatedAt||!['price','eps','fcfPerShare','roe','debtRatio','revenueGrowth'].every(k=>Number.isFinite(s[k as keyof StockInput])))return null;
   if(s.price<=0||s.eps<=0||s.fcfPerShare<=0||s.roe<=0||!input.close21||input.close21<=0||!input.close63||input.close63<=0)return null;
   if(/finance|financial|bank|insurance|reit|real estate|金融|保險|銀行/i.test(`${s.sector} ${s.industry??''}`)||s.market==='TW'&&/^28\d\d$/.test(s.ticker))return null;

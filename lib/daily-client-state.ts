@@ -1,5 +1,6 @@
 import type {StockInput} from './valuation.ts';
 import {dailyValuationState,DAILY_VALUATION_VERSION} from './daily-valuation-state.ts';
+import {getUsEarningsReview} from './us-earnings-review.ts';
 
 export type DailyClientStatus={state:string;runId?:string|null;valuationVersion?:string|null;taiwanValuationCurrent?:boolean};
 export const isUserManagedInput=(stock:StockInput)=>stock.source==='手動輸入'||stock.source==='方舟截圖';
@@ -9,6 +10,9 @@ export const isDailyInput=(stock:StockInput)=>!isUserManagedInput(stock)&&stock.
 export const persistableInputs=(inputs:StockInput[])=>inputs.filter(stock=>stock&&typeof stock==='object'&&typeof stock.ticker==='string'&&!isDailyInput(stock));
 export function currentClientInput(stock:StockInput,status:DailyClientStatus|null) {
   if(isUserManagedInput(stock))return true;
+  // Retain archived inputs, but a refresh or legacy automatic cache cannot
+  // resolve an explicitly reviewed issuer's earnings-basis issue.
+  if(getUsEarningsReview(stock))return false;
   // TW automatic inputs must come from the active, versioned generation.
   // A missing source or an arbitrary price-source label is not a manual import.
   // Preserve the existing US non-daily SEC lookup path in this TW-only fix.

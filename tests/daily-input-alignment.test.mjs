@@ -51,6 +51,19 @@ test('successful US collector preserves percent margin through stock constructio
   assert.equal(restored.stock.netMargin,.5);assert.equal(restored.stock.netMarginUnit,'percent');
   assert.equal(restored.stock.eps,.2);assert.equal(restored.stock.price,40);
 });
+test('reviewed US collector preserves reported inputs and candles but creates no value context',async()=>{
+  const session='2026-09-18',p=fixture();
+  p.timeseries.result.find(row=>row.meta.type[0]==='quarterlyOrdinarySharesNumber').quarterlyOrdinarySharesNumber[0].reportedValue.raw=100000000;
+  const timestamp=Array.from({length:80},(_,i)=>(Date.parse(`${session}T20:00:00Z`)-(79-i)*86400000)/1000);
+  const chart={chart:{result:[{meta:{currency:'USD'},timestamp,indicators:{quote:[{
+    open:timestamp.map(()=>40),high:timestamp.map(()=>41),low:timestamp.map(()=>39),close:timestamp.map(()=>40),volume:timestamp.map(()=>1000000),
+  }]}}]}};
+  const row=await fetchRefreshRecord({ticker:'VISN',name:'Old directory name',market:'US',sector:'Technology'},session,now,
+    async url=>Response.json(url.includes('/chart/')?chart:p));
+  assert.equal(row.status,'ready');assert.deepEqual(row.issues,['US_EARNINGS_BASIS_REVIEW_REQUIRED']);
+  assert.equal(row.stock.eps,8);assert.equal(row.stock.price,40);assert.match(row.stock.name,/Vistance/);
+  assert.equal(row.history.candles.length,80);assert.equal(row.history.technicalAnalysis.valueTrendResonance,null);assert.equal(row.rankingEligible,true);
+});
 test('missing quarter plus missing TTM flow is never filled from an older quarter',()=>{
   const p=fixture();p.timeseries.result=p.timeseries.result.filter(r=>r.meta.type[0]!=='trailingOperatingCashFlow');
   p.timeseries.result.push(series('quarterlyOperatingCashFlow',[['2025-06-30',20],['2025-12-31',20],['2026-03-31',20],[end,20]]));
