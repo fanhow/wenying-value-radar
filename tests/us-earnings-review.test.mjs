@@ -19,6 +19,7 @@ test('known US case exposes canonical identity, specific issue and recorded prim
   assert.equal(review.issue,US_EARNINGS_REVIEW_ISSUE);
   assert.equal(review.issuerName,'Vistance Networks, Inc.');
   assert.equal(review.issuerCik,'1517228');
+  assert.equal(review.basis,'earnings');
   assert.equal(review.eventDate,'2026-01-09');
   assert.equal(review.reportedPeriodEnd,'2026-06-30');
   assert.equal(review.reviewVersion,US_EARNINGS_REVIEW_VERSION);
@@ -101,4 +102,47 @@ test('an unresolved duplicate cannot be suppressed by resolved entry order',()=>
   const resolved=clearedFixture();
   assert.deepEqual(evaluateUsEarningsReview(input,[resolved,knownCase]),evaluateUsEarningsReview(input,[knownCase,resolved]));
   assert.equal(evaluateUsEarningsReview(input,[resolved,knownCase]).issue,US_EARNINGS_REVIEW_ISSUE);
+});
+
+test('KODK cash-flow review preserves the compatible issue with specific source-backed identity and dates',()=>{
+  const review=getUsEarningsReview({market:'US',ticker:' kodk '});
+  assert.equal(review.issue,'US_EARNINGS_BASIS_REVIEW_REQUIRED');
+  assert.equal(review.basis,'cash-flow');assert.equal(review.issuerName,'Eastman Kodak Company');
+  assert.equal(review.issuerCik,'31235');assert.equal(review.eventDate,'2025-11-26');
+  assert.equal(review.reportedPeriodEnd,'2026-06-30');assert.equal(review.reviewVersion,'us-earnings-review-2026-09-25-v2');
+  assert.match(review.reasonZh,/KRIP/);assert.match(review.reasonZh,/保留原始 FCF、EPS/);
+  assert.match(review.reasonZh,/不推定調整後公允價值/);assert.match(review.reasonZh,/個別人工核證/);
+  assert.equal(review.sources.length,4);
+  assert.equal(review.sources.find(s=>s.url.endsWith('/node/21211')).publicationDate,'2026-03-12');
+  assert.equal(review.sources.find(s=>s.url.endsWith('/node/21436')).publicationDate,'2026-08-04');
+  assert.equal(review.sources.find(s=>s.url.endsWith('kodk-20251126.htm')).publicationDate,'2025-12-02');
+  for(const row of [{market:'TW',ticker:'KODK'},{market:'US',ticker:'KODK.TW'},
+    {market:'US',ticker:'CONTROL',name:'Eastman Kodak Company'}])assert.equal(getUsEarningsReview(row),null);
+  assert.equal(US_EARNINGS_REVIEW_CASES[0].ticker,'VISN');
+});
+
+test('KODK review never normalizes raw FCF or clears on input dates, refresh or asserted resolution',()=>{
+  const raw=Object.freeze({market:'US',ticker:'KODK',eps:-1.37,fcfPerShare:4.73953013278856,
+    cashPerShare:2.96220633299285,debtPerShare:1.5117466802860062,
+    basis:'earnings',valuationReviewRequired:false,resolution:clearedFixture().resolution});
+  const before=structuredClone(raw),expected=getUsEarningsReview(raw);
+  for(const date of [undefined,null,'invalid','2020-01-01','2026-06-30','2035-12-31']){
+    assert.deepEqual(getUsEarningsReview({...raw,financialDataDate:date,updatedAt:date,dailyRunId:String(date)}),expected);
+  }
+  assert.deepEqual(raw,before);assert.equal(expected.basis,'cash-flow');
+  for(const key of ['eps','fcfPerShare','normalizedFcfPerShare','fairValue'])assert.equal(Object.hasOwn(expected,key),false);
+  assert.throws(()=>{expected.sources[0].publicationDate='2000-01-01';},TypeError);
+});
+
+test('KODK requires its own source-backed clearance and legacy cases without basis remain compatible',()=>{
+  const kodk=US_EARNINGS_REVIEW_CASES.find(review=>review.ticker==='KODK'),input={market:'US',ticker:'KODK'};
+  const resolved={...kodk,disposition:'resolved',resolution:{...clearedFixture().resolution,caseId:kodk.caseId,issuerCik:kodk.issuerCik}};
+  assert.equal(evaluateUsEarningsReview(input,[resolved]),null);
+  assert.ok(evaluateUsEarningsReview(input,[{...resolved,resolution:clearedFixture().resolution}]));
+  assert.ok(evaluateUsEarningsReview(input,[{...kodk,disposition:'resolved'}]));
+  assert.ok(evaluateUsEarningsReview(input,[{...resolved,resolution:{...resolved.resolution,sources:[]}}]));
+  assert.ok(evaluateUsEarningsReview(input,[resolved,kodk]));assert.ok(getUsEarningsReview(input));
+  const legacy={...knownCase};delete legacy.basis;
+  const review=evaluateUsEarningsReview({market:'US',ticker:'VISN'},[legacy]);
+  assert.equal(review.issue,US_EARNINGS_REVIEW_ISSUE);assert.equal(Object.hasOwn(review,'basis'),false);
 });

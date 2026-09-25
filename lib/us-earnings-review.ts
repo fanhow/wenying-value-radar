@@ -3,7 +3,9 @@
  * a ratio threshold, a permanent stock blacklist, or a valuation adjustment.
  * Callers own manual/ARK exceptions. Missing/new dates never clear a case.
  */
-export const US_EARNINGS_REVIEW_VERSION = 'us-earnings-review-2026-09-25-v1';
+export const US_EARNINGS_REVIEW_VERSION = 'us-earnings-review-2026-09-25-v2';
+// Retain the existing wire issue and earningsReview response key for API
+// compatibility. The optional basis distinguishes earnings from cash-flow cases.
 export const US_EARNINGS_REVIEW_ISSUE = 'US_EARNINGS_BASIS_REVIEW_REQUIRED';
 
 export type UsEarningsReviewSource = Readonly<{
@@ -27,6 +29,7 @@ export type UsEarningsReviewCase = Readonly<{
   ticker: string;
   issuerName: string;
   issuerCik: string;
+  basis?: 'earnings' | 'cash-flow';
   disposition: 'unresolved' | 'resolved';
   reviewedOn: string;
   reasonZh: string;
@@ -42,6 +45,7 @@ export type UsEarningsReview = Readonly<{
   caseId: string;
   issuerName: string;
   issuerCik: string;
+  basis?: 'earnings' | 'cash-flow';
   sourceUrls: readonly string[];
   sources: readonly UsEarningsReviewSource[];
   reviewedOn: string;
@@ -78,6 +82,29 @@ const visnSources: readonly UsEarningsReviewSource[] = Object.freeze([
   }),
 ]);
 
+const kodkSources: readonly UsEarningsReviewSource[] = Object.freeze([
+  Object.freeze({
+    url: 'https://investor.kodak.com/node/21211',
+    publicationDate: '2026-03-12',
+    descriptionZh: '公司 FY2025 現金流量表：營業現金流 480 百萬美元，含 KRIP 現金返還 618 百萬美元；資本支出 34 百萬美元。不能直接扣除返還額推定正常化 FCF。',
+  }),
+  Object.freeze({
+    url: 'https://investor.kodak.com/node/21436',
+    publicationDate: '2026-08-04',
+    descriptionZh: '公司 2026 上半年現金流量表提供 H1 2025／H1 2026 比較，可橋接截至 2026-06-30 的 TTM；投資贖回 87 百萬美元列於投資活動，不再從 CFO 扣除。',
+  }),
+  Object.freeze({
+    url: 'https://www.sec.gov/Archives/edgar/data/31235/000119312525305285/kodk-20251126.htm',
+    publicationDate: '2025-12-02',
+    descriptionZh: 'SEC 8-K 核證 2025-11-26 KRIP 資產返還事件及相關稅項、債務支出；事件日金額與年末現金流表有時點差異，未據此完成正常化現金流。',
+  }),
+  Object.freeze({
+    url: 'https://www.sec.gov/Archives/edgar/data/31235/000119312526332861/0001193125-26-332861-index.htm',
+    publicationDate: '2026-08-04',
+    descriptionZh: 'SEC 申報索引核對 Eastman Kodak Company、CIK 31235 及 2026-08-04 申報日。',
+  }),
+]);
+
 /** Human-reviewed disposition, not vendor-computed classification or exhaustive coverage. */
 export const US_EARNINGS_REVIEW_CASES: readonly UsEarningsReviewCase[] = Object.freeze([
   Object.freeze({
@@ -86,12 +113,27 @@ export const US_EARNINGS_REVIEW_CASES: readonly UsEarningsReviewCase[] = Object.
     ticker: 'VISN',
     issuerName: 'Vistance Networks, Inc.',
     issuerCik: '1517228',
+    basis: 'earnings',
     disposition: 'unresolved',
     reviewedOn: '2026-09-25',
     reasonZh: 'VISN（Vistance Networks）已核證報告盈餘含重大 CCS 處分相關停業部門收益，尚未完成一致的可持續盈餘口徑覆核；暫停自動估值及財務排序，保留原始 EPS。此為個別人工核證事件，不代表全體美股已檢查。',
     eventDate: '2026-01-09',
     reportedPeriodEnd: '2026-06-30',
     sources: visnSources,
+  }),
+  Object.freeze({
+    caseId: 'us-kodk-krip-cash-flow-2026',
+    market: 'US',
+    ticker: 'KODK',
+    issuerName: 'Eastman Kodak Company',
+    issuerCik: '31235',
+    basis: 'cash-flow',
+    disposition: 'unresolved',
+    reviewedOn: '2026-09-25',
+    reasonZh: 'KODK（Eastman Kodak Company）已核證報告現金流含 KRIP 計畫資產返還，尚未完成相關稅項、現金支出及可持續每股現金流口徑覆核；暫停自動估值及財務排序，保留原始 FCF、EPS 與 K 線，不推定調整後公允價值。此為個別人工核證事件，不代表全體美股已檢查。',
+    eventDate: '2025-11-26',
+    reportedPeriodEnd: '2026-06-30',
+    sources: kodkSources,
   }),
 ]);
 
@@ -142,6 +184,7 @@ export function evaluateUsEarningsReview(
     caseId: review.caseId,
     issuerName: review.issuerName,
     issuerCik: review.issuerCik,
+    ...(review.basis ? {basis: review.basis} : {}),
     sourceUrls: Object.freeze(sources.map(source => source.url)),
     sources,
     reviewedOn: review.reviewedOn,
