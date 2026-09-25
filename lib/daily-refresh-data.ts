@@ -199,10 +199,45 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
   return record;
 }
 export async function expectedSession(market:'TW'|'US',now=new Date(),fetcher:typeof fetch=fetch) {
-  const symbol=market==='TW'?'0050.TW':'SPY';
+  if(market==='TW')return taiwanExpectedSession(now,fetcher);
+  const symbol='SPY';
   const url=`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1mo`;
   const [p,calendar]=await Promise.all([json(url,fetcher),officialSession(market,now,fetcher)]), candles=completedCandles(p,market,now,calendar.date), date=candles.at(-1)?.date;
   if(!date || (now.getTime()-Date.parse(date))/DAY>14) throw new Error('SESSION_REFERENCE_UNAVAILABLE');
   if(date!==calendar.date)throw new Error('REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR');
   return {date,source:url,calendarSource:calendar.source,basis:'official exchange holiday calendar checked against completed benchmark OHLC; mismatch fails closed'};
+}
+
+async function taiwanExpectedSession(now:Date,fetcher:typeof fetch) {
+  // The calendar remains authoritative. A missing ETF candle must never move it back a day.
+  const calendar=await officialSession('TW',now,fetcher);
+  if((now.getTime()-Date.parse(calendar.date))/DAY>14)throw new Error('SESSION_REFERENCE_UNAVAILABLE');
+  const checks:Array<{symbol:string;source:string;latest:string|null;issue:string|null}>=[];
+  for(const symbol of ['0050.TW','^TWII']) {
+    const source=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo`;
+    const check={symbol,source,latest:null as string|null,issue:null as string|null};
+    checks.push(check);
+    try {
+      const payload=await json(source,fetcher), result=payload?.chart?.result?.[0];
+      if(payload?.chart?.error)throw new Error('REFERENCE_PROVIDER_ERROR');
+      if(result?.meta?.symbol!==symbol||result?.meta?.currency!=='TWD')throw new Error('REFERENCE_IDENTITY_INVALID');
+      const timestamps=result?.timestamp;
+      if(!Array.isArray(timestamps)||!timestamps.length||!timestamps.every((t:unknown)=>typeof t==='number'&&Number.isSafeInteger(t)&&Number.isFinite(new Date(t*1000).getTime())))throw new Error('REFERENCE_TIMESTAMPS_INVALID');
+      const dates=timestamps.map((t:number)=>new Date(t*1000).toISOString().slice(0,10));
+      if(!dates.every((date:string,i:number)=>isoDate(date)&&(i===0||date>dates[i-1])))throw new Error('REFERENCE_TIMESTAMPS_INVALID');
+      const candle=completedCandles(payload,'TW',now,calendar.date).at(-1);
+      check.latest=candle?.date??null;
+      if(!candle||candle.date!==calendar.date)throw new Error('REFERENCE_EXPECTED_OHLC_MISSING');
+      if(![candle.open,candle.high,candle.low,candle.close].every(v=>Number.isFinite(v)&&v>0)
+        ||candle.high<Math.max(candle.open,candle.close)||candle.low>Math.min(candle.open,candle.close))throw new Error('REFERENCE_OHLC_INVALID');
+      return {date:calendar.date,source,calendarSource:calendar.source,
+        basis:'official exchange calendar checked against complete OHLC; fixed 0050.TW then ^TWII references; exact date required',checkedAt:now.toISOString(),referenceChecks:checks};
+    } catch(error) {
+      const message=error instanceof Error?error.message:'';
+      // Do not turn an explicit access/rate-limit/provider denial into a fallback probe.
+      if(/^(UPSTREAM_HTTP_(401|403|429)|REFERENCE_PROVIDER_ERROR)$/.test(message))throw error;
+      check.issue=/^(REFERENCE_[A-Z_]+|UPSTREAM_HTTP_\d{3})$/.test(message)?message:'REFERENCE_FETCH_FAILED';
+    }
+  }
+  throw new Error(`REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR TW expected=${calendar.date} ${checks.map(c=>`${c.symbol}:${c.latest??'none'}:${c.issue}`).join(' ')}`);
 }

@@ -29,6 +29,7 @@ export async function loadUniverse() {
 async function main() {
   if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
   const now=new Date(),[tw,us]=await Promise.all([expectedSession('TW',now),expectedSession('US',now)]);
+  console.log(JSON.stringify({event:'sessions_verified',TW:tw,US:us}));
   const targets=await loadUniverse();
   const manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
     universeSource:['Existing WenYing Taiwan equity directory and US equity directory; new listings require directory maintenance',tw.source,us.source,tw.calendarSource,us.calendarSource]};
