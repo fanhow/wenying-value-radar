@@ -1,3 +1,5 @@
+import {US_EARNINGS_REVIEW_CASES} from './us-earnings-review.ts';
+
 export type StockDirectoryEntry = {
   ticker: string;
   market: "TW" | "US";
@@ -78,6 +80,12 @@ export function rankMarketSymbols(entries: MarketSymbol[], query: string, limit 
   if (!normalized) return [];
 
   return entries
+    // Use the source-verified issuer identity without rewriting the historical
+    // directory snapshot. A reviewed case's name remains valid after clearance.
+    .map(entry=>{
+      const identity=US_EARNINGS_REVIEW_CASES.find(item=>item.market===entry.market&&item.ticker===entry.ticker);
+      return identity?{...entry,name:identity.issuerName}:entry;
+    })
     .filter((entry, index, all) => entry.ticker && entry.name
       && all.findIndex((candidate) => candidate.ticker === entry.ticker) === index
       && (entry.ticker.toLowerCase().includes(normalized) || entry.name.toLowerCase().includes(normalized)))
@@ -114,7 +122,7 @@ export function parseYahooTaiwanHtml(html: string): YahooTaiwanSnapshot | null {
 }
 
 export function safeLookupError(message: string, language: "zh" | "en") {
-  if (!message || /https?:\/\/|redirect|fetch failed|network|socket|資料來源回應/i.test(message)) {
+  if (!message || /https?:\/\/|redirect|fetch failed|network(?=$|[^a-z]|error\b)|socket|資料來源回應/i.test(message)) {
     return language === "zh"
       ? "公開資料暫時無法連線，請稍後再試。"
       : "Public market data is temporarily unavailable. Please try again later.";

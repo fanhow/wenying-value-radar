@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { findStockDirectoryEntries, isTaiwanSymbolQuery, parseYahooTaiwanHtml, rankMarketSymbols, safeLookupError } from "../lib/stock-directory.ts";
+import {getUsEarningsReview} from '../lib/us-earnings-review.ts';
+
+test('source-reviewed issuer labels replace stale names without mutating the directory',()=>{
+  const old=[{ticker:'VISN',market:'US',name:'Visionary Holdings Inc'},{ticker:'TEST',market:'US',name:'Control'}],before=structuredClone(old);
+  assert.equal(rankMarketSymbols(old,'VISN')[0].name,'Vistance Networks, Inc.');
+  assert.equal(rankMarketSymbols(old,'Vistance')[0].ticker,'VISN');
+  assert.deepEqual(rankMarketSymbols(old,'Visionary'),[]);assert.deepEqual(old,before);
+  assert.equal(rankMarketSymbols(old,'Control')[0].ticker,'TEST');
+});
+
+test('issuer Networks names do not hide review reasons, while network failures remain sanitized',()=>{
+  const reason=getUsEarningsReview({market:'US',ticker:'VISN'}).reasonZh;
+  assert.equal(safeLookupError(reason,'zh'),reason);
+  for(const message of ['NetworkError when fetching','network timeout','NETWORK_ERROR','fetch failed','socket closed','https://secret.example/path'])
+    assert.equal(safeLookupError(message,'zh'),'公開資料暫時無法連線，請稍後再試。');
+});
 
 test("suggests Apple before a valuation has been loaded", () => {
   assert.deepEqual(findStockDirectoryEntries("AAPL").map(({ ticker, nameEn }) => ({ ticker, nameEn })), [
