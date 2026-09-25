@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {quarterlyInputs,completedCandles} from '../lib/daily-refresh-data.ts';
+import {quarterlyInputs,completedCandles,fetchRefreshRecord} from '../lib/daily-refresh-data.ts';
 const now=new Date('2026-09-20T15:00:00Z'),end='2026-06-30';
 function series(type,points){return {meta:{type:[type]},[type]:points.map(([asOfDate,raw])=>({asOfDate,periodType:type.startsWith('trailing')?'TTM':'3M',currencyCode:'USD',reportedValue:{raw}}))};}
 function fixture(){return {timeseries:{result:[
@@ -13,6 +13,43 @@ test('aligned provider TTM is accepted when an intermediate quarter is absent',(
   const r=quarterlyInputs(fixture(),'USD',now);
   assert.equal(r.eps,8);assert.equal(r.fcfPerShare,6);assert.equal(r.ebitdaPerShare,10);
   assert.equal(r.financialDataDate,end);assert.ok(Math.abs(r.revenueGrowth-100/3)<1e-10);
+});
+
+test('daily USD and TWD margins retain explicit percent units across the one-percent boundary',()=>{
+  for(const currency of ['USD','TWD']) for(const margin of [-2,-1,-0.5,0,0.5,1,1.01,2,40]){
+    const p=fixture();p.timeseries.result.push(series('trailingNetIncome',[[end,400*margin/100]]));
+    for(const row of p.timeseries.result)for(const point of row[row.meta.type[0]])point.currencyCode=currency;
+    const r=quarterlyInputs(p,currency,now);
+    assert.equal(r.netMargin,margin,`${currency} ${margin}% must remain a percentage`);
+    assert.equal(r.netMarginUnit,'percent');
+    assert.equal(r.eps,8);assert.equal(r.bvps,20);assert.equal(r.fcfPerShare,6);
+  }
+});
+
+test('explicit margin unit does not invent missing net income or margin',()=>{
+  for(const currency of ['USD','TWD']){
+    const p=fixture();
+    for(const row of p.timeseries.result)for(const point of row[row.meta.type[0]])point.currencyCode=currency;
+    const r=quarterlyInputs(p,currency,now);
+    assert.equal(r.netMargin,undefined);
+    assert.equal(r.netMarginUnit,'percent');
+  }
+});
+
+test('successful US collector preserves percent margin through stock construction and JSON storage',async()=>{
+  const p=fixture();p.timeseries.result.push(series('trailingNetIncome',[[end,2]]));
+  p.timeseries.result.find(row=>row.meta.type[0]==='trailingDilutedEPS').trailingDilutedEPS[0].reportedValue.raw=.2;
+  const session='2026-09-18';
+  const timestamp=Array.from({length:80},(_,i)=>(Date.parse(`${session}T20:00:00Z`)-(79-i)*86400000)/1000);
+  const chart={chart:{result:[{meta:{currency:'USD'},timestamp,indicators:{quote:[{
+    open:timestamp.map(()=>40),high:timestamp.map(()=>41),low:timestamp.map(()=>39),close:timestamp.map(()=>40),volume:timestamp.map(()=>1000000),
+  }]}}]}};
+  const row=await fetchRefreshRecord({ticker:'UNITFIX',name:'Synthetic unit fixture',market:'US',sector:'Technology'},session,now,
+    async url=>Response.json(url.includes('/chart/')?chart:p));
+  assert.equal(row.status,'ready',JSON.stringify(row.issues));
+  const restored=JSON.parse(JSON.stringify(row));
+  assert.equal(restored.stock.netMargin,.5);assert.equal(restored.stock.netMarginUnit,'percent');
+  assert.equal(restored.stock.eps,.2);assert.equal(restored.stock.price,40);
 });
 test('missing quarter plus missing TTM flow is never filled from an older quarter',()=>{
   const p=fixture();p.timeseries.result=p.timeseries.result.filter(r=>r.meta.type[0]!=='trailingOperatingCashFlow');

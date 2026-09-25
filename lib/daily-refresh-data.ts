@@ -94,6 +94,9 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
   const result: Partial<StockInput> = { eps:annualEps, bvps, fcfPerShare:(ocf-Math.abs(capex))/shares,
     revenueGrowth, roe, debtRatio, revenuePerShare:revenue/shares, financialDataDate:end,
     dataBasis:'ltm', dataCompleteness:'historical', qualityAvailable:true,
+    // Every margin computed here is already multiplied by 100, including USD.
+    // Preserve its unit so sub-1% margins never enter legacy fraction detection.
+    netMarginUnit:'percent',
     ...valuationTargets(revenueGrowth,roe,debtRatio), sourceNote:`Yahoo Finance TTM（同截止日供應商 TTM；僅在四季連續時加總補足）；營收成長：${growthBasis}` };
   const operatingIncome=sum('OperatingIncome'), depreciation=sum('DepreciationAndAmortization');
   // Yahoo EBIT/EBITDA may include non-operating investment gains. Keep an
@@ -113,7 +116,6 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     const averageEquity=openingEquity!==undefined&&openingEquity>0?(openingEquity+equity)/2:undefined;
     result.roe=net!==undefined?net/(averageEquity??equity)*100:roe;
     Object.assign(result,valuationTargets(revenueGrowth,result.roe,debtRatio));
-    result.netMarginUnit='percent';
     result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
       shareAsOfDate:end,shareSourceField:'quarterlyOrdinarySharesNumber',
       roeBasis:net===undefined?'eps-ending-bvps':averageEquity===undefined?'parent-income-ending-equity':'parent-income-average-equity',

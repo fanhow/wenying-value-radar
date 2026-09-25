@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.09.25.1";
+const SITE_REVISION = "Rev. 2026.09.25.2";
 
 const REVISION_ENTRIES = [
+  ['2026.09.25.2', '修正每日美股財報輸入的淨利率單位：明確標示百分比，避免 0.5% 被誤判為 50%；保留原始數值，缺漏不補零。新增正負值、零值與 1% 邊界回歸測試；估值引擎公式、台股模型、即時資料流程與存取權限不變。修正適用後續新收集的資料批次，不宣稱既有批次已重算。', 'Fix net-margin units in daily US financial inputs: explicitly mark percentages so 0.5% cannot be interpreted as 50%. Preserve reported values and missingness. Add positive, negative, zero and 1% boundary regressions. Preserve valuation formulas, Taiwan models, live data flow and access controls. Applies to newly collected generations; does not claim existing generations were recalculated.'],
   ['2026.09.25.1', '每日更新參考行情修復：0050 缺少完整收盤日 K 時，僅以固定台灣加權指數備援核對交易日；兩者皆須符合官方日曆與完整 OHLC，失敗仍停止，不退回舊交易日、不補造價格。記錄實際參考來源與失敗原因；個股行情、財報、估值公式與權限保持不變。', 'Daily-refresh reference repair: when 0050 lacks a complete daily candle, verify the session using the fixed Taiwan Weighted Index fallback. Both references require the exact official-calendar date and valid OHLC; fail closed without reverting to an older session or inventing prices. Log reference provenance and failures; preserve stock data checks, financials, valuation formulas and access controls.'],
   ['2026.09.21.3', '台股舊快取防護：本機舊自動估值與來源不明資料不得混入當代排行榜、搜尋結果及估值詳情；保留原始本機紀錄、手動輸入、明確方舟截圖與觀察清單。台股自動估值須通過目前每日批次與版本檢查；美股既有 SEC 查詢及所有估值公式不變。', 'Taiwan legacy-cache safeguard: exclude old automatic and unclassified local inputs from current rankings, search results and valuation details. Retain original local records, manual inputs, explicit ARKER captures and watchlists. Taiwan automatic valuations must pass current daily-generation and version checks; preserve the existing US SEC lookup path and all valuation formulas.'],
   ['2026.09.21.2', '台股股數來源揭露：供應商標示的財報日期不再視為期末股數核證，保留 as-of 日期及欄位來源；新版與舊版資料均提示公司行動與稀釋 EPS 的口徑差異。保留所有原始數值、PE／PB／PS 公式及資格，EV 核證條件不放寬；不以外部估值或官方舊股數強行覆寫資料。', 'Taiwan share provenance: no longer treat a vendor financial-date label as verification of period-end shares; retain the provider as-of date and source field. Explain corporate-action and diluted-EPS basis differences for new and legacy records. Preserve raw values, PE/PB/PS formulas and eligibility, and strict EV evidence requirements. Do not overwrite inputs to fit external valuations or stale official share counts.'],
