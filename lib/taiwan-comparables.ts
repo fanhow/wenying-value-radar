@@ -82,9 +82,32 @@ function dated(s:StockInput) {
   return Number.isFinite(age)&&age>=0&&age<=180&&positive(s.price)&&positive(s.financialMetrics.sharesOutstanding)
     &&s.price*s.financialMetrics.sharesOutstanding>=1e9;
 }
-/** Independently sourced business/industry peers, not proprietary selected multiples. */
-export function buildTaiwanComparableMap(stocks:StockInput[]) {
-  const out=new Map<string,ComparableMultiples>();
+/** Keep only native fields used by peer selection, signatures and observations. */
+export function compactTaiwanComparableSource(s:StockInput):StockInput {
+  const source:StockInput={ticker:s.ticker,name:s.name,market:s.market,sector:s.sector,price:s.price,eps:s.eps,bvps:s.bvps,
+    fcfPerShare:s.fcfPerShare,targetPe:s.targetPe,targetPb:s.targetPb,targetFcfMultiple:s.targetFcfMultiple,
+    revenueGrowth:s.revenueGrowth,roe:s.roe,debtRatio:s.debtRatio,uncertainty:s.uncertainty};
+  const fields=['industry','updatedAt','financialDataDate','dataBasis','qualityAvailable','revenuePerShare',
+    'ebitdaPerShare','ebitPerShare','debtPerShare','cashPerShare','taiwanBusinessGroup'] as const;
+  for(const field of fields)if(field in s)Object.assign(source,{[field]:s[field]});
+  if(s.taiwanBusinessGroup&&typeof s.taiwanBusinessGroup==='object')source.taiwanBusinessGroup={
+    id:s.taiwanBusinessGroup.id,registryVersion:s.taiwanBusinessGroup.registryVersion};
+  const m=s.financialMetrics;
+  if(m!==undefined) {
+    source.financialMetrics=m?{currency:m.currency,periodBasis:m.periodBasis,shareBasis:m.shareBasis,roeBasis:m.roeBasis,growthBasis:m.growthBasis}:m;
+    if(m)for(const field of ['sharesOutstanding','shareAsOfDate','shareSourceField','nonControllingBookPerShare',
+      'ebitdaBasis','netIncomePerShare','enterpriseBridgeEvidence'] as const)
+      if(field in m)Object.assign(source.financialMetrics!,{[field]:m[field]});
+    const e=m?.enterpriseBridgeEvidence;
+    if(e&&typeof e==='object')source.financialMetrics!.enterpriseBridgeEvidence={sourceType:e.sourceType,sourceUrl:e.sourceUrl,
+      publishedDate:e.publishedDate,periodEnd:e.periodEnd,currency:e.currency,sharesOutstanding:e.sharesOutstanding,
+      cashAndInvestments:e.cashAndInvestments,debtIncludingLeases:e.debtIncludingLeases,cashScope:e.cashScope,debtScope:e.debtScope};
+  }
+  return source;
+}
+export type TaiwanComparableIndex={sourceCount:number;evaluate:(ticker:string)=>ComparableMultiples|undefined};
+/** Reusable native index; derived peer evidence exists only for the target in use. */
+export function createTaiwanComparableIndex(stocks:Iterable<StockInput>):TaiwanComparableIndex {
   const groups=new Map<string,StockInput[]>();
   const businessGroups=new Map<string,StockInput[]>();
   const unique=new Map<string,StockInput>(),conflicts=new Set<string>();
@@ -93,51 +116,64 @@ export function buildTaiwanComparableMap(stocks:StockInput[]) {
     return [e!==undefined,e?.sourceType,e?.sourceUrl,e?.publishedDate,e?.periodEnd,e?.currency,e?.sharesOutstanding,e?.cashAndInvestments,e?.debtIncludingLeases,e?.cashScope,e?.debtScope];
   };
   const signature=(s:StockInput)=>JSON.stringify([s.name,s.industry,s.market,s.updatedAt,s.financialDataDate,s.dataBasis,s.price,s.eps,s.bvps,s.roe,s.qualityAvailable,s.financialMetrics?.roeBasis,s.revenuePerShare,s.ebitdaPerShare,s.ebitPerShare,s.debtPerShare,s.cashPerShare,s.financialMetrics?.currency,s.financialMetrics?.sharesOutstanding,s.financialMetrics?.periodBasis,typeof s.financialMetrics?.shareBasis,s.financialMetrics?.shareBasis,typeof s.financialMetrics?.shareAsOfDate,s.financialMetrics?.shareAsOfDate,typeof s.financialMetrics?.shareSourceField,s.financialMetrics?.shareSourceField,s.financialMetrics?.nonControllingBookPerShare,s.financialMetrics?.ebitdaBasis,s.financialMetrics?.netIncomePerShare,bridgeSignature(s),s.taiwanBusinessGroup!==undefined,s.taiwanBusinessGroup?.id,s.taiwanBusinessGroup?.registryVersion]);
-  for(const stock of stocks) {
+  for(const input of stocks) {
+    const stock=compactTaiwanComparableSource(input);
     const previous=unique.get(stock.ticker);
     if(previous&&signature(previous)!==signature(stock))conflicts.add(stock.ticker);
     else unique.set(stock.ticker,stock);
   }
   const clean=[...unique.values()].filter(s=>!conflicts.has(s.ticker));
+  const sources=new Map(clean.map(s=>[s.ticker,s]));
+  const profiles=new Map<string,ReturnType<typeof taiwanApplicabilityProfile>>();
+  const observed=new Map<string,Record<TaiwanComparableModelId,{numerator:number|undefined;denominator:number|undefined}>>();
   for(const stock of clean) {
     if(!dated(stock))continue;
+    profiles.set(stock.ticker,taiwanApplicabilityProfile(stock));
+    const divergence=taiwanEarningsOperationsDivergence(stock),bridge=taiwanEnterpriseAdjustment(stock),ev=bridge===null?undefined:stock.price+bridge;
+    observed.set(stock.ticker,{pe:{numerator:stock.price,denominator:divergence?undefined:stock.eps},
+      pb:{numerator:stock.price,denominator:stock.bvps},
+      'p-sales':{numerator:stock.price,denominator:taiwanMaterialMinorityClaims(stock)?undefined:stock.revenuePerShare},
+      'ev-revenue':{numerator:ev,denominator:stock.revenuePerShare},
+      'ev-ebitda':{numerator:ev,denominator:stock.financialMetrics?.ebitdaBasis==='operating-income-plus-cashflow-da'&&!divergence?stock.ebitdaPerShare:undefined},
+      'ev-ebit':{numerator:ev,denominator:divergence?undefined:stock.ebitPerShare}});
     // Do not remove classified members from another target's original industry pool.
     const key=industryKey(stock);
     if(key) {
       const group=key+'|'+stock.updatedAt;
-      groups.set(group,[...(groups.get(group)??[]),stock]);
+      if(!groups.has(group))groups.set(group,[]);
+      groups.get(group)!.push(stock);
     }
     if(validTaiwanBusinessGroupReference(stock)) {
       const group=stock.taiwanBusinessGroup!.id+'|'+stock.updatedAt;
-      businessGroups.set(group,[...(businessGroups.get(group)??[]),stock]);
+      if(!businessGroups.has(group))businessGroups.set(group,[]);
+      businessGroups.get(group)!.push(stock);
     }
   }
-  for(const s of clean) {
-    if(!dated(s))continue;
+  for(const group of [...groups.values(),...businessGroups.values()])group.sort((a,b)=>a.ticker.localeCompare(b.ticker));
+  const evaluate=(ticker:string):ComparableMultiples|undefined=>{
+    const s=sources.get(ticker);
+    if(!s||!profiles.has(ticker))return undefined;
     const business=s.taiwanBusinessGroup!==undefined;
-    if(business&&!validTaiwanBusinessGroupReference(s))continue;
-    const key=business?s.taiwanBusinessGroup!.id:industryKey(s);if(!key)continue;
-    const target=taiwanApplicabilityProfile(s);
+    if(business&&!validTaiwanBusinessGroupReference(s))return undefined;
+    const key=business?s.taiwanBusinessGroup!.id:industryKey(s);if(!key)return undefined;
+    const target={...profiles.get(ticker)!};
     const peers=((business?businessGroups:groups).get(key+'|'+s.updatedAt)??[]).filter(p=>p.ticker!==s.ticker
-      &&p.financialDataDate===s.financialDataDate&&p.financialMetrics?.shareBasis===s.financialMetrics?.shareBasis).sort((a,b)=>a.ticker.localeCompare(b.ticker));
-    const metric=(id:TaiwanComparableModelId,getDenominator:(p:StockInput)=>number|undefined,getNumerator:(p:StockInput)=>number|undefined=p=>p.price) => {
+      &&p.financialDataDate===s.financialDataDate&&p.financialMetrics?.shareBasis===s.financialMetrics?.shareBasis);
+    const metric=(id:TaiwanComparableModelId) => {
       const observations=peers.map(p=>{
-        const numerator=getNumerator(p),denominator=getDenominator(p);
-        return {ticker:p.ticker,value:positive(numerator)&&positive(denominator)?numerator/denominator:undefined,numerator,denominator,profile:taiwanApplicabilityProfile(p)};
+        const {numerator,denominator}=observed.get(p.ticker)![id];
+        return {ticker:p.ticker,value:positive(numerator)&&positive(denominator)?numerator/denominator:undefined,numerator,denominator,profile:{...profiles.get(p.ticker)!}};
       }).filter((p):p is {ticker:string;value:number;numerator:number;denominator:number;profile:typeof target}=>positive(p.value)&&positive(p.numerator)&&positive(p.denominator)&&p.value<=MULTIPLE_CAPS[id]&&taiwanPeerApplicable(id,target,p.profile));
       const summary=summarizeTaiwanMultiple(id,target,observations);
       return {...summary,observations,tickers:observations.map(p=>p.ticker)};
     };
-    const ev=(p:StockInput)=>{const bridge=taiwanEnterpriseAdjustment(p);return bridge===null?undefined:p.price+bridge;};
-    const pe=metric('pe',p=>!taiwanEarningsOperationsDivergence(p)?p.eps:undefined);
-    const pb=metric('pb',p=>p.bvps);
+    const pe=metric('pe'),pb=metric('pb');
     // Sales multiples are strongly margin-dependent. Select comparable
     // observations instead of changing the observed multiple with a PE cap.
     // Factor 2 is a disclosed research assumption, not an external AI rule.
-    const ps=metric('p-sales',p=>!taiwanMaterialMinorityClaims(p)?p.revenuePerShare:undefined);
-    const er=metric('ev-revenue',p=>p.revenuePerShare,ev),ee=metric('ev-ebitda',p=>p.financialMetrics?.ebitdaBasis==='operating-income-plus-cashflow-da'&&!taiwanEarningsOperationsDivergence(p)?p.ebitdaPerShare:undefined,ev),ei=metric('ev-ebit',p=>!taiwanEarningsOperationsDivergence(p)?p.ebitPerShare:undefined,ev);
+    const ps=metric('p-sales'),er=metric('ev-revenue'),ee=metric('ev-ebitda'),ei=metric('ev-ebit');
     const modelEvidence=Object.fromEntries([['pe',pe],['pb',pb],['p-sales',ps],['ev-revenue',er],['ev-ebitda',ee],['ev-ebit',ei]].map(([id,m])=>[id,{observations:(m as typeof pe).observations,issues:(m as typeof pe).issues}])) as NonNullable<ComparableMultiples['taiwanApplicabilityEvidence']>['models'];
-    out.set(s.ticker,{market:'TW',sector:s.industry!,peerGroup:key,peerCount:peers.length,
+    return {market:'TW',sector:s.industry!,peerGroup:key,peerCount:peers.length,
       peMedian:pe.value,pePeerCount:pe.count,pbMedian:pb.value,pbPeerCount:pb.count,
       psMedian:ps.value,psPeerCount:ps.count,evRevenueMedian:er.value,evRevenuePeerCount:er.count,
       evEbitdaMedian:ee.value,evEbitdaPeerCount:ee.count,evEbitMedian:ei.value,evEbitPeerCount:ei.count,
@@ -146,7 +182,17 @@ export function buildTaiwanComparableMap(stocks:StockInput[]) {
       taiwanApplicabilityEvidence:{version:TAIWAN_APPLICABILITY_VERSION,profitabilityRatioLimit:2,target,models:modelEvidence},
       salesMarginEvidence:{targetNetMargin:incomeMargin(s,true),targetOperatingMargin:incomeMargin(s,false),psPeerTickers:ps.tickers,evRevenuePeerTickers:er.tickers},
       ...(business?{taiwanBusinessRegistryVersion:s.taiwanBusinessGroup!.registryVersion}:{}),
-      method:business?'tw-business-group-same-session-median':'tw-industry-same-session-median'});
+      method:business?'tw-business-group-same-session-median':'tw-industry-same-session-median'};
+  };
+  return {sourceCount:sources.size,evaluate};
+}
+/** Collector-compatible wrapper; finalize evaluates and discards one target at a time. */
+export function buildTaiwanComparableMap(stocks:StockInput[]) {
+  const index=createTaiwanComparableIndex(stocks),out=new Map<string,ComparableMultiples>();
+  for(const stock of stocks) {
+    if(out.has(stock.ticker))continue;
+    const result=index.evaluate(stock.ticker);
+    if(result)out.set(stock.ticker,result);
   }
   return out;
 }

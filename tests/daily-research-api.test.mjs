@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {DAILY_VALUATION_VERSION,dailyValuationState} from '../lib/daily-valuation-state.ts';
 import {DAILY_RESEARCH_CACHE_VERSION,withDailyResearchCache,currentDailyResearch,dailyResearchStockDigest,dailyResearchCohortDigest} from '../lib/daily-research-ranking.ts';
 import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts';
-import {REFRESH_SCHEMA,handleDailyRead,handleRefreshWrite,researchCohortIntegrity,
+import {REFRESH_SCHEMA,handleDailyRead,handleRefreshWrite,researchCohortIntegrity,verifyTaiwanGenerationPeers,
   RESEARCH_INTEGRITY_PAGE_BYTES,RESEARCH_INTEGRITY_PAGE_ROWS,RESEARCH_INTEGRITY_HASH_CONCURRENCY} from '../lib/daily-refresh-store.ts';
 import {analyzeTechnicalSetup} from '../lib/technical-analysis.ts';
 
@@ -265,9 +265,18 @@ test('dense 184-peer evidence uses byte-bounded complete pages and one canonical
     if(!sql.includes('research_integrity_candidates'))return statement;
     return {bind:(...values)=>db.prepare(sql,values),all:async()=>{
       const result=await statement.all(),rows=result.results??[];
-      pages.push({rows:rows.length,bytes:rows.reduce((sum,row)=>sum+row.stock_bytes,0)});return result;
+      pages.push({rows:rows.length,bytes:rows.reduce((sum,row)=>sum+row.stock_bytes,0),peerSources:sql.includes('json_remove')});return result;
     }};
   };
+  // Both finalize passes must use the same real byte boundary. No full derived
+  // map or legacy 500-full-JSON request is needed to reproduce every target.
+  assert.equal(await verifyTaiwanGenerationPeers(db,runId),185);
+  assert.equal(pages.filter(page=>page.peerSources).length,1);
+  assert.equal(pages.filter(page=>!page.peerSources).length,15);
+  assert.equal(pages.find(page=>page.peerSources).rows,185);
+  assert.ok(pages.find(page=>page.peerSources).bytes<300000);
+  assert.ok(pages.every(page=>page.rows<=RESEARCH_INTEGRITY_PAGE_ROWS&&page.bytes<=RESEARCH_INTEGRITY_PAGE_BYTES));
+  pages.length=0;
   const originalDigest=crypto.subtle.digest.bind(crypto.subtle);
   let active=0,maxActive=0,peakHeap=process.memoryUsage().heapUsed;
   const initialHeap=peakHeap,start=performance.now();

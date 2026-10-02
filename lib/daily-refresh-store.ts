@@ -4,7 +4,7 @@ import { isoDate,taiwanPerShareIssue,validRefreshCandles, type RefreshRecord } f
 import { detectValueTrendResonance } from './technical-analysis.ts';
 import type { TechnicalSnapshot, TechnicalCandidate } from './technical-screener.ts';
 import { rotationAudit } from './rotation-audit-store.ts';
-import {buildTaiwanComparableMap} from './taiwan-comparables.ts';
+import {compactTaiwanComparableSource,createTaiwanComparableIndex} from './taiwan-comparables.ts';
 import {withTaiwanBusinessGroup} from './taiwan-business-groups.ts';
 import type {StockInput} from './valuation.ts';
 import {validTaiwanShareMetadata} from './taiwan-share-metadata.ts';
@@ -96,25 +96,67 @@ type ResearchSeal = {version:string;digest:string;ready_count:number};
 export const RESEARCH_INTEGRITY_PAGE_BYTES = 2*1024*1024;
 export const RESEARCH_INTEGRITY_PAGE_ROWS = 500;
 export const RESEARCH_INTEGRITY_HASH_CONCURRENCY = 1;
-/** Byte-bounded reads cover every ready row; OHLC is never loaded. */
-export async function researchCohortIntegrity(db:D1Database,runId:string,market:'TW'|'US',quoteDate:string,verifyState=false) {
-  const members:[string,string][]=[];let afterTicker='';
-  for(;;) {
-    // The window sees only the next 500 ticker/length pairs. Stock JSON is
-    // joined only after the byte boundary is chosen, not copied for 500 rows.
-    const page=await db.prepare(`WITH research_integrity_candidates AS (
-        SELECT ticker,length(CAST(stock AS BLOB)) AS stock_bytes FROM daily_refresh_records
+export type ResearchStockPageRow={ticker:string;stock:string;stock_bytes:number;candidate_count:number};
+/** Shared byte boundary for source indexing, target verification and seals. */
+export async function readResearchStockPage(db:D1Database,runId:string,market:'TW'|'US',afterTicker:string,peerSources=false) {
+  // The window sees only the next 500 ticker/length pairs. Stock JSON is
+  // joined only after the byte boundary is chosen, not copied for 500 rows.
+  // Source indexing removes only derived objects inside SQL. JSON key presence,
+  // nulls and booleans remain intact for the compact native-field whitelist.
+  const candidateStock=peerSources?"json_remove(stock,'$.comparableMultiples','$.dailyResearch')":'stock';
+  const returnedStock=peerSources?"json_remove(r.stock,'$.comparableMultiples','$.dailyResearch')":'r.stock';
+  const page=await db.prepare(`WITH research_integrity_candidates AS (
+        SELECT ticker,length(CAST(${candidateStock} AS BLOB)) AS stock_bytes FROM daily_refresh_records
         WHERE run_id=? AND market=? AND status='ready' AND ticker>? ORDER BY ticker LIMIT ?
       ), sized AS (
         SELECT ticker,stock_bytes,ROW_NUMBER() OVER (ORDER BY ticker) AS position,
           SUM(stock_bytes) OVER (ORDER BY ticker ROWS UNBOUNDED PRECEDING) AS cumulative_bytes,
           COUNT(*) OVER () AS candidate_count FROM research_integrity_candidates
-      ) SELECT r.ticker,r.stock,s.stock_bytes,s.candidate_count FROM sized s
+      ) SELECT r.ticker,${returnedStock} AS stock,s.stock_bytes,s.candidate_count FROM sized s
         JOIN daily_refresh_records r ON r.run_id=? AND r.market=? AND r.ticker=s.ticker
         WHERE s.cumulative_bytes<=? OR s.position=1 ORDER BY s.ticker`)
       .bind(runId,market,afterTicker,RESEARCH_INTEGRITY_PAGE_ROWS,runId,market,RESEARCH_INTEGRITY_PAGE_BYTES)
-      .all<{ticker:string;stock:string;stock_bytes:number;candidate_count:number}>();
-    const rows=page.results??[];
+      .all<ResearchStockPageRow>();
+  return page.results??[];
+}
+const stockPageEnds=(rows:ResearchStockPageRow[])=>rows.length===rows[0].candidate_count&&rows[0].candidate_count<RESEARCH_INTEGRITY_PAGE_ROWS;
+/** Compact native index plus one target's evidence; no full derived cohort map. */
+export async function verifyTaiwanGenerationPeers(db:D1Database,runId:string) {
+  const sources:StockInput[]=[];let afterTicker='';
+  for(;;) {
+    const rows=await readResearchStockPage(db,runId,'TW',afterTicker,true);
+    if(!rows.length)break;
+    for(const row of rows) {
+      const stock=JSON.parse(row.stock) as StockInput;
+      if(!validTaiwanShareMetadata(stock))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
+      sources.push(compactTaiwanComparableSource(stock));
+    }
+    if(stockPageEnds(rows))break;
+    afterTicker=rows.at(-1)!.ticker;
+  }
+  const peers=createTaiwanComparableIndex(sources);
+  // The index owns separate compact snapshots; no source/full-page array is
+  // kept alive while derived target evidence is reconstructed and checked.
+  sources.length=0;afterTicker='';
+  for(;;) {
+    const rows=await readResearchStockPage(db,runId,'TW',afterTicker);
+    if(!rows.length)break;
+    for(const row of rows) {
+      const stock=JSON.parse(row.stock) as StockInput;
+      if(stock.market!=='TW'||stock.ticker!==row.ticker||stock.dailyRunId!==runId||stock.dailyValuationVersion!==DAILY_VALUATION_VERSION
+        ||JSON.stringify(stock.taiwanBusinessGroup??null)!==JSON.stringify(withTaiwanBusinessGroup(stock).taiwanBusinessGroup??null)
+        ||JSON.stringify(stock.comparableMultiples??null)!==JSON.stringify(peers.evaluate(stock.ticker)??null))throw new Error('GENERATION_PEER_EVIDENCE_MISMATCH');
+    }
+    if(stockPageEnds(rows))break;
+    afterTicker=rows.at(-1)!.ticker;
+  }
+  return peers.sourceCount;
+}
+/** Byte-bounded reads cover every ready row; OHLC is never loaded. */
+export async function researchCohortIntegrity(db:D1Database,runId:string,market:'TW'|'US',quoteDate:string,verifyState=false) {
+  const members:[string,string][]=[];let afterTicker='';
+  for(;;) {
+    const rows=await readResearchStockPage(db,runId,market,afterTicker);
     if(!rows.length)break;
     // Keep only one parsed/canonical stock alive during an awaited digest.
     // A single oversized row is allowed to make forward progress on its own.
@@ -124,7 +166,7 @@ export async function researchCohortIntegrity(db:D1Database,runId:string,market:
         ||verifyState&&!await currentDailyResearchCache(stock,runId,quoteDate))throw new Error('RESEARCH_CACHE_STATE_MISMATCH');
       members.push([row.ticker,await dailyResearchStockDigest(stock)]);
     }
-    if(rows.length===rows[0].candidate_count&&rows[0].candidate_count<RESEARCH_INTEGRITY_PAGE_ROWS)break;
+    if(stockPageEnds(rows))break;
     afterTicker=rows.at(-1)!.ticker;
   }
   return {version:DAILY_RESEARCH_SEAL_VERSION,digest:await dailyResearchCohortDigest(runId,market,quoteDate,members),ready_count:members.length};
@@ -218,7 +260,8 @@ export async function handleDailyRead(request:Request,db:D1Database|undefined):P
       if(query.length>80)return response({error:'INVALID_QUERY'},400);
       if(url.searchParams.has('runId')&&url.searchParams.get('runId')!==status.runId)return response({error:'DATA_GENERATION_CHANGED',freshness:status},409);
       // Fetch formal rows before the optional full-cohort research work. A
-      // research-only query/CPU failure must not discard validated formal rows.
+      // Catchable research query/parse errors must not discard validated formal
+      // rows. Hard Worker CPU/memory termination cannot be recovered here.
       const byMarket=scope==='research'?[]:await Promise.all(['TW','US'].map(async market=>{
         if(market==='TW'&&!status.taiwanValuationCurrent)return {low:[],high:[]};
         const q=(direction:string)=>db.prepare(`SELECT stock FROM daily_refresh_records WHERE run_id=? AND market=? AND status='ready' AND eligible=1 AND upside IS NOT NULL AND upside ${direction==='DESC'?'>=0.05':'<=-0.05'}
@@ -344,21 +387,7 @@ export async function handleRefreshWrite(request:Request,db:D1Database|undefined
       if(JSON.stringify(sealedCounts.results)!==JSON.stringify(counts.results))throw new Error('GENERATION_CHANGED_DURING_FINALIZE');
       // Rebuild peer evidence from this generation, not a collector assertion
       // or an earlier batch with the same quote date. No OHLC is loaded here.
-      const stocks:StockInput[]=[];
-      let afterTicker='';
-      for(;;) {
-        const page=await db.prepare("SELECT ticker,stock FROM daily_refresh_records WHERE run_id=? AND market='TW' AND status='ready' AND ticker>? ORDER BY ticker LIMIT 500").bind(id,afterTicker).all<{ticker:string;stock:string}>();
-        for(const row of page.results??[])stocks.push(JSON.parse(row.stock) as StockInput);
-        if(!page.results?.length||page.results.length<500)break;
-        afterTicker=page.results.at(-1)!.ticker;
-      }
-      if(stocks.some(stock=>!validTaiwanShareMetadata(stock)))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
-      const peers=buildTaiwanComparableMap(stocks);
-      for(const stock of stocks) {
-        if(stock.dailyRunId!==id||stock.dailyValuationVersion!==DAILY_VALUATION_VERSION
-          ||JSON.stringify(stock.taiwanBusinessGroup??null)!==JSON.stringify(withTaiwanBusinessGroup(stock).taiwanBusinessGroup??null)
-          ||JSON.stringify(stock.comparableMultiples??null)!==JSON.stringify(peers.get(stock.ticker)??null))throw new Error('GENERATION_PEER_EVIDENCE_MISMATCH');
-      }
+      if(await verifyTaiwanGenerationPeers(db,id)!==summary.TW.ready)throw new Error('GENERATION_PEER_EVIDENCE_MISMATCH');
       const head=await db.prepare('SELECT r.* FROM daily_refresh_runs r JOIN daily_refresh_head h ON h.run_id=r.id WHERE h.id=1').first<Run>();
       if(head&&head.started_at>run.started_at)throw new Error('NEWER_GENERATION_ALREADY_ACTIVE');
       // Finalize recalculates all caches once. Reads use this independent seal
