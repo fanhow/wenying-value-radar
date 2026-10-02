@@ -40,7 +40,8 @@ test("renders development preview metadata", async () => {
   assert.match(html, /公允價值[\s\S]*技術分析[\s\S]*大戶追蹤/);
   assert.match(html, /大戶追蹤/);
   assert.match(html, /語言選擇/);
-  assert.match(html, /MARKET SCAN \/ 02/);
+  assert.match(html, /ELIGIBLE VALUATIONS \/ 02/);
+  assert.match(html, /研究排行/);
   assert.match(source, /VALUATION \/ 01/);
   assert.match(source, /MY WATCHLIST \/ 03/);
   assert.match(source, /ticker: firstCandidate\.ticker, market: firstCandidate\.market, refresh: true/);
@@ -48,7 +49,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.09\.25\.5/);
+  assert.match(html, /Rev\. 2026\.10\.02\.2/);
   const forbiddenBrand = ["Investing", "Pro"].join("");
   assert.doesNotMatch(html, new RegExp(forbiddenBrand, "i"));
   assert.match(source, /className="table-extend-bar"/);
@@ -82,7 +83,7 @@ test("keeps the local preview working when Cloudflare env bindings are absent", 
   );
 
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /MARKET SCAN \/ 02/);
+  assert.match(await response.text(), /ELIGIBLE VALUATIONS \/ 02/);
 });
 
 test("valuation details expose the bilingual model audit trail", async () => {

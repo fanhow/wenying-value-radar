@@ -2,7 +2,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
-import { calculateStock } from '../lib/valuation.ts';
+import {dailyValuationState,effectiveValuationConfidence} from '../lib/daily-valuation-state.ts';
 
 export const BASE = 'https://stable-value.fanhow.chatgpt.site';
 const DAY = 86400000;
@@ -53,19 +53,31 @@ export function evaluate(stock, history, expected, now = new Date()) {
   const safeTechnical = history?.technicalAnalysis ? { ...history.technicalAnalysis, valueTrendResonance: fromDaily ? history.technicalAnalysis.valueTrendResonance : null } : null;
   const blocking = issues.filter(x => x !== 'API_VALUE_TREND_DEFAULT_UPSIDE_IGNORED');
   let model = null;
+  let rankingEligible = false;
   if (stock && !blocking.length) {
     try {
-      const calculated = calculateStock(stock);
-      const fairValue = calculated.calibratedFairValue ?? calculated.fairValue;
-      const upside = calculated.calibratedUpside ?? calculated.upside;
-      if (!Number.isFinite(fairValue) || !Number.isFinite(upside)) throw Error();
-      model = { fairValue, upside, confidence: calculated.valuationConfidence,
-        provenance: 'DEPLOYED_DAILY_MODEL_FROM_SAME_GENERATION_API_INPUTS' };
+      const state = dailyValuationState(stock,history?.freshness?.runId);
+      issues.push(...state.issues);
+      rankingEligible = state.rankingEligible;
+      if(state.hasModel)model = { fairValue:state.estimatedFairValue,upside:state.upside,
+        estimatedUpside:state.estimatedUpside,estimatedCalibratedUpside:state.estimatedCalibratedUpside,
+        confidence:effectiveValuationConfidence(state.stock),
+        provenance: 'LOCAL_CURRENT_MODEL_FROM_API_INPUTS' };
     } catch { issues.push('MODEL_CALCULATION_FAILED'); }
   }
+  if(!rankingEligible&&safeTechnical)safeTechnical.valueTrendResonance=null;
   return { quoteStatus, candleStatus, signalStatus, financialStatus: finances, issues,
-    model, technical: safeTechnical, latestFilingVerified: false,
-    status: blocking.length || !model ? 'DATA_WARNING' : 'READY_FOR_SOURCE_REVIEW' };
+    model, rankingEligible,researchOnly:!!model&&!rankingEligible,technical: safeTechnical, latestFilingVerified: false,
+    status: blocking.length || !model ? 'DATA_WARNING' : rankingEligible?'READY_FOR_SOURCE_REVIEW':'RESEARCH_ONLY' };
+}
+
+export function invalidateSelectionAssessment(assessment,issue,discardModel=false) {
+  assessment.issues.push(issue);
+  assessment.rankingEligible=false;
+  assessment.status='DATA_WARNING';
+  if(assessment.technical)assessment.technical.valueTrendResonance=null;
+  if(discardModel){assessment.model=null;assessment.researchOnly=false;}
+  return assessment;
 }
 
 export async function requestJson(path, token, body, fetcher = fetch) {
@@ -106,7 +118,7 @@ async function main() {
       '排名僅涵蓋當批可用且符合流動性門檻的股票；不等於所有上市股。',
       '不沿用昨日結果；未讀取到的資料保留空值。',
       '每日 API 使用實際模型估值；舊 API 預設值仍排除，最高勝率等文案不是已驗證績效。',
-      '估值使用每日部署的原有模型與同批輸入；財報仍需外部核對最新申報。'], rows: [] };
+      '估值使用本機目前模型重算同批 API 輸入；低信心僅供研究，財報仍需外部核對最新申報。'], rows: [] };
   if (!token) {
     report.status = 'AUTH_UNAVAILABLE';
   } else {
@@ -141,14 +153,14 @@ async function main() {
           if (technical?.ticker !== ticker || technical?.market !== market) technical = null;
           const assessment = evaluate(stock, technical, expectedSessions[market], now);
           const generation=scan.payload.freshness?.runId;
-          if(!generation || valuation.payload?.freshness?.runId!==generation || history.payload?.freshness?.runId!==generation) {assessment.issues.push('GENERATION_MISMATCH');assessment.model=null;assessment.status='DATA_WARNING';}
+          if(!generation || valuation.payload?.freshness?.runId!==generation || history.payload?.freshness?.runId!==generation)invalidateSelectionAssessment(assessment,'GENERATION_MISMATCH',true);
           const row = { market, ticker, name: stock?.name ?? candidate.name, rank,
             rankingDate: normalizedDate(candidate.updatedAt), rankingStatus: sessionStatus(candidate.updatedAt, expectedSessions[market]),
             quoteDate: normalizedDate(stock?.updatedAt), financialDate: normalizedDate(stock?.financialDataDate),
             signalDate: normalizedDate(technical?.technicalAnalysis?.asOf), price: stock?.price ?? null,
             valuationHttpStatus: valuation.status ?? null, technicalHttpStatus: history.status ?? null,
             sourceNote: stock?.sourceNote ?? null, dataBasis: stock?.dataBasis ?? null, ...assessment };
-          if (row.rankingStatus !== 'CURRENT_SESSION') { row.issues.push(`RANKING_${row.rankingStatus}`); row.status = 'DATA_WARNING'; }
+          if (row.rankingStatus !== 'CURRENT_SESSION')invalidateSelectionAssessment(row,`RANKING_${row.rankingStatus}`);
           report.rows.push(row);
           await writeFile(resolve(output, `${market}-${ticker}.json`), JSON.stringify({ candidate, valuation, history, assessment: row }, null, 2));
           console.log(`${market}:${ticker} ${row.status} quote=${row.quoteDate} financial=${row.financialDate}`);

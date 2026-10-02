@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateStock } from "../lib/valuation.ts";
 import { calibrateFairValue, effectiveValuationUpside } from "../lib/valuation-calibration.ts";
-import { BENCHMARK_ORDER_TW, marketStockFromRatio, selectMarketCandidates } from "../lib/market-scan.ts";
+import { BENCHMARK_ORDER_TW, marketStockFromRatio, selectMarketCandidates, isCandidateLiquid } from "../lib/market-scan.ts";
 import { EXPERT_CONSENSUS_TAIWAN_BENCHMARKS, EXPERT_CONSENSUS_TW_BENCHMARKS, EXPERT_CONSENSUS_TW_BEARISH_BENCHMARKS, EXPERT_CONSENSUS_TAIWAN_BEARISH_TICKER_ORDER } from "../lib/expert-consensus-tw-benchmark.ts";
 import { EXPERT_CONSENSUS_US_BENCHMARKS, EXPERT_CONSENSUS_US_BEARISH_BENCHMARKS, EXPERT_CONSENSUS_US_TICKER_ORDER, EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER } from "../lib/expert-consensus-us-benchmark.ts";
 
@@ -111,13 +111,15 @@ test("uses the current US benchmark order for all 40 tickers", () => {
   assert.deepEqual(EXPERT_CONSENSUS_US_BEARISH_TICKER_ORDER.slice(35, 40), ["INBX", "SRRK", "METC", "GKOS", "ROMA"]);
 });
 
-test("keeps benchmark stocks when either Taiwan volume or turnover threshold is met", () => {
-  const selected = selectMarketCandidates([
+test("benchmark liquidity accepts Taiwan volume or turnover while low confidence remains excluded from ranking", () => {
+  const rows=[
     { ticker: "2704", name: "國賓", market: "TW", price: 45.35, pe: 10, pb: 1, volume: 107_564, sector: "台灣上市公司" },
     { ticker: "7722", name: "LINEPAY", market: "TW", price: 290, pe: 10, pb: 1, volume: 26_592, sector: "台灣上市公司" },
-  ], "undervalued", 20);
-
-  assert.deepEqual(selected.map((row) => row.ticker), ["2704", "7722"]);
+  ];
+  assert.deepEqual(rows.map(isCandidateLiquid),[true,true]);
+  assert.equal(isCandidateLiquid({...rows[1],volume:1000}),false);
+  assert.deepEqual(selectMarketCandidates(rows,"undervalued",20),[]);
+  assert.deepEqual(rows.map(row=>marketStockFromRatio(row)?.ticker),["2704","7722"]);
 });
 
 test("uses calibrated upside for ranking filters and falls back to native upside", () => {

@@ -20,7 +20,7 @@ export function currentClientInput(stock:StockInput,status:DailyClientStatus|nul
   if(!status||!['complete','partial'].includes(status.state))return false;
   if(stock.market!=='TW')return true;
   return status.taiwanValuationCurrent===true&&status.valuationVersion===DAILY_VALUATION_VERSION
-    &&!!status.runId&&dailyValuationState(stock,status.runId).rankingEligible;
+    &&!!status.runId&&dailyValuationState(stock,status.runId).hasModel;
 }
 export const withoutDailyInstrument=(inputs:StockInput[],ticker:string,market:string)=>
   inputs.filter(stock=>!(isDailyInput(stock)&&stock.ticker===ticker&&stock.market===market));

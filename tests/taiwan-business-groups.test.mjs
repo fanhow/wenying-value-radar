@@ -42,7 +42,9 @@ test('business self/session/market-cap gates stay identical, five peers minimum'
     assert.equal(p.peerCount,5);assert.ok(!p.peerTickers.includes('2451'));assert.ok(!p.peerTickers.includes('8271'));
   }
   assert.ok(buildTaiwanComparableMap(group().slice(0,6)).get('2451'));
-  assert.equal(buildTaiwanComparableMap(group().slice(0,5)).has('2451'),false);
+  const insufficient=buildTaiwanComparableMap(group().slice(0,5)).get('2451');
+  assert.equal(insufficient.peMedian,null);assert.equal(insufficient.pbMedian,null);
+  assert.ok(insufficient.taiwanApplicabilityEvidence.models.pb.issues.some(i=>i.code==='INSUFFICIENT_MATCHED_PEERS'));
 });
 
 test('unclassified industry targets keep exactly the original peer population',()=>{

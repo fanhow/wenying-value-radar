@@ -8,6 +8,7 @@
 
 import { normalizeSector } from "./sector-normalization.ts";
 import { businessGroupForTicker } from "./fund-signal.ts";
+import type { TaiwanApplicabilityEvidence } from './taiwan-multiple-applicability.ts';
 
 export type ComparableRow = {
   ticker: string;
@@ -30,6 +31,8 @@ export type ComparableRow = {
 };
 
 export type ComparableMultiples = {
+  /** Versioned per-model observations and applicability decisions for Taiwan. */
+  taiwanApplicabilityEvidence?: TaiwanApplicabilityEvidence;
   pbMedian?: number | null;
   pbPeerCount?: number;
   quoteDate?: string;

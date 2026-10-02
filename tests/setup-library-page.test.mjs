@@ -48,7 +48,9 @@ test("keeps the approved Phase 1 Setup 05 ideal model unchanged", async () => {
   assert.match(data, /不等待收復頸線/);
   assert.match(data, /Do not wait for neckline reclaim/);
   assert.equal(createHash("sha256").update(png).digest("hex"), "b3f3e14702649e53db9b8e0516ba29e6bf678e5519df5904c1c5a2f5fb2eb9d3");
-  assert.equal(createHash("sha256").update(svg).digest("hex"), "1530e2699224a62e02d309ec47e4b24213422ccb838acb352adb797703b96bb6");
+  // The approved Windows capture used CRLF; Git checks this text asset out
+  // with LF on macOS. Compare identical content in the approved serialization.
+  assert.equal(createHash("sha256").update(svg.toString("utf8").replace(/\r?\n/g, "\r\n")).digest("hex"), "1530e2699224a62e02d309ec47e4b24213422ccb838acb352adb797703b96bb6");
 });
 
 test("real-market case files parse without invented numeric fields", async () => {

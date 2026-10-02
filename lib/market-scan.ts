@@ -1,5 +1,5 @@
 import { calculateStock, valuationTargets, type Market, type StockInput } from "./valuation.ts";
-import { calibrateFairValue } from "./valuation-calibration.ts";
+import { valuationRankingState } from "./daily-valuation-state.ts";
 import { sanitizeMarketScanRatios } from "./market-scan-sanitizer.ts";
 import {
   fundPortfolioPeProfiles,
@@ -123,7 +123,7 @@ function hasBenchmarkLiquidity(row: MarketScanRow) {
   return false;
 }
 
-function isCandidateLiquid(row: MarketScanRow) {
+export function isCandidateLiquid(row: MarketScanRow) {
   return hasCandidateLiquidity(row) || hasBenchmarkLiquidity(row);
 }
 
@@ -256,16 +256,13 @@ export function marketCandidateFromRatio(row: MarketScanRow): StockInput | null 
   if (!input) return null;
   const valuation = validValuation(input);
   if (!valuation) return null;
-  const cal = calibrateFairValue(valuation);
-  return cal.calibratedUpside >= 0.05 ? input : null;
+  const state = valuationRankingState(valuation);
+  return state.upside !== null && state.upside >= 0.05 ? input : null;
 }
 
 function validValuation(stock: StockInput) {
   const valuation = calculateStock(stock);
-  const hasValidModel = valuation.models.some((model) => Number.isFinite(model.value) && model.value > 0);
-  return Number.isFinite(valuation.fairValue) && valuation.fairValue > 0 && hasValidModel
-    ? valuation
-    : null;
+  return valuationRankingState(valuation).rankingEligible ? valuation : null;
 }
 
 export function selectTopMarketCandidates(universe: MarketScanRow[], limit = 20) {
@@ -292,16 +289,17 @@ export function selectMarketCandidates(
     .map((stock) => {
       const valuation = validValuation(stock);
       if (!valuation) return null;
-      const cal = calibrateFairValue(valuation);
+      const state = valuationRankingState(valuation);
+      if(state.upside===null)return null;
       const ticker = String(stock.ticker).trim().toUpperCase();
       let bmList = stock.market === "US" ? BENCHMARK_ORDER_US : BENCHMARK_ORDER_TW;
       if (direction === "overvalued") {
         bmList = stock.market === "US" ? BENCHMARK_ORDER_US_BEARISH : BENCHMARK_ORDER_TW_BEARISH;
       }
       const bmIdx = bmList.indexOf(ticker);
-      return { stock, valuation, cal, upside: cal.calibratedUpside, bmIdx: bmIdx >= 0 ? bmIdx : 9999 };
+      return { stock, valuation, upside: state.upside, bmIdx: bmIdx >= 0 ? bmIdx : 9999 };
     })
-    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock>; cal: ReturnType<typeof calibrateFairValue>; upside: number; bmIdx: number } => row !== null)
+    .filter((row): row is { stock: StockInput; valuation: ReturnType<typeof calculateStock>; upside: number; bmIdx: number } => row !== null)
     .filter(({ upside }) => direction === "undervalued"
       ? upside >= 0.05
       : upside <= -0.05)

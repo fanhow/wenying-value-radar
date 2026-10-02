@@ -2,7 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateStock, clamp, type Market, type Stock, type StockInput } from "../lib/valuation";
-import { effectiveValuationUpside } from "../lib/valuation-calibration";
 import type { InstitutionalSignal } from "../lib/fund-signal";
 import { assessGrowthPremium, type GrowthPremiumAssessment } from "../lib/growth-premium";
 import { findStockDirectoryEntries, safeLookupError } from "../lib/stock-directory";
@@ -15,6 +14,9 @@ import { DailyDataStatus } from './daily-data-status';
 import {currentClientInput,isDailyInput,isUserManagedInput,persistableInputs,withoutDailyInstrument,mergeCurrentInputs,type DailyClientStatus} from '../lib/daily-client-state';
 import { UsEarningsPanel } from "./us-earnings-panel";
 import { valuationSourceNote } from '../lib/valuation-source-note';
+import {valuationRankingState,effectiveValuationConfidence} from '../lib/daily-valuation-state';
+import {displayValuationReasons,englishApplicabilityReason,valuationReasonCategory,type ValuationReasonCategory} from './valuation-explanations';
+import {selectValuationList,researchRequestQuery,researchScanMayReplace,researchFailureScope,researchRowsAfterInvalidation,researchValuesAfterInvalidation,researchHeadAfterFailure,type ValuationListScope,type ValuationListMarket} from './valuation-lists';
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
 type SortKey = "recommended" | "upside" | "quality" | "price";
@@ -30,6 +32,12 @@ type MarketScanResponse = {
   scannedByMarket?: { TW?: number; US?: number };
   candidates?: StockInput[];
   overvaluedCandidates?: StockInput[];
+  researchCandidates?:StockInput[];
+  researchCounts?:{TW:number;US:number};
+  researchTotalCounts?:{TW:number;US:number};
+  researchStatus?:'current'|'refresh_required';
+  researchStatusByMarket?:{TW:'current'|'refresh_required';US:'current'|'refresh_required'};
+  freshness?:Partial<DailyClientStatus>;
 };
 
 type ValuationCandidate = {
@@ -92,6 +100,37 @@ function stockDescriptor(stock: Pick<StockInput, "name" | "market" | "sector" | 
 
 function formatSignedPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
+}
+
+function valuationIssueLabel(issue:string,language:Language) {
+  const labels:Record<string,[string,string]>={
+    LOW_VALUATION_CONFIDENCE:['原生估值信心不足','Low native valuation confidence'],
+    LOW_CALIBRATION_CONFIDENCE:['校準估值信心不足','Low calibrated valuation confidence'],
+    VALUATION_REVIEW_REQUIRED:['模型適用性、資料口徑或交叉驗證仍需覆核','Model applicability, accounting basis or cross-checks require review'],
+    VALUATION_MODEL_UNAVAILABLE:['缺少適用估值模型','No applicable valuation model'],
+  };
+  return labels[issue]?.[language==='zh'?0:1]??issue;
+}
+
+function ValuationStatusNotice({stock,language}:{stock:Stock;language:Language}) {
+  const state=valuationRankingState(stock);
+  const reasons=displayValuationReasons(stock.historicalCautionReasons);
+  if(state.rankingEligible)return null;
+  return <div className="confidence-warning" role="status">
+    <strong>{state.hasModel?(language==='zh'?'研究試算／不列正式排名':'Research estimate / excluded from ranking'):
+      (language==='zh'?'無適用模型／無法估值':'No applicable model / valuation unavailable')}</strong>
+    <p>{state.issues.map(issue=>valuationIssueLabel(issue,language)).join(' · ')}</p>
+    {state.hasModel&&<p>{language==='zh'?'保留原生模型與試算差距供研究；此結果不具正式高低估排名資格。':'Native model outputs and estimated gaps remain visible for research. This result is excluded from official valuation rankings.'}</p>}
+    {(['source-data','peer-comparability','assumption'] as ValuationReasonCategory[]).map(category=>{
+      const grouped=reasons.filter(reason=>valuationReasonCategory(reason)===category);
+      return grouped.length?<div key={category}><strong>{valuationReasonCategoryLabel(category,language)}</strong><p>{language==='zh'?grouped.join(' '):[...new Set(grouped.map(reason=>englishApplicabilityReason(reason)).filter(Boolean))].join(' ')||'Review the excluded models below for the available evidence.'}</p></div>:null;
+    })}
+  </div>;
+}
+
+function valuationReasonCategoryLabel(category:ValuationReasonCategory,language:Language) {
+  const labels={'source-data':['資料來源缺口','Source data gaps'],'peer-comparability':['同業可比性限制','Peer comparability limits'],assumption:['模型與研究假設限制','Model and research assumptions']};
+  return labels[category][language==='zh'?0:1];
 }
 
 function technicalAlertCopy(alert: TechnicalAlertEvent, language: Language) {
@@ -243,6 +282,14 @@ function TrendMark({ direction }: { direction: ValuationDirection }) {
 type AppliedValuationModel = Stock["models"][number];
 type ExcludedValuationModel = Stock["excludedModels"][number];
 
+class ValuationLookupError extends Error {
+  excludedModels:ExcludedValuationModel[];
+  constructor(message:string,excludedModels:ExcludedValuationModel[]) {
+    super(message);
+    this.excludedModels=excludedModels;
+  }
+}
+
 const modelCopy: Record<string, { zh: string; en: string; enDescription: string }> = {
   "etf-inav": { zh: "即時淨值法", en: "iNAV Method", enDescription: "Uses the iNAV captured from the ARKER screenshot." },
   pe: { zh: "本益比法", en: "P/E Method", enDescription: "Applies a target P/E multiple to positive earnings per share." },
@@ -277,6 +324,8 @@ function localizedModelExplanation(model: AppliedValuationModel, language: Langu
 }
 
 function englishExclusionReason(model: ExcludedValuationModel) {
+  const applicabilityReason=englishApplicabilityReason(model.reason);
+  if(applicabilityReason)return applicabilityReason;
   if (model.reason.includes("對數分布") || model.reason.includes("極端")) {
     return "Removed by a price-independent robust outlier filter because the result was far from the other applicable models.";
   }
@@ -332,6 +381,11 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("undervalued");
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
+  const [valuationScope,setValuationScope]=useState<ValuationListScope>('official');
+  const [researchFilter,setResearchFilter]=useState<Filter>('all');
+  const [researchSortKey,setResearchSortKey]=useState<SortKey>('upside');
+  const [officialMarket,setOfficialMarket]=useState<ValuationListMarket>('all');
+  const [researchMarket,setResearchMarket]=useState<ValuationListMarket>('TW');
   const [selectedTicker, setSelectedTicker] = useState("");
   const [dailyStatus,setDailyStatus]=useState<DailyClientStatus|null>(null);
   const dailyStatusRef=useRef<DailyClientStatus|null>(null);
@@ -345,13 +399,38 @@ export default function Home() {
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
+  const [lookupExcludedModels,setLookupExcludedModels]=useState<ExcludedValuationModel[]>([]);
   const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
   const [marketCandidates, setMarketCandidates] = useState<StockInput[]>([]);
   const [overvaluedCandidates, setOvervaluedCandidates] = useState<StockInput[]>([]);
+  const [researchCandidates,setResearchCandidates]=useState<StockInput[]>([]);
+  const [researchRunId,setResearchRunId]=useState<string|null>(null);
+  const [researchCounts,setResearchCounts]=useState({TW:0,US:0});
+  const [researchTotalCounts,setResearchTotalCounts]=useState({TW:0,US:0});
+  const [researchStatusByMarket,setResearchStatusByMarket]=useState<{TW:'current'|'refresh_required';US:'current'|'refresh_required'}>({TW:'refresh_required',US:'refresh_required'});
+  const [researchLoadingMarket,setResearchLoadingMarket]=useState<Market|null>(null);
+  const [researchError,setResearchError]=useState('');
+  const [researchQueryLoading,setResearchQueryLoading]=useState(false);
+  const researchQueryKey=useRef('');
+  const [researchLoadedQueryKey,setResearchLoadedQueryKey]=useState('');
+  const clearResearch=useCallback((scope:ValuationListMarket)=>{
+    setResearchCandidates(current=>researchRowsAfterInvalidation(current,scope));
+    setResearchCounts(current=>researchValuesAfterInvalidation(current,scope,0));
+    setResearchTotalCounts(current=>researchValuesAfterInvalidation(current,scope,0));
+    setResearchStatusByMarket(current=>researchValuesAfterInvalidation(current,scope,'refresh_required' as const));
+    if(scope==='all')setResearchRunId(null);
+  },[]);
+  const syncRejectedGeneration=useCallback((freshness:MarketScanResponse['freshness'],requestRunId:string,generationRejected=false)=>{
+    // A response from the request's generation may advance the known head.
+    // Never let an old response roll a newer client head backwards.
+    const current=dailyStatusRef.current,next=researchHeadAfterFailure(current,requestRunId,freshness,generationRejected);
+    if(next&&next!==current)onDailyStatus(next);
+  },[onDailyStatus]);
   const invalidateDaily=useCallback((ticker:string,market:Market)=>{
     setStockInputs(current=>withoutDailyInstrument(current,ticker,market));
     setMarketCandidates(current=>withoutDailyInstrument(current,ticker,market));
     setOvervaluedCandidates(current=>withoutDailyInstrument(current,ticker,market));
+    setResearchCandidates(current=>withoutDailyInstrument(current,ticker,market));
   },[]);
   const [scannedCount, setScannedCount] = useState(0);
   const [scannedByMarket, setScannedByMarket] = useState({ TW: 0, US: 0 });
@@ -367,6 +446,7 @@ export default function Home() {
   const [twDisplayLimit, setTwDisplayLimit] = useState(20);
   const [usDisplayLimit, setUsDisplayLimit] = useState(20);
   const initialTickerHandled = useRef(false);
+  const initialScopeHandled=useRef(false);
   const lookupRequest = useRef<AbortController | null>(null);
   const [form, setForm] = useState({
     ticker: "",
@@ -471,6 +551,7 @@ export default function Home() {
   useEffect(() => {
     const controller = new AbortController();
     async function loadMarketCandidates() {
+      const startingRun=dailyStatusRef.current?.runId;
       setIsMarketScanLoading(true);
       try {
         const response = await fetch("/api/market-scan", { signal: controller.signal });
@@ -478,10 +559,26 @@ export default function Home() {
         if(controller.signal.aborted)return;
         if (!response.ok) throw new Error("market scan failed");
         const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
+        const research=Array.isArray(payload.researchCandidates)?payload.researchCandidates:[];
         setMarketCandidates(candidates);
         setOvervaluedCandidates(Array.isArray(payload.overvaluedCandidates) ? payload.overvaluedCandidates : []);
-        if (!new URLSearchParams(window.location.search).get("ticker") && candidates[0]?.ticker) {
-          const firstCandidate = candidates[0];
+        // The independent research request owns active filters/pages. A slower
+        // default scan must not replace a globally filtered result with its
+        // default first page after the filtered request has started.
+        if(researchScanMayReplace(researchQueryKey.current,payload.freshness?.runId)) {
+          setResearchCandidates(research);
+          setResearchRunId(payload.freshness?.runId??null);
+          setResearchCounts(payload.researchCounts??{TW:0,US:0});
+          setResearchTotalCounts(payload.researchTotalCounts??payload.researchCounts??{TW:0,US:0});
+          setResearchStatusByMarket(payload.researchStatusByMarket??{TW:'refresh_required',US:'refresh_required'});
+        }
+        const showTaiwanResearch=!candidates.some(stock=>stock.market==='TW')&&research.some(stock=>stock.market==='TW');
+        if(!initialScopeHandled.current&&research.length){
+          if(showTaiwanResearch)setValuationScope('research');
+          initialScopeHandled.current=true;
+        }
+        const firstCandidate=showTaiwanResearch?research.find(stock=>stock.market==='TW'):candidates[0]??research[0];
+        if (!new URLSearchParams(window.location.search).get("ticker") && firstCandidate?.ticker) {
           setSelectedTicker(current=>current||firstCandidate.ticker);
           void fetch("/api/valuation", {
             method: "POST",
@@ -507,9 +604,10 @@ export default function Home() {
         setScannedCount(Number(payload.scannedCount) || 0);
         setScannedByMarket({ TW: Number(payload.scannedByMarket?.TW) || 0, US: Number(payload.scannedByMarket?.US) || 0 });
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+        if (!controller.signal.aborted&&!(error instanceof DOMException && error.name === "AbortError")) {
           setMarketCandidates([]);
           setOvervaluedCandidates([]);
+          if(researchScanMayReplace(researchQueryKey.current,startingRun))clearResearch('all');
           setScannedCount(0);
           setScannedByMarket({ TW: 0, US: 0 });
         }
@@ -519,21 +617,63 @@ export default function Home() {
     }
     void loadMarketCandidates();
     return () => controller.abort();
-  }, [dailyStatus?.runId,dailyStatus?.state,invalidateDaily]);
+  }, [dailyStatus?.runId,dailyStatus?.state,invalidateDaily,clearResearch]);
 
+  useEffect(()=>{
+    if(valuationScope!=='research'||!dailyStatus?.runId||!['complete','partial'].includes(dailyStatus.state))return;
+    const runId=dailyStatus.runId;
+    const options={runId,market:researchMarket,filter:researchFilter,sort:researchSortKey,query};
+    const key=JSON.stringify(options),controller=new AbortController();
+    researchQueryKey.current=key;
+    async function loadResearch() {
+      let failedFreshness:MarketScanResponse['freshness'],responseStatus:number|undefined;
+      setResearchQueryLoading(true);setResearchError('');
+      try {
+        const response=await fetch(`/api/market-scan?${researchRequestQuery(options)}`,{signal:controller.signal});
+        responseStatus=response.status;
+        const payload=await response.json() as MarketScanResponse;
+        failedFreshness=payload.freshness;
+        if(controller.signal.aborted||researchQueryKey.current!==key)return;
+        if(!response.ok||payload.freshness?.runId!==runId||dailyStatusRef.current?.runId!==runId
+          ||payload.freshness.state&&!['complete','partial'].includes(payload.freshness.state))throw new Error('generation');
+        setResearchCandidates(Array.isArray(payload.researchCandidates)?payload.researchCandidates:[]);
+        setResearchRunId(runId);
+        setResearchCounts(payload.researchCounts??{TW:0,US:0});
+        setResearchTotalCounts(payload.researchTotalCounts??payload.researchCounts??{TW:0,US:0});
+        setResearchStatusByMarket(payload.researchStatusByMarket??{TW:'refresh_required',US:'refresh_required'});
+        setResearchLoadedQueryKey(key);
+      } catch(error) {
+        if(controller.signal.aborted||researchQueryKey.current!==key)return;
+        clearResearch('all');setResearchLoadedQueryKey(key);
+        syncRejectedGeneration(failedFreshness,runId,researchFailureScope({market:'TW',requestRunId:runId,currentRunId:dailyStatusRef.current?.runId,responseStatus,freshness:failedFreshness})==='all');
+        setResearchError(t('研究資料無法載入，請更新頁面或稍後重試。','Research data could not load. Reload the page or try again later.'));
+        if(error instanceof DOMException&&error.name==='AbortError')return;
+      } finally {if(!controller.signal.aborted&&researchQueryKey.current===key)setResearchQueryLoading(false);}
+    }
+    const timer=window.setTimeout(()=>void loadResearch(),query.trim()?250:0);
+    return ()=>{window.clearTimeout(timer);controller.abort();};
+  },[valuationScope,researchMarket,researchFilter,researchSortKey,query,dailyStatus?.runId,dailyStatus?.state,t,clearResearch,syncRejectedGeneration]);
+
+  const currentResearchInputs=useMemo(()=>researchRunId&&researchRunId===dailyStatus?.runId
+    &&['complete','partial'].includes(dailyStatus.state)?researchCandidates.filter(stock=>currentClientInput(stock,dailyStatus)):[],
+    [researchCandidates,researchRunId,dailyStatus]);
   const stocks = useMemo(() => {
-    return mergeCurrentInputs([...marketCandidates, ...overvaluedCandidates],stockInputs,dailyStatus)
+    return mergeCurrentInputs([...marketCandidates, ...overvaluedCandidates,...currentResearchInputs],stockInputs,dailyStatus)
       .map((stock) => calculateStock(stock, formatNumber));
-  }, [marketCandidates, overvaluedCandidates, stockInputs,dailyStatus]);
+  }, [marketCandidates, overvaluedCandidates,currentResearchInputs, stockInputs,dailyStatus]);
+  const allResearchStocks=useMemo(()=>currentResearchInputs.map(stock=>calculateStock(stock,formatNumber))
+    .filter(stock=>{const state=valuationRankingState(stock);return state.hasModel&&!state.rankingEligible;}),[currentResearchInputs]);
   const allRankingStocks = useMemo(() => {
     return marketCandidates
       .filter(stock=>currentClientInput(stock,dailyStatus))
-      .map((stock) => calculateStock(stock, formatNumber));
+      .map((stock) => calculateStock(stock, formatNumber))
+      .filter(stock=>valuationRankingState(stock).rankingEligible);
   }, [marketCandidates,dailyStatus]);
   const allOvervaluedRankingStocks = useMemo(() => {
     return overvaluedCandidates
       .filter(stock=>currentClientInput(stock,dailyStatus))
-      .map((stock) => calculateStock(stock, formatNumber));
+      .map((stock) => calculateStock(stock, formatNumber))
+      .filter(stock=>valuationRankingState(stock).rankingEligible);
   }, [overvaluedCandidates,dailyStatus]);
 
   const totalTwUndervalued = useMemo(
@@ -566,47 +706,51 @@ export default function Home() {
     return [...tw, ...us];
   }, [allOvervaluedRankingStocks, twDisplayLimit, usDisplayLimit]);
   const selected = selectedTicker?stocks.find((stock) => stock.ticker === selectedTicker):stocks[0];
+  const selectedValuation=valuationRankingState(selected);
   const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
-  const selectedUpside = selected?.calibratedUpside ?? selected?.upside ?? 0;
+  const selectedUpside = selectedValuation.estimatedCalibratedUpside ?? 0;
   const selectedDirection = valuationDirection(selectedUpside);
   const selectedRangePosition = selected
     ? valuationRangePosition(selected.price, selected.calibratedRangeLow ?? selected.rangeLow, selected.calibratedRangeHigh ?? selected.rangeHigh)
     : 50;
 
-  const filteredStocks = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const sourceStocks = filter === "undervalued"
-      ? rankingStocks
-      : filter === "overvalued"
-        ? overvaluedRankingStocks
-        : stocks;
-    const filtered = sourceStocks.filter((stock) => {
-      const effectiveUpside = effectiveValuationUpside(stock);
-      const matchesQuery =
-        !normalizedQuery ||
-        stock.ticker.toLowerCase().includes(normalizedQuery) ||
-        stock.name.toLowerCase().includes(normalizedQuery) ||
-        stock.sector.toLowerCase().includes(normalizedQuery) ||
-        stock.industry?.toLowerCase().includes(normalizedQuery);
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "undervalued" && effectiveUpside >= 0.1) ||
-        (filter === "overvalued" && effectiveUpside <= -0.1) ||
-        (filter === "quality" && stock.qualityAvailable !== false && stock.qualityScore >= 75) ||
-        (filter === "risk" && stock.risk === "高");
-      return matchesQuery && matchesFilter;
-    });
-    if (sortKey === "recommended") return filtered;
-    return [...filtered].sort((a, b) => {
-      if (a.market !== b.market) return a.market === "TW" ? -1 : 1;
-      if (sortKey === "quality") return b.qualityScore - a.qualityScore;
-      if (sortKey === "price") return b.price - a.price;
-      const leftUpside = effectiveValuationUpside(a);
-      const rightUpside = effectiveValuationUpside(b);
-      if (filter === "overvalued") return leftUpside - rightUpside;
-      return rightUpside - leftUpside;
-    });
-  }, [filter, overvaluedRankingStocks, query, rankingStocks, sortKey, stocks]);
+  const activeFilter=valuationScope==='research'?researchFilter:filter;
+  const activeSortKey=valuationScope==='research'?researchSortKey:sortKey;
+  const activeMarket=valuationScope==='research'?researchMarket:officialMarket;
+  const activeSourceStocks=valuationScope==='research'?allResearchStocks:filter==='undervalued'?rankingStocks:
+    filter==='overvalued'?overvaluedRankingStocks:stocks;
+  const filteredStocks=useMemo(()=>selectValuationList(activeSourceStocks,{scope:valuationScope,market:activeMarket,
+    filter:activeFilter,sort:activeSortKey,query}),[activeSourceStocks,valuationScope,activeMarket,activeFilter,activeSortKey,query]);
+
+  async function loadMoreResearch(market:Market) {
+    const runId=dailyStatusRef.current?.runId;
+    if(!runId||runId!==researchRunId||researchLoadingMarket)return;
+    const key=researchQueryKey.current;
+    setResearchLoadingMarket(market);setResearchError('');
+    let responseStatus:number|undefined,failedFreshness:MarketScanResponse['freshness'];
+    try {
+      const offset=researchCandidates.filter(stock=>stock.market===market).length;
+      const response=await fetch(`/api/market-scan?${researchRequestQuery({market:researchMarket,filter:researchFilter,sort:researchSortKey,query,runId},offset,market)}`);
+      responseStatus=response.status;
+      const payload=await response.json() as MarketScanResponse;
+      failedFreshness=payload.freshness;
+      if(researchQueryKey.current!==key)return;
+      if(!response.ok||payload.freshness?.runId!==runId||dailyStatusRef.current?.runId!==runId
+          ||payload.freshness.state&&!['complete','partial'].includes(payload.freshness.state))throw new Error('generation');
+      if(payload.researchStatusByMarket?.[market]!=='current')throw new Error('research');
+      const incoming=Array.isArray(payload.researchCandidates)?payload.researchCandidates:[];
+      setResearchCandidates(current=>{const seen=new Set(current.map(stock=>`${stock.market}:${stock.ticker}`));
+        return [...current,...incoming.filter(stock=>stock.market===market&&!seen.has(`${stock.market}:${stock.ticker}`))];});
+      if(payload.researchCounts)setResearchCounts(payload.researchCounts);
+    } catch {if(researchQueryKey.current===key) {
+      const invalidScope=researchFailureScope({market,requestRunId:runId,currentRunId:dailyStatusRef.current?.runId,
+        responseStatus,freshness:failedFreshness});
+      clearResearch(invalidScope);
+      syncRejectedGeneration(failedFreshness,runId,invalidScope==='all');
+      setResearchError(t('研究資料批次已變更或尚未完成，請更新頁面後再試。','The research generation changed or is incomplete. Reload the page and try again.'));
+    }}
+    finally {setResearchLoadingMarket(null);}
+  }
 
   const watchlistStocks = stocks.filter((stock) => watchlist.includes(stock.ticker));
   const technicalSubscriptions = useMemo(() => watchlist.map((ticker) => {
@@ -659,11 +803,17 @@ export default function Home() {
   }, [language, notificationPermission, technicalAlerts, technicalLastSeen]);
   const undervaluedCount = rankingStocks.length;
   const overvaluedCount = overvaluedRankingStocks.length;
-  const displayedUniverseCount = filter === "undervalued"
-    ? rankingStocks.length
-    : filter === "overvalued"
-      ? overvaluedRankingStocks.length
-      : stocks.length;
+  const displayedUniverseCount=selectValuationList(activeSourceStocks,{scope:valuationScope,market:activeMarket,filter:'all',sort:'recommended',query:''}).length;
+  const officialAvailableCount=stocks.filter(stock=>valuationRankingState(stock).rankingEligible).length;
+  const researchCurrent=!!researchRunId&&researchRunId===dailyStatus?.runId&&['complete','partial'].includes(dailyStatus.state);
+  const researchRefreshRequired=!researchCurrent||(activeMarket==='all'
+    ?researchStatusByMarket.TW==='refresh_required'||researchStatusByMarket.US==='refresh_required'
+    :researchStatusByMarket[activeMarket]==='refresh_required');
+  const researchMatchingCount=activeMarket==='all'?researchCounts.TW+researchCounts.US:researchCounts[activeMarket];
+  const researchAvailableCount=researchCurrent?researchTotalCounts.TW+researchTotalCounts.US:0;
+  const researchPageCurrent=researchLoadedQueryKey===JSON.stringify({runId:dailyStatus?.runId,market:researchMarket,filter:researchFilter,sort:researchSortKey,query});
+  const researchPageLoading=researchQueryLoading||researchCurrent&&!researchPageCurrent;
+  const tableLoading=isMarketScanLoading||valuationScope==='research'&&researchPageLoading;
   const exactMatch = stocks.find((stock) => stock.ticker.toLowerCase() === query.trim().toLowerCase());
   const searchSuggestions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -676,7 +826,7 @@ export default function Home() {
         ticker: stock.ticker,
         market: stock.market,
         name: stock.name,
-        upside: stock.upside,
+        upside: valuationRankingState(stock).upside,
         isLoaded: true,
         isRefreshable: stock.source !== "手動輸入",
       }));
@@ -701,20 +851,28 @@ export default function Home() {
   function handleQueryChange(value: string) {
     setQuery(value);
     setLookupError("");
+    setLookupExcludedModels([]);
     setRemoteSymbols([]);
     const match = stocks.find((stock) => stock.ticker.toLowerCase() === value.trim().toLowerCase());
     if (match) {
+      retainLoadedInput(match.ticker);
       lookupRequest.current?.abort();lookupRequest.current=null;setIsLookupLoading(false);
       setSelectedTicker(match.ticker);
     }
   }
 
-  function selectStock(ticker: string) {
+  const retainLoadedInput=useCallback((ticker:string)=>{
+    const input=[...currentResearchInputs,...marketCandidates,...overvaluedCandidates].find(stock=>stock.ticker===ticker);
+    if(input&&currentClientInput(input,dailyStatusRef.current))setStockInputs(current=>[...withoutDailyInstrument(current,input.ticker,input.market),input]);
+  },[currentResearchInputs,marketCandidates,overvaluedCandidates]);
+
+  const selectStock=useCallback((ticker:string)=>{
+    retainLoadedInput(ticker);
     lookupRequest.current?.abort();lookupRequest.current=null;setIsLookupLoading(false);
     setSelectedTicker(ticker);
     setQuery("");
     window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  }
+  },[retainLoadedInput]);
 
   function openWatchlistStock(ticker: string) {
     selectStock(ticker);
@@ -768,8 +926,8 @@ export default function Home() {
       body: JSON.stringify(candidate),
       signal,
     });
-    const payload = await response.json() as { stock?: StockInput; error?: string };
-    if (!response.ok || !payload.stock) throw new Error(payload.error || "暫時無法建立估值");
+    const payload = await response.json() as { stock?: StockInput; error?: string;excludedModels?:ExcludedValuationModel[] };
+    if (!response.ok || !payload.stock) throw new ValuationLookupError(payload.error || "暫時無法建立估值",Array.isArray(payload.excludedModels)?payload.excludedModels:[]);
     return payload.stock;
   }
 
@@ -783,6 +941,7 @@ export default function Home() {
     }
     setIsLookupLoading(true);
     setLookupError("");
+    setLookupExcludedModels([]);
     setSelectedTicker(ticker);
     lookupRequest.current?.abort();
     const controller = new AbortController();
@@ -802,6 +961,7 @@ export default function Home() {
     } catch (error) {
       if (lookupRequest.current === controller&&startingRun===dailyStatusRef.current?.runId) {
         invalidateDaily(ticker,/^\d/.test(ticker)?'TW':'US');
+        setLookupExcludedModels(error instanceof ValuationLookupError&&!controller.signal.aborted?error.excludedModels:[]);
         setLookupError(controller.signal.aborted
           ? (language === "zh" ? "查詢超過 12 秒，已停止；請稍後再試。" : "The lookup exceeded 12 seconds and was stopped. Please try again.")
           : safeLookupError(error instanceof Error ? error.message : "", language));
@@ -813,7 +973,7 @@ export default function Home() {
         setIsLookupLoading(false);
       }
     }
-  }, [language, query, stocks,invalidateDaily]);
+  }, [language, query, stocks,invalidateDaily,selectStock]);
 
   useEffect(() => {
     if (!hasLoadedStorage || !dailyStatus || initialTickerHandled.current) return;
@@ -940,65 +1100,87 @@ export default function Home() {
         </section>
 
         <section className="main-grid">
-          <div className="table-panel panel">
+          <div className="table-panel panel" data-valuation-scope={valuationScope} role="region" aria-label={valuationScope==='research'?t('研究排行','Research ranking'):t('正式可用估值','Eligible valuations')}>
+            <div className="filter-tabs" role="tablist" aria-label={t('估值資料分區','Valuation categories')}>
+              <button type="button" role="tab" aria-selected={valuationScope==='official'} className={valuationScope==='official'?'selected':''} onClick={()=>setValuationScope('official')}>{t('正式可用估值','Eligible valuations')} {officialAvailableCount}</button>
+              <button type="button" role="tab" aria-selected={valuationScope==='research'} className={valuationScope==='research'?'selected':''} onClick={()=>setValuationScope('research')}>{t('研究排行','Research ranking')} {researchAvailableCount}</button>
+            </div>
             <div className="panel-heading">
               <div>
-                <p className="section-kicker">MARKET SCAN / 02</p>
-                <h2>{t("公允價值排行榜", "Fair Value Ranking")}</h2>
-                <p className="panel-subtitle">{t("低估與高估候選皆提供台股前 20＋美股前 20，作為多空研究起點", "Both screens show the top 20 Taiwan and top 20 U.S. stocks as a starting point for long and short research")}</p>
+                <p className="section-kicker">{valuationScope==='research'?'RESEARCH ESTIMATES / 02':'ELIGIBLE VALUATIONS / 02'}</p>
+                <h2>{valuationScope==='research'?t('研究排行','Research ranking'):t('正式可用估值','Eligible valuations')}</h2>
+                <p className="panel-subtitle">{valuationScope==='research'
+                  ?t('同批可計算但信心不足或待覆核的原生試算。排序與篩選涵蓋本批研究集合；數值差距不是投資機會，不列正式估值榜。','Native estimates from the current generation with low confidence or pending review. Sorting and filtering cover this generation’s research set. Gaps are research signals, not investment opportunities, and are excluded from eligible valuation rankings.')
+                  :t('僅包含目前批次中信心足夠、無覆核要求的可用估值；各市場先顯示 20 檔，可延伸查看。','Only current, sufficiently confident valuations without pending review are included. Each market starts with 20 entries and can be extended.')}</p>
               </div>
               <div className="sort-control">
                 <label htmlFor="sort">{t("排序", "Sort")}</label>
-                <select id="sort" value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)}>
-                  <option value="recommended">{t("推薦排序", "Recommended")}</option>
-                  <option value="upside">{t("上行空間", "Upside")}</option>
+                <select id="sort" value={activeSortKey} onChange={(event) => valuationScope==='research'?setResearchSortKey(event.target.value as SortKey):setSortKey(event.target.value as SortKey)}>
+                  <option value="recommended">{t("資料順序", "Data order")}</option>
+                  <option value="upside">{valuationScope==='research'?t('原生試算差距','Native estimate gap'):t("估值差距", "Valuation gap")}</option>
                   <option value="quality">{t("品質分數", "Quality score")}</option>
                   <option value="price">{t("現價", "Current price")}</option>
                 </select>
               </div>
             </div>
+            <div className="filter-tabs" role="tablist" aria-label={t('市場篩選','Market filter')}>
+              {([['all',t('全部市場','All markets')],['TW',t('台股','Taiwan')],['US',t('美股','U.S.')]] as [ValuationListMarket,string][]).map(([market,label])=>
+                <button type="button" key={market} role="tab" aria-selected={activeMarket===market} className={activeMarket===market?'selected':''} onClick={()=>valuationScope==='research'?setResearchMarket(market):setOfficialMarket(market)}>{label}</button>)}
+            </div>
+            {valuationScope==='research'&&researchRefreshRequired&&!researchQueryLoading&&<div className="confidence-warning" role="status"><strong>{t('研究集合待當前批次更新','Research set requires a current-generation refresh')}</strong><p>{t('這個批次尚未提供完整、經核對的研究排序資料。研究名單不以舊估值或快照補入；仍可搜尋個股查看已完成的模型與 K 線。','This generation does not yet provide a complete, verified research ranking cache. Previous estimates and snapshots are excluded. Individual completed models and price charts remain searchable.')}</p></div>}
+            {researchError&&valuationScope==='research'&&<p className="confidence-warning" role="status">{researchError}</p>}
             <div className="filter-tabs" role="tablist" aria-label={t("股票篩選", "Stock filters")}>
               {([
                 ["all", t("全部", "All")],
-                ["undervalued", t(`低估候選 ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)} Undervalued`)],
-                ["overvalued", t(`高估候選 ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)} Overvalued`)],
+                ["undervalued", valuationScope==='research'?t('試算差距 ≥ +10%','Estimated gap ≥ +10%'):t(`低估候選 ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwUndervalued) + Math.min(usDisplayLimit, totalUsUndervalued)} Undervalued`)],
+                ["overvalued", valuationScope==='research'?t('試算差距 ≤ −10%','Estimated gap ≤ −10%'):t(`高估候選 ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)}`, `Top ${Math.min(twDisplayLimit, totalTwOvervalued) + Math.min(usDisplayLimit, totalUsOvervalued)} Overvalued`)],
                 ["quality", t("高品質", "High quality")],
-                ["risk", t("審慎檢視", "Needs review")],
+                ["risk", t("待覆核／高風險", "Review required / high risk")],
               ] as [Filter, string][]).map(([key, label]) => (
-                <button key={key} type="button" className={filter === key ? "selected" : ""} onClick={() => setFilter(key)} role="tab" aria-selected={filter === key}>{label}</button>
+                <button key={key} type="button" className={activeFilter === key ? "selected" : ""} onClick={() => valuationScope==='research'?setResearchFilter(key):setFilter(key)} role="tab" aria-selected={activeFilter === key}>{label}</button>
               ))}
             </div>
             <div className="stock-table-wrap">
               <table className="stock-table">
                 <thead>
-                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{t("模型參考值", "Model Estimate")}</th><th scope="col">{t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("模型狀態／信心", "Model Status / Confidence")}</th></tr>
+                  <tr><th scope="col">{t("標的", "Stock")}</th><th scope="col">{t("現價", "Price")}</th><th scope="col">{valuationScope==='research'?t('原生試算值','Native estimate'):t("模型參考值", "Model Estimate")}</th><th scope="col">{valuationScope==='research'?t('原生模型差距','Native model gap'):t("估值差距", "Valuation Gap")}</th><th scope="col">{t("品質", "Quality")}</th><th scope="col">{t("模型狀態／信心", "Model Status / Confidence")}</th></tr>
                 </thead>
                 <tbody>
-                  {filteredStocks.map((stock) => {
+                  {(!researchPageLoading||valuationScope!=='research')&&filteredStocks.map((stock) => {
                     const isSelected = selected?.ticker === stock.ticker;
                     const isWatched = watchlist.includes(stock.ticker);
                     const growthPremium = assessGrowthPremium(stock);
-                    const fairVal = stock.calibratedFairValue ?? stock.fairValue;
+                    const state=valuationRankingState(stock);
+                    const fairVal = valuationScope==='research'&&state.hasModel?stock.fairValue:state.estimatedFairValue;
                     const rangeLow = stock.calibratedRangeLow ?? stock.rangeLow;
                     const rangeHigh = stock.calibratedRangeHigh ?? stock.rangeHigh;
-                    const upside = stock.calibratedUpside ?? stock.upside;
-                    const direction = valuationDirection(upside);
+                    const upside = valuationScope==='research'?state.estimatedUpside:state.estimatedCalibratedUpside;
+                    const direction = valuationDirection(upside??0);
                     return (
                       <tr key={stock.ticker} className={isSelected ? "is-selected" : ""} role="button" tabIndex={0} onClick={() => openRankedStock(stock.ticker)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRankedStock(stock.ticker); } }}>
                         <td><div className="stock-name-cell"><button type="button" className={`watch-star ${isWatched ? "watched" : ""}`} onClick={(event) => { event.stopPropagation(); toggleWatchlist(stock.ticker); }} aria-label={isWatched ? t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`) : t(`加入觀察清單 ${stock.ticker}`, `Add ${stock.ticker} to watchlist`)}>{isWatched ? "★" : "☆"}</button><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><span><strong>{stock.ticker}</strong><small>{stockDescriptor(stock, language)}</small></span></div></td>
                         <td data-label={t("目前價格", "Current Price")}><span className="table-number">{formatPrice(stock.price, stock.market)}</span></td>
-                        <td data-label={t("模型參考值", "Model Estimate")}><span className="fair-value-number">{formatPrice(fairVal, stock.market)}</span><small className="range-hint">{stock.valuationConfidence === "low" ? t("低信心歷史初估", "Low-confidence historical estimate") : `${t("校準區間", "Calibrated Range")} ${formatPrice(rangeLow, stock.market)} – ${formatPrice(rangeHigh, stock.market)}`}</small></td>
-                        <td data-label={t("估值差距", "Valuation Gap")}><div className="table-upside-cell"><span className={`upside-value ${directionTextClass(direction)}`}><TrendMark direction={direction} /><span>{formatSignedPercent(upside)}</span></span>{stock.calibrationGap !== undefined && Math.abs(stock.calibrationGap) > 0.01 && <small className="calibration-gap-sub">{t("較原生", "vs Native")} {formatSignedPercent(stock.calibrationGap)}</small>}</div></td>
+                        <td data-label={valuationScope==='research'?t('原生試算值','Native estimate'):t("模型參考值", "Model Estimate")}><span className="fair-value-number">{fairVal===null?'—':formatPrice(fairVal, stock.market)}</span><small className="range-hint">{!state.hasModel?t('無適用模型','No applicable model'):!state.rankingEligible?t('研究試算／不列正式排名','Research estimate / excluded from ranking'):`${t("校準區間", "Calibrated Range")} ${formatPrice(rangeLow, stock.market)} – ${formatPrice(rangeHigh, stock.market)}`}</small></td>
+                        <td data-label={valuationScope==='research'?t('原生模型差距','Native model gap'):t("估值差距", "Valuation Gap")}><div className="table-upside-cell"><span className={`upside-value ${directionTextClass(direction)}`}>{upside===null?'—':<><TrendMark direction={direction} /><span>{formatSignedPercent(upside)}</span></>}</span>{valuationScope==='official'&&state.hasModel&&stock.calibrationGap !== undefined && Math.abs(stock.calibrationGap) > 0.01 && <small className="calibration-gap-sub">{t("較原生", "vs Native")} {formatSignedPercent(stock.calibrationGap)}</small>}</div></td>
                         <td data-label={t("品質", "Quality")}>{stock.qualityAvailable === false ? <span className="quality-unavailable" title={t("公開資料不足，未計算品質分數", "Insufficient public data for a quality score")}>—</span> : <div className="quality-score"><span className="score-bar"><span style={{ width: `${stock.qualityScore}%` }} /></span><strong>{stock.qualityScore}</strong></div>}</td>
-                        <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={stock.calibrationConfidence ?? stock.valuationConfidence} language={language} /><GrowthPremiumPill assessment={growthPremium} language={language} /></div></td>
+                        <td data-label={t("模型狀態／信心", "Model Status / Confidence")}><div className="signal-pills"><RiskPill risk={stock.risk} language={language} /><ConfidencePill confidence={effectiveValuationConfidence(stock)} language={language} /><GrowthPremiumPill assessment={growthPremium} language={language} /></div>{state.issues.length>0&&<small className="range-hint">{state.issues.map(issue=>valuationIssueLabel(issue,language)).join(' · ')}</small>}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              {filteredStocks.length === 0 && <div className="table-empty"><span className="empty-orbit">⌕</span><strong>{isMarketScanLoading ? t("正在掃描市場…", "Scanning the market…") : stocks.length ? t("目前名單沒有符合條件的標的", "No stocks in the current list match") : t("市場資料暫時無法載入", "Market data is temporarily unavailable")}</strong><p>{isMarketScanLoading ? t("正在整理上市與上櫃估值候選", "Reviewing listed and OTC valuation candidates") : stocks.length ? t("可切換篩選條件，或搜尋其他股票代碼", "Change the filter or search another ticker") : t("仍可在上方搜尋單一股票代碼", "You can still search for an individual ticker above")}</p><button type="button" onClick={() => document.getElementById("stock-search")?.focus()}>{t("搜尋股票代碼", "Search tickers")}</button></div>}
+              {(filteredStocks.length===0||tableLoading)&&<div className="table-empty" role="status">
+                <span className="empty-orbit">⌕</span>
+                <strong>{tableLoading?t('正在整理估值資料…','Loading valuations…'):valuationScope==='research'
+                  ?researchRefreshRequired?t('研究集合待更新','Research set requires a refresh'):t('本批研究集合沒有符合條件的標的','No stocks in this generation’s research set match')
+                  :t('目前沒有符合正式資格與篩選條件的標的','No stocks currently meet the eligibility and filter criteria')}</strong>
+                <p>{tableLoading?t('正在核對當前批次及完整研究集合的排序。','Verifying the current generation and the research set’s global ordering.')
+                  :valuationScope==='research'?t('可切換市場、試算差距與品質篩選，或搜尋個股；無適用模型的股票不列研究排行。','Change the market, estimated-gap or quality filter, or search a ticker. Stocks without applicable models are excluded from research ranking.')
+                  :t('可切換至研究排行查看信心不足或待覆核的原生試算。','Switch to Research ranking to inspect native estimates with low confidence or pending review.')}</p>
+                {!tableLoading&&<button type="button" onClick={()=>valuationScope==='official'?setValuationScope('research'):document.getElementById('stock-search')?.focus()}>{valuationScope==='official'?t('查看研究排行','View research ranking'):t('搜尋股票代碼','Search tickers')}</button>}
+              </div>}
             </div>
-            {(filter === "undervalued" || filter === "overvalued") && (
+            {valuationScope==='official'&&(filter === "undervalued" || filter === "overvalued") && (
               <div className="table-extend-bar">
                 <button
                   type="button"
@@ -1028,30 +1210,47 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="table-footer"><span>{t("顯示", "Showing")} {filteredStocks.length} / {displayedUniverseCount} {filter === "overvalued" ? t(`檔高估候選；台股 ${Math.min(twDisplayLimit, totalTwOvervalued)}＋美股 ${Math.min(usDisplayLimit, totalUsOvervalued)}`, `overvalued candidates; Taiwan ${Math.min(twDisplayLimit, totalTwOvervalued)} + U.S. ${Math.min(usDisplayLimit, totalUsOvervalued)}`) : filter === "undervalued" ? t(`檔低估候選；台股 ${Math.min(twDisplayLimit, totalTwUndervalued)}＋美股 ${Math.min(usDisplayLimit, totalUsUndervalued)}`, `undervalued candidates; Taiwan ${Math.min(twDisplayLimit, totalTwUndervalued)} + U.S. ${Math.min(usDisplayLimit, totalUsUndervalued)}`) : t("檔", "stocks")}</span><span><span className="legend-dot red-dot" />{t("價格低於模型價", "Below fair value")} <span className="legend-dot green-dot" />{t("價格高於模型價", "Above fair value")}</span></div>
+            {valuationScope==='research'&&<div className="table-extend-bar">
+              {(['TW','US'] as Market[]).filter(market=>activeMarket==='all'||activeMarket===market).map(market=>{
+                const loaded=allResearchStocks.filter(stock=>stock.market===market).length;
+                const total=researchCurrent?researchCounts[market]:0;
+                return <button type="button" key={market} className="extend-btn" onClick={()=>void loadMoreResearch(market)}
+                  disabled={researchPageLoading||!!researchLoadingMarket||researchStatusByMarket[market]!=='current'||loaded>=total}>
+                  <span className="extend-icon">+</span><span>{researchLoadingMarket===market?t('載入研究資料…','Loading research…')
+                    :t(`延伸 20 檔${market==='TW'?'台股':'美股'}研究（已載入 ${loaded} / ${total} 檔）`,`Load 20 more ${market==='TW'?'Taiwan':'U.S.'} research estimates (${loaded} / ${total} loaded)`)}</span>
+                </button>;
+              })}
+            </div>}
+            <div className="table-footer">
+              <span>{valuationScope==='research'
+                ?t(`已顯示 ${researchPageLoading?0:filteredStocks.length} / 本批符合條件 ${researchCurrent?researchMatchingCount:0} 檔；排序與篩選涵蓋完整研究集合。`,`Showing ${researchPageLoading?0:filteredStocks.length} / ${researchCurrent?researchMatchingCount:0} matching stocks in this generation; sorting and filtering cover the entire research set.`)
+                :<>{t('顯示','Showing')} {filteredStocks.length} / {displayedUniverseCount} {t('檔正式可用估值','eligible valuations')}</>}</span>
+              <span><span className="legend-dot red-dot" />{valuationScope==='research'?t('價格低於原生試算值','Below native estimate'):t('價格低於模型價','Below fair value')} <span className="legend-dot green-dot" />{valuationScope==='research'?t('價格高於原生試算值','Above native estimate'):t('價格高於模型價','Above fair value')}</span>
+            </div>
           </div>
 
           {selected && (
             <aside id="valuation-detail" className="detail-panel panel" aria-label={t("個股估值明細", "Stock valuation details")}>
               <div className="detail-topline"><span className="section-kicker">VALUATION / 01</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
-              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{stockDescriptor(selected, language)}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={selected.calibrationConfidence ?? selected.valuationConfidence} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
-              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong className={selected.isLimitUp ? "limit-up-price" : ""}>{formatPrice(selected.price, selected.market)}</strong>{selected.priceChangePercent !== undefined && <small className={selected.priceChangePercent >= 0 ? "quote-up" : "quote-down"}>{selected.priceChange !== undefined ? `${selected.priceChange >= 0 ? "+" : ""}${formatNumber(selected.priceChange)} ` : ""}({formatSignedPercent(selected.priceChangePercent)}){selected.isLimitUp ? ` · ${t("漲停", "Limit up")}` : ""}</small>}{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}{selected.priceSource ? ` · ${selected.priceSource}` : ""}</small>}</div><div className={selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{selected.valuationConfidence === "low" ? t("歷史模型差距", "Historical Model Gap") : modelDirectionLabel(selectedDirection, language)}</span><strong><TrendMark direction={selectedDirection} /> <span className={directionTextClass(selectedDirection)}>{formatSignedPercent(selected.calibratedUpside ?? selected.upside)}</span></strong><small>{selected.valuationConfidence === "low" ? t("公開財務資料不足，僅供初步研究", "Incomplete public financial data; preliminary research only") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
+              <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{stockDescriptor(selected, language)}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={effectiveValuationConfidence(selected)} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
+              <ValuationStatusNotice stock={selected} language={language} />
+              <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong className={selected.isLimitUp ? "limit-up-price" : ""}>{formatPrice(selected.price, selected.market)}</strong>{selected.priceChangePercent !== undefined && <small className={selected.priceChangePercent >= 0 ? "quote-up" : "quote-down"}>{selected.priceChange !== undefined ? `${selected.priceChange >= 0 ? "+" : ""}${formatNumber(selected.priceChange)} ` : ""}({formatSignedPercent(selected.priceChangePercent)}){selected.isLimitUp ? ` · ${t("漲停", "Limit up")}` : ""}</small>}{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}{selected.priceSource ? ` · ${selected.priceSource}` : ""}</small>}</div><div className={selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{!selectedValuation.rankingEligible ? t("研究試算差距", "Research estimate gap") : modelDirectionLabel(selectedDirection, language)}</span><strong>{selectedValuation.hasModel?<><TrendMark direction={selectedDirection} /> <span className={directionTextClass(selectedDirection)}>{formatSignedPercent(selectedUpside)}</span></>:"—"}</strong><small>{!selectedValuation.hasModel?t("無適用模型，未產生估值", "No applicable model; valuation unavailable"):!selectedValuation.rankingEligible ? t("研究試算／不列正式排名", "Research estimate / excluded from ranking") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
               {selected.market === "US" && <UsEarningsPanel ticker={selected.ticker} initialReport={selected.earningsReport} language={language} />}
               <div className="fair-value-focus">
                 <div className="dual-fair-value-header">
-                  <div><span className="focus-label">{t("多模型共識公允價值", "Multi-Model Consensus Fair Value")}</span><strong>{formatPrice(selected.calibratedFairValue ?? selected.fairValue, selected.market)}</strong></div>
-                  <div className="native-fair-value-card"><span className="focus-label">{t("WenYing 原生模型中心公允價值", "WenYing Native Model Center Fair Value")}</span><span className="native-fair-value-price">{formatPrice(selected.fairValue, selected.market)}</span><small>{t("校準差距", "Gap")} {formatSignedPercent(selected.calibrationGap ?? 0)}</small></div>
+                  <div><span className="focus-label">{!selectedValuation.rankingEligible?t("研究模型參考值", "Research model estimate"):t("多模型共識公允價值", "Multi-Model Consensus Fair Value")}</span><strong>{selectedValuation.estimatedFairValue===null?"—":formatPrice(selectedValuation.estimatedFairValue, selected.market)}</strong></div>
+                  <div className="native-fair-value-card"><span className="focus-label">{t("WenYing 原生模型中心公允價值", "WenYing Native Model Center Fair Value")}</span><span className="native-fair-value-price">{selectedValuation.hasModel?formatPrice(selected.fairValue, selected.market):"—"}</span><small>{t("校準差距", "Gap")} {selectedValuation.hasModel?formatSignedPercent(selected.calibrationGap ?? 0):"—"}</small></div>
                 </div>
                 {selected.isOutOfDistribution && selected.oodReasons && selected.oodReasons.length > 0 && (
                   <div className="ood-warning-banner"><span>⚠️ {selected.valuationPolicy==='tw-comparables-v1'?t('部分輸入超出參考範圍；未套用校準溢價或平滑','Some inputs exceed reference ranges; no calibration uplift or smoothing applied'):t("超出常規訓練分布（已保守平滑）", "Out of Distribution (Safely Dampened)")}</span><small>{selected.oodReasons.map(reason=>selected.valuationPolicy==='tw-comparables-v1'?reason.replaceAll('訓練分布','參考範圍'):reason).join(" · ")}</small></div>
                 )}
                 {selected.marketPricing?.enabled && selected.marketPricing.fairValue !== null && <div className="market-fair-value-banner"><span>{t("市場定價參考（非內在公允價值）", "Market pricing reference (not intrinsic fair value)")}</span><strong>{formatPrice(selected.marketPricing.fairValue, selected.market)}</strong><small>{t(`依公開基金本益比分布與產業倍數，較模型中心 ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} · 不含分析師共識`, `Based on public fund P/E distribution and peer multiples, ${formatSignedPercent(selected.fairValue > 0 ? selected.marketPricing.fairValue / selected.fairValue - 1 : 0)} versus the model center · no analyst consensus`)}</small></div>}
-                <div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("校準悲觀", "Calibrated Bear")} {formatPrice(selected.calibratedRangeLow ?? selected.rangeLow, selected.market)}</span><span>{t("校準樂觀", "Calibrated Bull")} {formatPrice(selected.calibratedRangeHigh ?? selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>
+                {selectedValuation.hasModel&&<div className="range-track"><span className="range-line"><i style={{ left: `${clamp(selectedRangePosition, 4, 96)}%` }} /></span><div><span>{t("校準悲觀", "Calibrated Bear")} {formatPrice(selected.calibratedRangeLow ?? selected.rangeLow, selected.market)}</span><span>{t("校準樂觀", "Calibrated Bull")} {formatPrice(selected.calibratedRangeHigh ?? selected.rangeHigh, selected.market)}</span></div><small>{t("價格位置", "Price position")} <b>{Math.round(selectedRangePosition)}%</b></small></div>}
                 <div className="valuation-meta-grid">
                   <div><span>{t("校準模型版本", "Calibration Version")}</span><strong>{selected.calibrationMetadata?.modelVersion ?? "2026.08.17-v1.0"}</strong><small>{t("歷史校準版本不是目前資料的準確率。", "A historical calibration version does not establish accuracy on current data.")} <a href="/rotation">{t("查看當次估值差異", "View current comparison")}</a></small></div>
-                  {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{selected.valuationPolicy==='tw-comparables-v1'?t('同日同行中位數，每種倍數至少 5 個有效樣本；已分類業務群不退回廣義產業。分散過大或缺證據時排除，銷售倍數另檢查利潤率。','Same-session peer medians with at least 5 valid observations per multiple. Assigned business groups never fall back to broad industries. Missing or dispersed evidence is excluded; sales multiples also require comparable margins.'):t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
+                  {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{selected.valuationPolicy==='tw-comparables-v1'?t('同報價日、財報截止日與股數口徑，每種倍數至少 5 個通過適用性檢查的樣本。P/B 核對歸母平均權益 ROE，P/E、P/S 核對同期間利潤率；獲利能力相似的 0.5–2 倍範圍是尚未驗證的研究假設。P/S 另核對非控制權益。已分類業務群不退回廣義產業，分散過大或缺證據時排除。','Each multiple needs at least 5 applicable peers sharing the quote date, financial period and share basis. P/B checks parent-income/average-equity ROE. P/E and P/S check same-period profit margins; the 0.5–2 profitability ratio is an unvalidated research assumption. P/S also checks minority interests. Assigned groups never fall back to broad industries; missing or dispersed evidence is excluded.'):t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/B ${selected.assumptions.comparablePbPeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/B ${selected.assumptions.comparablePbPeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
                   <div><span>CAPM / WACC</span><strong>CAPM {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
                   <div><span>{t("資料基礎", "Data Basis")}</span><strong>{formatDataBasis(selected.assumptions.dataBasis, language)}</strong>{selected.assumptions.financialDataDate && <small>{t("財務日期", "Financial date")} {selected.assumptions.financialDataDate}</small>}</div>
                   <div><span>{t("資料新鮮度", "Data Freshness")}</span><strong>{formatFinancialFreshness(selected.assumptions.financialFreshness, language)}</strong><small>{selected.assumptions.financialAgeDays === null ? t("無法計算資料年齡", "Age unavailable") : t(`距今約 ${selected.assumptions.financialAgeDays} 天`, `About ${selected.assumptions.financialAgeDays} days old`)}</small></div>
@@ -1075,17 +1274,18 @@ export default function Home() {
                 ))}</div>
               </div>
               <div className="detail-research-column">
-                <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與模型狀態", "Quality & Model Status")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
+                <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與模型狀態", "Quality & Model Status")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("模型分歧", "Model dispersion")}</span><strong>{selected.modelDispersion==null?"—":`${(selected.modelDispersion*100).toFixed(2)}%`}</strong><small>{t("固定覆核門檻 ≥35%；以未四捨五入值判定", "Fixed review threshold ≥35%; assessed before rounding")}</small></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
                 <DailyCandlestickChart ticker={selected.ticker} market={selected.market} language={language} />
               </div>
-              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
-              {selected.valuationConfidence === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.historicalCaution ? t("目前主要依據公開歷史財報；資料日期、模型數量或模型分歧使結果的不確定性較高。畫面保留計算結果供研究，但不做強烈高低估判定。", "The estimate mainly uses public historical filings. Data age, model count, or model dispersion increases uncertainty, so the result remains visible for research without a strong valuation call.") : t("目前公開資料缺少足夠的現金流、成長或負債資訊，因此只能提供初步參考。", "Public cash-flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
+              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><small className="range-hint">{valuationReasonCategoryLabel(valuationReasonCategory(model.reason),language)}</small><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
+              {effectiveValuationConfidence(selected) === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.historicalCaution ? t("目前主要依據公開歷史財報；資料日期、模型數量或模型分歧使結果的不確定性較高。畫面保留計算結果供研究，但不做強烈高低估判定。", "The estimate mainly uses public historical filings. Data age, model count, or model dispersion increases uncertainty, so the result remains visible for research without a strong valuation call.") : t("目前公開資料缺少足夠的現金流、成長或負債資訊，因此只能提供初步參考。", "Public cash-flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
               <div className="detail-note"><span>i</span><p>{valuationSourceNote(selected, language)}</p></div>
             </aside>
           )}
           {!selected&&selectedTicker&&<aside id="valuation-detail" className="detail-panel panel" aria-label={t('個股資料狀態','Stock data status')}>
             <h2>{selectedTicker}</h2><p role="status">{isLookupLoading?t('正在核對當前批次估值…','Checking the current valuation generation…'):
               lookupError||t('估值模型不足或待覆核，未顯示舊估值。仍可查看 K 線。','Valuation unavailable or under review. Old values are hidden; price charts remain available.')}</p>
+            {lookupExcludedModels.length>0&&<div className="detail-section excluded-models-section"><h3>{t('模型排除原因','Why models are excluded')}</h3><div className="excluded-model-list">{lookupExcludedModels.map(model=><div className="excluded-model-row" key={model.id}><strong>{localizedModelLabel(model,language)}</strong><small className="range-hint">{valuationReasonCategoryLabel(valuationReasonCategory(model.reason),language)}</small><p>{language==='zh'?model.reason:englishExclusionReason(model)}</p></div>)}</div></div>}
             <button type="button" disabled={isLookupLoading} onClick={()=>void lookupTicker(selectedTicker,true)}>{t('重新查詢','Retry')}</button>
             <button type="button" onClick={()=>toggleWatchlist(selectedTicker)}>{watchlist.includes(selectedTicker)?t('移除觀察','Remove from watchlist'):t('加入觀察','Add to watchlist')}</button>
             <DailyCandlestickChart ticker={selectedTicker} market={/^\d/.test(selectedTicker)?'TW':'US'} language={language}/>
@@ -1101,12 +1301,12 @@ export default function Home() {
           <article className="metric-card">
             <div className="metric-card-top"><span>{t("低估候選", "Undervalued")}</span><span className="metric-icon red">↗</span></div>
             <strong>{undervaluedCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t(`台股 ${marketCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${marketCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${marketCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${marketCandidates.filter((stock) => stock.market === "US").length}`)}</p>
+            <p>{t(`台股 ${allRankingStocks.filter((stock) => stock.market === "TW").length} · 美股 ${allRankingStocks.filter((stock) => stock.market === "US").length}`, `Taiwan ${allRankingStocks.filter((stock) => stock.market === "TW").length} · U.S. ${allRankingStocks.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card">
             <div className="metric-card-top"><span>{t("高估候選", "Overvalued")}</span><span className="metric-icon green">↘</span></div>
             <strong>{overvaluedCount}<small> {t("檔", "stocks")}</small></strong>
-            <p>{t(`台股 ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · 美股 ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`, `Taiwan ${overvaluedCandidates.filter((stock) => stock.market === "TW").length} · U.S. ${overvaluedCandidates.filter((stock) => stock.market === "US").length}`)}</p>
+            <p>{t(`台股 ${allOvervaluedRankingStocks.filter((stock) => stock.market === "TW").length} · 美股 ${allOvervaluedRankingStocks.filter((stock) => stock.market === "US").length}`, `Taiwan ${allOvervaluedRankingStocks.filter((stock) => stock.market === "TW").length} · U.S. ${allOvervaluedRankingStocks.filter((stock) => stock.market === "US").length}`)}</p>
           </article>
           <article className="metric-card muted-card">
             <div className="metric-card-top"><span>{t("資料狀態", "Data Status")}</span><span className="live-label"><span className="status-dot" />{t("公開資料", "Public data")}</span></div>
@@ -1145,10 +1345,11 @@ export default function Home() {
           </div>
           <div className="watchlist-cards">
             {watchlistStocks.length > 0 ? watchlistStocks.map((stock) => {
-              const upside = stock.calibratedUpside ?? stock.upside;
-              const direction = valuationDirection(upside);
-              const label = directionLabel(direction, language);
-              return <article key={stock.ticker} className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`}><button type="button" className="watch-card-main" onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={directionTextClass(direction)}><span className={`watch-direction direction-${direction}`}>{valuationDirectionSymbol(direction)}</span>{formatSignedPercent(upside)}</strong><small>{stock.valuationConfidence === "low" ? `${t("低信心初估", "Low-confidence estimate")} · ${label}` : label}</small></div></button><button type="button" className="watch-remove" onClick={() => toggleWatchlist(stock.ticker)} aria-label={t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`)}>− {t("移除", "Remove")}</button></article>;
+              const state=valuationRankingState(stock);
+              const upside = state.estimatedCalibratedUpside;
+              const direction = valuationDirection(upside??0);
+              const label = !state.hasModel?t('無適用模型','No applicable model'):!state.rankingEligible?t('研究試算／不列正式排名','Research estimate / excluded from ranking'):directionLabel(direction, language);
+              return <article key={stock.ticker} className={`watch-card ${selected?.ticker === stock.ticker ? "active" : ""}`}><button type="button" className="watch-card-main" onClick={() => selectStock(stock.ticker)}><div><span className={`ticker-badge market-${stock.market.toLowerCase()}`}>{stock.market}</span><strong>{stock.ticker}</strong><small>{stock.name}</small></div><div><strong className={directionTextClass(direction)}><span className={`watch-direction direction-${direction}`}>{valuationDirectionSymbol(direction)}</span>{upside===null?"—":formatSignedPercent(upside)}</strong><small>{label}</small></div></button><button type="button" className="watch-remove" onClick={() => toggleWatchlist(stock.ticker)} aria-label={t(`從觀察清單移除 ${stock.ticker}`, `Remove ${stock.ticker} from watchlist`)}>− {t("移除", "Remove")}</button></article>;
             }) : watchlist.length===0?<div className="watchlist-empty">{t("還沒有觀察標的，從上方排行榜加入，或手動建立一筆估值。", "Your watchlist is empty. Add a stock from the ranking above or create a custom valuation.")}</div>:null}
             {watchlist.filter(ticker=>!watchlistStocks.some(stock=>stock.ticker===ticker)).map(ticker=><article className="watch-card" key={ticker}>
               <button type="button" className="watch-card-main" onClick={()=>openWatchlistStock(ticker)}><strong>{ticker}</strong><span>{t('估值未就緒 · 查看 K 線','Valuation unavailable · View chart')}</span></button>

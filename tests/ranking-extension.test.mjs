@@ -22,9 +22,10 @@ test("fair-value ranking provides deep candidate pools and extension controls", 
   assert.match(source, /延伸 20 檔台股排行/);
   assert.match(source, /延伸 20 檔美股排行/);
   assert.match(source, /useState<SortKey>\("recommended"\)/);
-  assert.match(source, /sortKey === "recommended"\) return filtered/);
+  const listSource = await readFile(new URL("../app/valuation-lists.ts", import.meta.url), "utf8");
+  assert.match(listSource, /options.sort==='recommended'\)return filtered/);
   assert.match(source, /<option value="recommended">/);
-  assert.match(source, /const effectiveUpside = effectiveValuationUpside\(stock\)/);
-  assert.match(source, /filter === "undervalued" && effectiveUpside >= 0\.1/);
-  assert.match(source, /const leftUpside = effectiveValuationUpside\(a\)/);
+  assert.match(listSource, /options.scope==='research'\?stock.upside:effectiveValuationUpside\(stock\)/);
+  assert.match(listSource, /options.filter==='undervalued'&&gap\(stock\)>=\.1/);
+  assert.match(source, /valuationScope==='official'&&\(filter === "undervalued"/);
 });

@@ -5,6 +5,8 @@ import type { StockInput } from "../../../lib/valuation.ts";
 import { buildTaiwanIndustryMap } from "../../../lib/taiwan-industry.ts";
 import { optionalPublicRows } from "../../../lib/optional-public-rows.ts";
 import { getRuntimeMarketScanMode } from "../../../lib/runtime-env.ts";
+import {dailyValuationState} from '../../../lib/daily-valuation-state.ts';
+import {DAILY_RESEARCH_CACHE_VERSION} from '../../../lib/daily-research-ranking.ts';
 import marketScanSnapshot from "../../../lib/market-scan-snapshot.json" with { type: "json" };
 import tpexSnapshot from "../../../lib/tpex-snapshot.json" with { type: "json" };
 import usMarketSnapshot from "../../../lib/us-market-snapshot.json" with { type: "json" };
@@ -19,6 +21,10 @@ import {
 type TwseRatioRow = { Date?: string; Code?: string; Name?: string; PEratio?: string; PBratio?: string };
 type TwseDailyRow = { Date?: string; Code?: string; Name?: string; ClosingPrice?: string; TradeVolume?: string };
 type TaiwanCompanyRow = Record<string, unknown>;
+// Bundled/live preview data is not a sealed full-cohort daily research ranking.
+const researchRefreshRequired={researchCandidates:[],researchCounts:{TW:0,US:0},researchTotalCounts:{TW:0,US:0},researchStatus:'refresh_required',
+  researchStatusByMarket:{TW:'refresh_required',US:'refresh_required'},researchCacheVersion:DAILY_RESEARCH_CACHE_VERSION,
+  researchIssues:{TW:['RESEARCH_REFRESH_REQUIRED'],US:['RESEARCH_REFRESH_REQUIRED']}};
 
 export async function buildLiveMarketScan() {
   const [twseRatios, twseDaily, twseCompanyData, tpexCompanyData] = await Promise.all([
@@ -123,6 +129,7 @@ export async function buildLiveMarketScan() {
     candidates,
     overvaluedCandidates,
     snapshotRun: latestSnapshotRun,
+    ...researchRefreshRequired,
   };
 
   return { payload, taiwanUniverse: refreshedTaiwanUniverse };
@@ -130,7 +137,9 @@ export async function buildLiveMarketScan() {
 
 export async function GET() {
   if (getRuntimeMarketScanMode() === "snapshot") {
-    return NextResponse.json(marketScanSnapshot);
+    return NextResponse.json({...marketScanSnapshot,...researchRefreshRequired,
+      candidates:marketScanSnapshot.candidates.filter(stock=>dailyValuationState(stock as StockInput).rankingEligible),
+      overvaluedCandidates:marketScanSnapshot.overvaluedCandidates.filter(stock=>dailyValuationState(stock as StockInput).rankingEligible)});
   }
 
   const { payload } = await buildLiveMarketScan();

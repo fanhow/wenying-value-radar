@@ -14,6 +14,13 @@ import usMarketSnapshot from "../lib/us-market-snapshot.json" with { type: "json
 import marketScanSnapshot from "../lib/market-scan-snapshot.json" with { type: "json" };
 import { optionalPublicRows } from "../lib/optional-public-rows.ts";
 
+function qualifiedSyntheticUniverse() {
+  const date=new Date().toISOString().slice(0,10);
+  return Array.from({length:25},(_,index)=>({ticker:`LIMIT${index}`,name:`Synthetic ${index}`,market:'US',
+    price:50,pe:10,pb:50/30,eps:5,bvps:30,sector:'Industrials',volume:1_000_000,marketCap:1_000_000_000,
+    revenueGrowth:3,fcfPerShare:4,debtRatio:30,dataBasis:'ltm',financialDataDate:date,date}));
+}
+
 test("keeps a precomputed ranking pool for the Cloudflare Free deployment", () => {
   assert.ok(marketScanSnapshot.candidates.length >= 40);
   assert.ok(marketScanSnapshot.overvaluedCandidates.length >= 40);
@@ -35,8 +42,8 @@ test("keeps the ranking available when an optional market source returns invalid
   assert.deepEqual(nonArray, []);
 });
 
-test("selects a materially undervalued exchange ratio candidate", () => {
-  const candidate = marketCandidateFromRatio({
+test("retains an exchange ratio estimate for research without promoting low confidence to a ranking", () => {
+  const row={
     ticker: "1234",
     name: "Value Co",
     price: 50,
@@ -44,8 +51,9 @@ test("selects a materially undervalued exchange ratio candidate", () => {
     pb: 0.8,
     sector: "台灣上市公司",
     volume: 1_000_000,
-  });
-  assert.equal(candidate?.ticker, "1234");
+  };
+  assert.equal(marketCandidateFromRatio(row),null);
+  assert.equal(marketStockFromRatio(row)?.ticker,"1234");
 });
 
 test("rejects expensive or non-equity rows from the market scan", () => {
@@ -61,15 +69,7 @@ test("removes illiquid Taiwan candidates and Taiwan ETFs", () => {
 });
 
 test("limits each market ranking to its requested top count", () => {
-  const universe = Array.from({ length: 25 }, (_, index) => ({
-    ticker: String(1000 + index),
-    name: `Value ${index}`,
-    price: 50,
-    pe: 7,
-    pb: 0.8,
-    sector: "台灣上市公司",
-    volume: 1_000_000,
-  }));
+  const universe = qualifiedSyntheticUniverse();
   assert.equal(selectTopMarketCandidates(universe, 20).length, 20);
 });
 
@@ -216,18 +216,10 @@ test("carries Taiwan industry and listing-board metadata without changing the va
 });
 
 test("selects and sorts the most overvalued candidates", () => {
-  const universe = Array.from({ length: 25 }, (_, index) => ({
-    ticker: String(2000 + index),
-    name: `Expensive ${index}`,
-    price: 100 + index * 5,
-    pe: 60 + index,
-    pb: 8,
-    sector: "台灣上市公司",
-    volume: 1_000_000,
-  }));
+  const universe = qualifiedSyntheticUniverse().map((row,index)=>({...row,price:150+index*5,pe:30+index,pb:5+index/6}));
   const selected = selectMarketCandidates(universe, "overvalued", 20);
   assert.equal(selected.length, 20);
-  assert.equal(selected[0].ticker, "2024");
+  assert.equal(selected[0].ticker, "LIMIT24");
 });
 
 test("does not rank an overvalued row without a finite fair value model", () => {

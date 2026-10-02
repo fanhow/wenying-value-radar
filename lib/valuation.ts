@@ -8,6 +8,7 @@ import { companyDescriptor, isFinancialCompany } from "./company-classification.
 import { taiwanEnterpriseAdjustment, validTaiwanComparableEvidence } from './taiwan-comparables.ts';
 import { taiwanAnnualEarnings, taiwanEarningsOperationsDivergence, taiwanMaterialMinorityClaims } from './taiwan-valuation-evidence.ts';
 import type { TaiwanBusinessGroupReference } from './taiwan-business-groups.ts';
+import type { TaiwanComparableModelId } from './taiwan-multiple-applicability.ts';
 
 export type { UsEarningsReport };
 export type Market = "TW" | "US";
@@ -17,6 +18,8 @@ export type DataCompleteness = "complete" | "historical" | "limited";
 export type ValuationConfidence = "high" | "medium" | "low";
 export type ValuationModelCategory = "intrinsic" | "relative" | "asset" | "income" | "fund";
 export type ValuationModelStatus = "applied" | "excluded";
+/** Apply the gate to the unrounded ratio; display precision never changes it. */
+export const VALUATION_MODEL_DISPERSION_REVIEW_THRESHOLD = 0.35;
 /**
  * Model families prevent repeated horizons or related multiples from
  * dominating the central value.  A family is a weighting bucket, not a claim
@@ -163,6 +166,8 @@ export type StockInput = {
   /** Daily generation provenance; never an external fair-value anchor. */
   dailyValuationVersion?: string;
   dailyRunId?: string;
+  /** Server-derived native research sort cache; never peer/source evidence. */
+  dailyResearch?: import('./daily-research-ranking.ts').DailyResearchCache;
   /** Public annual/LTM EPS observations used only for historical normalization. */
   epsHistory?: EarningsHistoryPoint[];
   /** Optional US earnings calendar, alerts, and market expectation details. */
@@ -221,6 +226,7 @@ export type ValuationAssumptions = {
   comparablePeerGroup?: string;
   comparablePeerCount?: number;
   comparablePePeerCount?: number;
+  comparablePbPeerCount?: number;
   comparablePsPeerCount?: number;
   comparableEvRevenuePeerCount?: number;
   comparableEvEbitdaPeerCount?: number;
@@ -263,6 +269,10 @@ export type Stock = StockInput & {
   qualityScore: number;
   risk: RiskLevel;
   valuationConfidence: ValuationConfidence;
+  /** Weighted mean absolute deviation / model center; unavailable with no model. */
+  modelDispersion?: number | null;
+  /** Correlated model variants do not add independent input groups. */
+  valuationIndependentEvidenceCount?: number;
   historicalCaution: boolean;
   historicalCautionReasons: string[];
   financialFreshness: FinancialFreshness;
@@ -632,6 +642,16 @@ function relativeRange(value: number, uncertainty: number) {
   return { low: value * (1 - width), high: value * (1 + width) };
 }
 
+export function valuationModelDispersion(
+  models: readonly Pick<ValuationModel, "value" | "weight">[],
+  fairValue = models.reduce((sum, model) => sum + model.value * model.weight, 0),
+): number | null {
+  if (models.length === 0 || !Number.isFinite(fairValue) || fairValue <= 0
+    || models.some((model) => !Number.isFinite(model.value) || model.value <= 0
+      || !Number.isFinite(model.weight) || model.weight < 0)) return null;
+  return models.reduce((sum, model) => sum + Math.abs(model.value - fairValue) * model.weight, 0) / fairValue;
+}
+
 function positivePercentile(value: number | undefined, fallback: number) {
   const parsed = numeric(value);
   return parsed > 0 ? parsed : fallback;
@@ -981,6 +1001,15 @@ function deriveMarketPricing(
 
 export function calculateStock(input: StockInput, formatNumber = (value: number) => String(value)): Stock {
   const twComparables = input.market === 'TW' && input.valuationPolicy === 'tw-comparables-v1';
+  // Keep per-model rejection evidence even when the overall peer provenance
+  // fails validation and its numeric multiples are discarded below.
+  const twApplicabilityEvidence = twComparables ? input.comparableMultiples?.taiwanApplicabilityEvidence : undefined;
+  const modelApplicabilityReasons = (id: string): string[] => {
+    const evidence = twApplicabilityEvidence?.models?.[id as TaiwanComparableModelId];
+    return Array.isArray(evidence?.issues)
+      ? evidence.issues.map((issue) => issue?.reason).filter((reason) => typeof reason === "string" && reason.length > 0)
+      : [];
+  };
   const validTwPeers = validTaiwanComparableEvidence(input);
   if(twComparables)input={...input,comparableMultiples:validTwPeers?input.comparableMultiples:undefined,
     targetPsMultiple:undefined,targetEvRevenueMultiple:undefined,targetEvEbitdaMultiple:undefined,targetEvEbitMultiple:undefined,targetFfoMultiple:undefined};
@@ -1048,6 +1077,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       comparablePeerGroup: undefined,
       comparablePeerCount: undefined,
       comparablePePeerCount: undefined,
+      comparablePbPeerCount: undefined,
       comparablePsPeerCount: undefined,
       comparableEvRevenuePeerCount: undefined,
       comparableEvEbitdaPeerCount: undefined,
@@ -1097,12 +1127,15 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       fairValue,
       rangeLow: range.low,
       rangeHigh: range.high,
-      upside: price > 0 ? (fairValue - price) / price : 0,
+      upside: model && price > 0 ? (fairValue - price) / price : 0,
       qualityScore: 0,
       risk: input.riskOverride ?? "中",
-      valuationConfidence: "medium",
-      historicalCaution: false,
-      historicalCautionReasons: [],
+      valuationConfidence: model ? "medium" : "low",
+      modelDispersion: model ? 0 : null,
+      valuationIndependentEvidenceCount: model ? 1 : 0,
+      historicalCaution: !model,
+      historicalCautionReasons: model ? [] : ["缺少有效 iNAV，沒有適用模型；0 是不可估值占位，不代表公允價值為零。"],
+      valuationReviewRequired: !model,
       financialFreshness: freshness,
       financialAgeDays: ageDays,
       reportedEpsPerShare: epsNormalization.reportedEpsPerShare,
@@ -1113,8 +1146,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       calibratedFairValue: fairValue,
       calibratedRangeLow: range.low,
       calibratedRangeHigh: range.high,
-      calibratedUpside: price > 0 ? (fairValue - price) / price : 0,
-      calibrationConfidence: "medium",
+      calibratedUpside: model && price > 0 ? (fairValue - price) / price : 0,
+      calibrationConfidence: model ? "medium" : "low",
       calibrationGap: 0,
       isOutOfDistribution: false,
       oodReasons: [],
@@ -1282,6 +1315,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     comparablePeerGroup: comparableMultiples?.peerGroup,
     comparablePeerCount: comparableMultiples?.peerCount,
     comparablePePeerCount: comparableMultiples?.pePeerCount,
+    comparablePbPeerCount: comparableMultiples?.pbPeerCount,
     comparablePsPeerCount: comparableMultiples?.psPeerCount,
     comparableEvRevenuePeerCount: comparableMultiples?.evRevenuePeerCount,
     comparableEvEbitdaPeerCount: comparableMultiples?.evEbitdaPeerCount,
@@ -1312,6 +1346,10 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const candidates: ModelCandidate[] = [];
   const excludedModels: ExcludedValuationModel[] = [];
   const addCandidate = (model: ModelCandidate | null, id: string, category: ValuationModelCategory, label: string) => {
+    const applicabilityReasons = modelApplicabilityReasons(id);
+    if (twComparables && applicabilityReasons.length > 0) {
+      addExcluded(excludedModels, id, category, label, applicabilityReasons.join(" ")); return;
+    }
     if(twComparables && id==='ev-ebitda' && input.financialMetrics?.ebitdaBasis!=='operating-income-plus-cashflow-da') {
       excludedModels.push({id,category,label,status:'excluded',reason:'缺少同期間營業利益加折舊攤銷口徑，不以供應商含業外損益的 EBITDA 替代。'});return;
     }
@@ -1449,7 +1487,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         value,
         range.low,
         range.high,
-        "每股淨值 " + formatNumber(bvps) + (twComparables ? " × " + twPeerScope + "中位數 P/B " : " × 目標 P/B ") + formatNumber(targetPb),
+        "每股淨值 " + formatNumber(bvps) + (twComparables ? " × " + twPeerScope + "中位數 P/B " : " × 目標 P/B ") + formatNumber(targetPb)
+          + (twComparables ? "（歸母平均權益 ROE 0.5–2 倍匹配；固定未驗證研究假設）" : ""),
       ),
       "pb",
       "asset",
@@ -1987,6 +2026,16 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
 
   // In the relative-only stage, disagreement is disclosed rather than letting
   // the number of EBITDA/EBIT variants erase an independent book/earnings view.
+  for (const excludedModel of excludedModels) {
+    const reasons = modelApplicabilityReasons(excludedModel.id);
+    if (reasons.length > 0) {
+      // Null multiples take the input-check branch instead of addCandidate;
+      // expose the same specific rejection reason in both paths while
+      // retaining independent financial/REIT/bridge exclusions.
+      const genericMissingInput = /^(必要輸入不足|EPS 或目標本益比不是正數|每股淨值或目標 P\/B 不是正數|缺少至少五筆)/.test(excludedModel.reason);
+      excludedModel.reason = [...new Set(validTwPeers && genericMissingInput ? reasons : [excludedModel.reason, ...reasons])].join(" ");
+    }
+  }
   const filtered = twComparables ? {kept:candidates,removed:[] as ModelCandidate[]} : robustModelFilter(candidates, input.market === 'TW' && input.priceSource === 'Yahoo Finance daily close / daily-refresh-v1');
   for (const model of filtered.removed) {
     addExcluded(
@@ -2021,9 +2070,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   // Matched-margin sales variants are correlated with earnings variants;
   // extra variants must not manufacture additional independent evidence.
   const informationCount=twComparables?new Set(models.map(m=>m.id==='pe'||m.id==='p-sales'?'earnings':m.id.startsWith('ev-')?'enterprise':m.family)).size:models.length;
-  const dispersion = fairValue > 0 && models.length > 0
-    ? models.reduce((sum, model) => sum + Math.abs(model.value - fairValue) * model.weight, 0) / fairValue
-    : 0.6;
+  const modelDispersion = valuationModelDispersion(models, fairValue);
+  const dispersion = modelDispersion ?? 0.6;
   const modelCountFloor = informationCount >= 7
     ? 0.12
     : informationCount >= 5
@@ -2046,7 +2094,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const rangeHigh = fairValue > 0
     ? Math.max(modelRangeHigh, fairValue * (1 + uncertainty), fairValue)
     : 0;
-  const upside = price > 0 ? (fairValue - price) / price : 0;
+  const upside = models.length > 0 && fairValue > 0 && price > 0 ? (fairValue - price) / price : 0;
 
   const netMarginFraction = input.netMarginUnit === "percent" ? numeric(input.netMargin) / 100 : rate(input.netMargin, 0);
   const assetTurnover = clamp(numeric(input.assetTurnover, 1), 0, 5);
@@ -2066,7 +2114,17 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const risk = input.riskOverride
     ?? (uncertainty >= 0.34 || debtRatio >= 80 ? "高" : uncertainty >= 0.22 ? "中" : "低");
   const historicalCautionReasons: string[] = [];
+  if (models.length === 0) historicalCautionReasons.push("沒有適用模型；0 是不可估值占位，不代表公允價值為零，也不產生上下行結論。");
+  if (twApplicabilityEvidence) {
+    for (const [id, evidence] of Object.entries(twApplicabilityEvidence.models ?? {})) {
+      if (!Array.isArray(evidence?.issues)) continue;
+      for (const issue of evidence.issues) {
+        if (typeof issue?.reason === "string") historicalCautionReasons.push(`MODEL_APPLICABILITY:${id}:${issue.code}：${issue.reason}`);
+      }
+    }
+  }
   if(twComparables)historicalCautionReasons.push('台股'+twPeerScope+'相對估值研究；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
+  if(twComparables && comparableMultiples?.method==='tw-industry-same-session-median')historicalCautionReasons.push('目前候選池仍按廣產業分類；ROE 與利潤率相近只支持財務適用性，未核證產品、製程或終端業務可比，僅供研究。');
   if(twComparables && twEnterpriseBridge===null)historicalCautionReasons.push('EV 橋接待核證：供應商現金／短期投資與總負債欄位可能混入受限或營運資產、漏列租賃；保留原始財報與非 EV 模型，不以未核證總額計算 EV。');
   if(earningsOperationsDivergence)historicalCautionReasons.push('營業利益與報告淨利背離；盈餘型模型暫不採用，需核對投資評價及非控制權益。');
   if(twComparables && (input.financialMetrics?.nonControllingBookPerShare??0)>0)historicalCautionReasons.push('非控制權益目前僅有帳面值：小額橋接以帳面值近似並揭露；超過母公司權益 25% 時停用 EV 模型，待獨立評價。');
@@ -2108,7 +2166,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   if (informationCount < 2) {
     historicalCautionReasons.push(twComparables?"獨立資料群少於兩種，相關模型變體不構成額外交叉驗證。":"適用模型少於兩種，缺少交叉驗證。");
   }
-  if (dispersion >= 0.35) {
+  if (modelDispersion !== null && modelDispersion >= VALUATION_MODEL_DISPERSION_REVIEW_THRESHOLD) {
     historicalCautionReasons.push("適用模型結果分歧偏高。");
   }
   const historicalCaution = historicalCautionReasons.length > 0;
@@ -2151,6 +2209,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     qualityScore,
     risk,
     valuationConfidence,
+    modelDispersion,
+    valuationIndependentEvidenceCount: informationCount,
     historicalCaution,
     historicalCautionReasons,
     financialFreshness: freshness,
@@ -2161,20 +2221,20 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     epsNormalizationApplied: epsNormalization.applied,
     epsNormalizationMethod: epsNormalization.method,
     epsHistoryCount: epsNormalization.historyCount,
-    valuationReviewRequired:twComparables && (!validTwPeers || informationCount<2 || earningsOperationsDivergence || materialMinorityClaims || earningsBaseShift || dispersion>=.35),
+    valuationReviewRequired:models.length === 0 || (twComparables && (!validTwPeers || informationCount<2 || earningsOperationsDivergence || materialMinorityClaims || earningsBaseShift || dispersion>=VALUATION_MODEL_DISPERSION_REVIEW_THRESHOLD)),
   };
 
   const calibrated = calibrateFairValue(baseStock);
 
   return {
     ...baseStock,
-    calibratedFairValue: calibrated.calibratedFairValue,
-    calibratedRangeLow: calibrated.calibratedRangeLow,
-    calibratedRangeHigh: calibrated.calibratedRangeHigh,
-    calibratedUpside: calibrated.calibratedUpside,
-    calibrationConfidence: calibrated.calibrationConfidence,
-    calibrationGap: calibrated.calibrationGap,
-    isOutOfDistribution: calibrated.isOutOfDistribution,
+    calibratedFairValue: models.length > 0 ? calibrated.calibratedFairValue : 0,
+    calibratedRangeLow: models.length > 0 ? calibrated.calibratedRangeLow : 0,
+    calibratedRangeHigh: models.length > 0 ? calibrated.calibratedRangeHigh : 0,
+    calibratedUpside: models.length > 0 ? calibrated.calibratedUpside : 0,
+    calibrationConfidence: models.length > 0 ? calibrated.calibrationConfidence : "low",
+    calibrationGap: models.length > 0 ? calibrated.calibrationGap : 0,
+    isOutOfDistribution: models.length === 0 || calibrated.isOutOfDistribution,
     oodReasons: calibrated.oodReasons,
     calibrationMetadata: calibrated.calibrationMetadata,
   };

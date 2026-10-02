@@ -13,7 +13,7 @@ const date=new Date().toISOString().slice(0,10),runId='generation_test_1';
 const secret='fixture-only-000000000000000000000000';
 function records(){return Array.from({length:20},(_,i)=>{
   const ticker=String(1000+i),candles=Array.from({length:400},(_,j)=>({date:new Date(Date.parse(date)-(399-j)*86400000).toISOString().slice(0,10),open:100,high:101,low:99,close:100,volume:1000000}));
-  const stock={ticker,market:'TW',name:'Synthetic issuer',sector:'Technology',industry:'Synthetic devices',price:100,eps:10,bvps:40,fcfPerShare:8,revenueGrowth:10,roe:25,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,uncertainty:.3,financialDataDate:date,updatedAt:date,priceSource:'Yahoo Finance daily close / daily-refresh-v1',source:'自動資料',dataBasis:'ltm',revenuePerShare:100,ebitPerShare:12,ebitdaPerShare:15,cashPerShare:10,debtPerShare:10,financialMetrics:{currency:'TWD',periodBasis:'ltm',sharesOutstanding:100000000,nonControllingBookPerShare:0,netIncomePerShare:10,ebitdaBasis:'operating-income-plus-cashflow-da'}};
+  const stock={ticker,market:'TW',name:'Synthetic issuer',sector:'Technology',industry:'Synthetic devices',price:100,eps:10,bvps:40,fcfPerShare:8,revenueGrowth:10,roe:25,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,uncertainty:.3,financialDataDate:date,updatedAt:date,priceSource:'Yahoo Finance daily close / daily-refresh-v1',source:'自動資料',dataBasis:'ltm',revenuePerShare:100,ebitPerShare:12,ebitdaPerShare:15,cashPerShare:10,debtPerShare:10,financialMetrics:{currency:'TWD',periodBasis:'ltm',sharesOutstanding:100000000,nonControllingBookPerShare:0,netIncomePerShare:10,ebitdaBasis:'operating-income-plus-cashflow-da',roeBasis:'parent-income-average-equity',shareBasis:'provider-as-of-ordinary',shareAsOfDate:date,shareSourceField:'quarterlyOrdinarySharesNumber'}};
   const technicalAnalysis=analyzeTechnicalSetup(candles,null);
   technicalAnalysis.candlestickPattern='morning-star';technicalAnalysis.patternStage='confirmed';
   return {ticker,market:'TW',status:'ready',stock,issues:[],rankingEligible:true,quoteDate:date,financialDate:date,fetchedAt:new Date().toISOString(),sources:['https://example.test/synthetic'],history:{ticker,market:'TW',name:stock.name,quoteSource:stock.priceSource,candles,weeklyCandles:[],monthlyCandles:[],technicalAnalysis}};
@@ -38,7 +38,7 @@ test('complete-cohort peers are order independent, retain 400 bars and pure tech
     assert.equal(a[i].stock.comparableMultiples.peerCount,19);
     assert.equal(a[i].history.candles.length,400);
     assert.deepEqual({...a[i].history.technicalAnalysis,valueTrendResonance:null},before[i].history.technicalAnalysis);
-    assert.equal(dailyValuationState(a[i].stock,runId).rankingEligible,true);
+    const state=dailyValuationState(a[i].stock,runId);assert.equal(state.hasModel,true);assert.equal(state.rankingEligible,false);assert.equal(state.upside,null);assert.ok(state.issues.includes('LOW_VALUATION_CONFIDENCE'));
   }
   assert.throws(()=>prepareTaiwanRefreshGeneration([...input,input[0]],runId),/DUPLICATE/);
   input[0].stock.updatedAt='2020-01-01';assert.throws(()=>prepareTaiwanRefreshGeneration(input,runId),/MIXED_TAIWAN/);
@@ -48,7 +48,7 @@ function providerShareRecords() {
   return records().map(r=>({...r,stock:{...r.stock,financialMetrics:{...r.stock.financialMetrics,
     shareBasis:'provider-as-of-ordinary',shareAsOfDate:r.stock.financialDataDate,shareSourceField:'quarterlyOrdinarySharesNumber'}}}));
 }
-test('unverified provider share metadata preserves ready, ranking and technical data through atomic generation',async()=>{
+test('unverified provider share metadata preserves ready research inputs and technical data through atomic generation',async()=>{
   const legacy=prepareTaiwanRefreshGeneration(records(),runId),rows=prepareTaiwanRefreshGeneration(providerShareRecords(),runId);
   for(let i=0;i<rows.length;i++) {
     assert.equal(rows[i].status,'ready');assert.deepEqual(rows[i].history,legacy[i].history);
@@ -138,8 +138,8 @@ test('review stocks retain financials and technicals, with SQL NULL upside and n
     const stored=db.raw.prepare('SELECT * FROM daily_refresh_records WHERE ticker=?').get(ticker);
     assert.equal(stored.status,'ready');assert.equal(stored.eligible,1);assert.equal(stored.upside,null);assert.ok(stored.stock);
     const history=await (await read(db,`/api/price-history?ticker=${ticker}&market=TW`)).json();
-    assert.equal(history.valuationAvailable,false);assert.equal(history.candles.length,400);assert.equal(history.technicalAnalysis.valueTrendResonance,null);
-    const response=await handleDailyRead(new Request('https://fixture/api/valuation',{method:'POST',body:JSON.stringify({ticker,market:'TW'})}),db);assert.equal(response.status,422);assert.equal((await response.json()).stock,undefined);
+    assert.equal(history.valuationAvailable,ticker==='1001');assert.equal(history.valuationRankingEligible,false);assert.equal(history.candles.length,400);assert.equal(history.technicalAnalysis.valueTrendResonance,null);
+    const response=await handleDailyRead(new Request('https://fixture/api/valuation',{method:'POST',body:JSON.stringify({ticker,market:'TW'})}),db);assert.equal(response.status,ticker==='1001'?200:422);const payload=await response.json();if(ticker==='1001'){assert.equal(payload.stock.ticker,ticker);assert.equal(payload.researchOnly,true);assert.equal(payload.rankingEligible,false);assert.equal(payload.upside,null);}else {assert.equal(payload.stock,undefined);assert.equal(payload.fairValue,undefined);assert.ok(payload.excludedModels.length>0);assert.ok(payload.excludedModels.every(model=>typeof model.reason==='string'&&model.reason.length>0));}
   }
   const technical=await (await read(db,'/api/technical-scan')).json();assert.ok(technical.morningStar.some(r=>r.ticker==='1000'&&r.upside===null));
   const ranked=await (await read(db,'/api/market-scan')).json();assert.ok(![...ranked.candidates,...ranked.overvaluedCandidates].some(r=>['1000','1001'].includes(r.ticker)));
@@ -248,13 +248,12 @@ test('manual inputs and explicit ARKER captures survive daily status changes and
   assert.deepEqual(mergeCurrentInputs([daily],[capture],status),[daily]);
 });
 
-test('TW daily metadata must remain current and eligible even when restored beside legacy records',()=>{
+test('TW daily metadata must remain current and calculable even when restored beside legacy records',()=>{
   const daily=prepareTaiwanRefreshGeneration(records(),runId)[0].stock;
   const status={state:'complete',runId,valuationVersion:DAILY_VALUATION_VERSION,taiwanValuationCurrent:true};
   const legacy={...daily,priceSource:'Yahoo Finance'};
   for(const patch of [{dailyRunId:undefined},{dailyRunId:'old-run'},
-    {dailyValuationVersion:undefined},{valuationPolicy:undefined},{comparableMultiples:undefined},
-    {financialMetrics:{...daily.financialMetrics,nonControllingBookPerShare:100}}]) {
+    {dailyValuationVersion:undefined},{valuationPolicy:undefined},{comparableMultiples:undefined}]) {
     const stale={...daily,...patch};
     assert.equal(currentClientInput(stale,status),false);
     assert.deepEqual(mergeCurrentInputs([stale],[legacy],status),[]);

@@ -109,7 +109,9 @@ const providerShares=s=>({...s,financialMetrics:{...s.financialMetrics,shareBasi
 test('provider share disclosure preserves non-EV peers, PE/PB/PS and valuation eligibility inputs',()=>{
   const legacy=group().map(s=>({...s,financialMetrics:{...s.financialMetrics,enterpriseBridgeEvidence:undefined}}));
   const provider=legacy.map(providerShares),a=buildTaiwanComparableMap(legacy),b=buildTaiwanComparableMap(provider);
-  assert.deepEqual(a,b);
+  // Numeric observations remain unchanged; the evidence must keep the distinct
+  // provider as-of and legacy share labels instead of erasing that provenance.
+  for(const ticker of a.keys())for(const field of ['peMedian','pbMedian','psMedian','pePeerCount','pbPeerCount','psPeerCount'])assert.equal(a.get(ticker)[field],b.get(ticker)[field]);
   for(let i=0;i<legacy.length;i++) {
     const before=calculateStock({...legacy[i],comparableMultiples:a.get(legacy[i].ticker),valuationPolicy:'tw-comparables-v1'});
     const after=calculateStock({...provider[i],comparableMultiples:b.get(provider[i].ticker),valuationPolicy:'tw-comparables-v1'});
@@ -289,8 +291,8 @@ test('empty peer provenance cannot activate six models merely by claiming a meth
   assert.equal(s.models.length,0);assert.equal(s.valuationReviewRequired,true);
 });
 test('Taiwan EV revenue model uses the reported peer median without a hidden margin cap',()=>{
-  const rows=group(),p=buildTaiwanComparableMap(rows).get('1000');
-  const input={...rows[0],netMargin:.5,valuationPolicy:'tw-comparables-v1',comparableMultiples:{...p,evRevenueMedian:10}};
+  const rows=group().map((r,i)=>i?{...r,price:995}:r),p=buildTaiwanComparableMap(rows).get('1000');
+  const input={...rows[0],netMargin:.5,valuationPolicy:'tw-comparables-v1',comparableMultiples:p};
   const s=calculateStock(input);assert.equal(s.models.find(m=>m.id==='ev-revenue').value,995);
 });
 test('non-financial operating loss does not turn positive net income into a normal PE',()=>{
@@ -331,8 +333,9 @@ test('peer admission rejects another industry, invalid dates and stale financial
   }
 });
 test('material minority claims require review and cannot enter a sales or EV valuation',()=>{
-  const rows=group(),p=buildTaiwanComparableMap(rows).get('1000');
-  const s=calculateStock({...rows[0],financialMetrics:{...rows[0].financialMetrics,nonControllingBookPerShare:30},valuationPolicy:'tw-comparables-v1',comparableMultiples:p});
+  const rows=group();rows[0]={...rows[0],financialMetrics:{...rows[0].financialMetrics,nonControllingBookPerShare:30}};
+  const p=buildTaiwanComparableMap(rows).get('1000');
+  const s=calculateStock({...rows[0],valuationPolicy:'tw-comparables-v1',comparableMultiples:p});
   assert.equal(s.valuationReviewRequired,true);assert.deepEqual(s.models.map(m=>m.id),['pe','pb']);
 });
 test('a large earnings-base shift remains a reported-value scenario, not a fabricated normalization',()=>{

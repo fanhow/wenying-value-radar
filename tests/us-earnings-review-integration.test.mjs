@@ -7,10 +7,12 @@ import {currentClientInput,persistableInputs,mergeCurrentInputs} from '../lib/da
 import {screenFeature} from '../lib/rotation-screen.ts';
 import {rotationAudit} from '../lib/rotation-audit-store.ts';
 import {analyzeTechnicalSetup} from '../lib/technical-analysis.ts';
+import {DAILY_RESEARCH_CACHE_VERSION,currentDailyResearch} from '../lib/daily-research-ranking.ts';
+import {US_EARNINGS_REVIEW_VERSION} from '../lib/us-earnings-review.ts';
 
 const date=new Date().toISOString().slice(0,10),runId='us_review_fixture_1';
 // Synthetic integration inputs, not issuer financial statements or market bars.
-const template={ticker:'VISN',market:'US',name:'Old directory name',sector:'Technology',price:100,eps:10,bvps:40,fcfPerShare:9,cashPerShare:3,debtPerShare:2,revenueGrowth:10,roe:25,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,uncertainty:.3,financialDataDate:date,updatedAt:date,priceSource:'Yahoo Finance daily close / daily-refresh-v1',source:'自動資料'};
+const template={ticker:'VISN',market:'US',name:'Old directory name',sector:'Technology',price:100,eps:10,bvps:40,fcfPerShare:9,cashPerShare:3,debtPerShare:2,revenueGrowth:3,roe:15,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,uncertainty:.3,dataBasis:'ltm',dataCompleteness:'complete',financialDataDate:date,updatedAt:date,priceSource:'Yahoo Finance daily close / daily-refresh-v1',source:'自動資料'};
 const candles=Array.from({length:80},(_,i)=>({date:new Date(Date.parse(date)-(79-i)*86400000).toISOString().slice(0,10),open:100,high:102,low:99,close:100,volume:1000000}));
 function history(stock){return {ticker:stock.ticker,market:'US',name:stock.name,quoteSource:stock.priceSource,candles,weeklyCandles:[],monthlyCandles:[],technicalAnalysis:{...analyzeTechnicalSetup(candles,null),candlestickPattern:'morning-star',patternStage:'confirmed'}};}
 function database(seed=false,reviewedStock=template){
@@ -81,7 +83,20 @@ test(`${base.ticker} new daily writes persist raw ready inputs and liquidity but
     const records=targets.map(t=>{const stock={...base,...t};return {...t,status:'ready',issues:[],fetchedAt:new Date().toISOString(),sources:[],quoteDate:date,financialDate:date,rankingEligible:true,stock,history:history(stock)};});
     assert.equal((await post({action:'batch',records})).status,200);
     const result=await post({action:'finalize'});assert.equal(result.status,200);const summary=await result.json();assert.equal(summary.coverage.US.ready,20);
-    const row=db.raw.prepare('SELECT * FROM daily_refresh_records WHERE ticker=?').get(base.ticker);assert.equal(row.status,'ready');assert.equal(row.eligible,1);assert.equal(row.upside,null);assert.deepEqual(JSON.parse(row.stock),base);assert.equal(JSON.parse(row.history).candles.length,80);assert.deepEqual(JSON.parse(row.issues),['US_EARNINGS_BASIS_REVIEW_REQUIRED']);
+    const row=db.raw.prepare('SELECT * FROM daily_refresh_records WHERE ticker=?').get(base.ticker);
+    assert.equal(row.status,'ready');assert.equal(row.eligible,1);assert.equal(row.upside,null);
+    const stored=JSON.parse(row.stock),{dailyResearch,...rawFinancialInput}=stored;
+    // Derived cache metadata is additive; every original financial/liquidity
+    // input must still match exactly, without substituting a reviewed value.
+    assert.deepEqual(rawFinancialInput,base);
+    assert.equal(dailyResearch.version,DAILY_RESEARCH_CACHE_VERSION);assert.equal(dailyResearch.valuationVersion,DAILY_VALUATION_VERSION);
+    assert.equal(dailyResearch.usReviewVersion,US_EARNINGS_REVIEW_VERSION);assert.equal(dailyResearch.runId,runId);assert.equal(dailyResearch.quoteDate,date);
+    assert.match(dailyResearch.inputDigest,/^[a-f0-9]{64}$/);assert.equal(dailyResearch.hasModel,false);assert.equal(dailyResearch.rankingEligible,false);
+    for(const field of ['nativeFairValue','estimatedFairValue','estimatedUpside','estimatedCalibratedUpside','valuationConfidence','calibrationConfidence'])assert.equal(dailyResearch[field],null);
+    assert.deepEqual(dailyResearch.issues,['US_EARNINGS_BASIS_REVIEW_REQUIRED']);assert.equal(await currentDailyResearch(stored,runId,date),false);
+    const scan=await (await read(db,`/api/market-scan?scope=research&market=US&query=${base.ticker}`)).json();
+    assert.equal(scan.researchStatusByMarket.US,'current');assert.deepEqual(scan.researchCandidates,[]);assert.equal(scan.researchCounts.US,0);
+    assert.equal(JSON.parse(row.history).candles.length,80);assert.deepEqual(JSON.parse(row.issues),['US_EARNINGS_BASIS_REVIEW_REQUIRED']);
   }finally{db.raw.close();}
 });
 test(`${base.ticker} read-time review also removes negative stored upside without rewriting inputs`,async()=>{
@@ -89,6 +104,7 @@ test(`${base.ticker} read-time review also removes negative stored upside withou
   try{
     db.raw.prepare('UPDATE daily_refresh_records SET upside=? WHERE ticker=?').run(-30,base.ticker);
     db.raw.prepare('UPDATE daily_refresh_records SET upside=? WHERE ticker=?').run(-.2,'T0');
+    db.raw.prepare('UPDATE daily_refresh_records SET stock=? WHERE ticker=?').run(JSON.stringify({...base,ticker:'T0',price:250}),'T0');
     const before=db.raw.prepare('SELECT stock,upside,eligible FROM daily_refresh_records WHERE ticker=?').get(base.ticker);
     const scan=await (await read(db,'/api/market-scan')).json();
     assert.equal(scan.candidates.length,9);assert.deepEqual(scan.overvaluedCandidates.map(s=>s.ticker),['T0']);
