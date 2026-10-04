@@ -1,0 +1,108 @@
+{
+  "description": "Public saved Site 90 financial-input excerpt and historical displayed estimate; not a complete comparable cohort, current book bridge, or fair-value truth. Chart histories used by integration tests are separately synthetic.",
+  "source": {
+    "path": "outputs/local-validation/site90-new-generation-20261002-final/22.json",
+    "sha256": "eca151e1b5a25396bdbd9699181ea49cdf3bc285a7ab689a3dd2c3c84bb32ebc",
+    "captureEntryStatus": 200,
+    "capturedRunId": "daily_508cd349-8828-49eb-9f68-8bc8718b358a",
+    "quoteDate": "2026-10-02",
+    "financialPeriodEnd": "2026-06-30"
+  },
+  "input": {
+    "ticker": "6176",
+    "name": "瑞儀",
+    "market": "TW",
+    "sector": "台灣上市公司",
+    "industry": "光電業",
+    "listingBoard": "TWSE",
+    "price": 92.30000305175781,
+    "eps": 10.896742,
+    "bvps": 105.16043343493116,
+    "fcfPerShare": -2.3302415935489047,
+    "revenueGrowth": -11.484866134691785,
+    "roe": 11.379644738115084,
+    "debtRatio": 48.31635873936797,
+    "targetPe": 12.16555736857381,
+    "targetPb": 1.482778684286905,
+    "targetFcfMultiple": 12.110371579049207,
+    "uncertainty": 0.3,
+    "revenuePerShare": 137.06825771006416,
+    "financialDataDate": "2026-06-30",
+    "dataBasis": "ltm",
+    "dataCompleteness": "historical",
+    "qualityAvailable": true,
+    "netMarginUnit": "percent",
+    "ebitPerShare": 15.6244139396257,
+    "ebitdaPerShare": 19.388975718871297,
+    "cashPerShare": 103.05596907699544,
+    "debtPerShare": 46.90385474839085,
+    "netMargin": 8.083394896294706,
+    "epsHistory": [
+      {
+        "value": 12.4,
+        "end": "2025-12-31",
+        "basis": "annual"
+      },
+      {
+        "value": 20.613333,
+        "end": "2024-12-31",
+        "basis": "annual"
+      },
+      {
+        "value": 14.946667,
+        "end": "2023-12-31",
+        "basis": "annual"
+      },
+      {
+        "value": 18.893333,
+        "end": "2022-12-31",
+        "basis": "annual"
+      }
+    ],
+    "financialMetrics": {
+      "currency": "TWD",
+      "periodBasis": "ltm",
+      "shareBasis": "provider-as-of-ordinary",
+      "shareAsOfDate": "2026-06-30",
+      "shareSourceField": "quarterlyOrdinarySharesNumber",
+      "roeBasis": "parent-income-average-equity",
+      "growthBasis": "ttm-yoy",
+      "revenueGrowthTtmYoY": -11.484866134691785,
+      "revenueGrowthQuarterYoY": -11.83667093167482,
+      "netIncomePerShare": 11.079768548175402,
+      "sharesOutstanding": 345180947,
+      "nonControllingBookPerShare": 0,
+      "ebitdaBasis": "operating-income-plus-cashflow-da",
+      "depreciationPerShare": 3.7645617792455965,
+      "providerEbitPerShare": 18.13941080589248,
+      "providerEbitdaPerShare": 21.903972585138078
+    },
+    "assetTurnover": 0.6736551408463157,
+    "financialLeverage": 1.9348481949194831,
+    "updatedAt": "2026-10-02",
+    "source": "自動資料",
+    "priceSource": "Yahoo Finance daily close / daily-refresh-v1",
+    "valuationPolicy": "tw-comparables-v1",
+    "dailyValuationVersion": "tw-comparables-2026-10-02-research-v3",
+    "dailyRunId": "daily_508cd349-8828-49eb-9f68-8bc8718b358a"
+  },
+  "historicalDisplayedEstimate": {
+    "hasModel": true,
+    "rankingEligible": false,
+    "nativeFairValue": 231.38710895372157,
+    "estimatedFairValue": 231.38710895372157,
+    "estimatedUpside": 1.506902505994174,
+    "valuationConfidence": "low",
+    "calibrationConfidence": "low",
+    "issues": [
+      "LOW_VALUATION_CONFIDENCE",
+      "LOW_CALIBRATION_CONFIDENCE"
+    ]
+  },
+  "sourceComparison": {
+    "q2ParentEquityTwdThousands": 36299378,
+    "july21AfterOutstandingExactNotice": 345180947,
+    "fullBookCashTreasuryPriceBridgeVerified": false,
+    "ratioOnlyRepairPermitted": false
+  }
+}

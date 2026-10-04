@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview,TAIWAN_SHARE_BASIS_REVIEW_VERSION} from './taiwan-share-basis-review.ts';
 import './runtime-env.ts';
 import { DAILY_VALUATION_VERSION, dailyValuationState } from './daily-valuation-state.ts';
 import { isoDate,taiwanPerShareIssue,validRefreshCandles, type RefreshRecord } from './daily-refresh-data.ts';
@@ -63,6 +64,7 @@ export async function statusData(db:D1Database) {
     valuationVersion:run?JSON.parse(run.manifest).valuationVersion??null:null,
     taiwanValuationCurrent:!!run&&JSON.parse(run.manifest).valuationVersion===DAILY_VALUATION_VERSION,
     usEarningsReviewVersion:US_EARNINGS_REVIEW_VERSION,usEarningsReviewCoverage:'source-reviewed-cases-only',
+    taiwanShareBasisReviewVersion:TAIWAN_SHARE_BASIS_REVIEW_VERSION,taiwanShareBasisReviewCoverage:'source-reviewed-cases-only',
     latestAttempt:latest,source:'Yahoo Finance public daily OHLC and quarterly/TTM financials',schedule:'Asia/Taipei 06:30 / 07:30 retry',
     note:'收盤資料；財報每日檢查，依公司公告頻率更新。低信心或待覆核估值僅供研究，不列正式排名；缺少適用模型時不顯示估值。已驗證的 K 線與純技術訊號仍可使用；估值為本站模型計算，非外部 AI 排名。'};
 }
@@ -188,6 +190,7 @@ async function researchCandidates(db:D1Database,status:Awaited<ReturnType<typeof
     COALESCE(SUM(CASE WHEN json_extract(stock,'$.dailyResearch.version') IS NOT ?
       OR json_extract(stock,'$.dailyResearch.valuationVersion') IS NOT ?
       OR json_extract(stock,'$.dailyResearch.usReviewVersion') IS NOT ?
+      OR json_extract(stock,'$.dailyResearch.taiwanShareBasisReviewVersion') IS NOT ?
       OR json_extract(stock,'$.dailyResearch.runId') IS NOT run_id
       OR json_extract(stock,'$.dailyResearch.quoteDate') IS NOT ?
       OR json_extract(stock,'$.updatedAt') IS NOT ?
@@ -202,7 +205,7 @@ async function researchCandidates(db:D1Database,status:Awaited<ReturnType<typeof
     COALESCE(SUM(CASE WHEN ${researchPredicate} THEN 1 ELSE 0 END),0) AS research,
     COALESCE(SUM(CASE WHEN ${researchPredicate} AND ${researchFilters[options.filter]} AND ${researchSearch} THEN 1 ELSE 0 END),0) AS filtered
     FROM daily_refresh_records WHERE run_id=? AND market=? AND status='ready'`)
-    .bind(DAILY_RESEARCH_CACHE_VERSION,DAILY_VALUATION_VERSION,US_EARNINGS_REVIEW_VERSION,status.expectedSessions[market],status.expectedSessions[market],DAILY_VALUATION_VERSION,options.query,status.runId,market)
+    .bind(DAILY_RESEARCH_CACHE_VERSION,DAILY_VALUATION_VERSION,US_EARNINGS_REVIEW_VERSION,TAIWAN_SHARE_BASIS_REVIEW_VERSION,status.expectedSessions[market],status.expectedSessions[market],DAILY_VALUATION_VERSION,options.query,status.runId,market)
     .first<{ready:number;invalid:number;research:number;filtered:number}>();
   if(!coverage||coverage.invalid||coverage.ready!==status.coverage?.[market]?.ready)return unavailable('RESEARCH_CACHE_INCOMPLETE');
   // The independent DB seal is written only after all server cache/state and
@@ -303,16 +306,20 @@ export async function handleDailyRead(request:Request,db:D1Database|undefined):P
     const ticker=String(body.ticker??'').toUpperCase().replace(/\.(TW|TWO)$/,''),market=body.market??(/^\d/.test(ticker)?'TW':'US');
     if(!/^[A-Z0-9.-]{1,12}$/.test(ticker)||!['TW','US'].includes(market))return response({error:'INVALID_TICKER'},400);
     const row=await db.prepare('SELECT * FROM daily_refresh_records WHERE run_id=? AND market=? AND ticker=?').bind(status.runId,market,ticker).first<Stored>();
-    const value=dailyValuationState(row?.status==='ready'&&row.stock&&!(market==='TW'&&!status.taiwanValuationCurrent)?JSON.parse(row.stock):null,status.runId!);
+    const input=row?.status==='ready'&&row.stock?JSON.parse(row.stock):null;
+    const requestReview=getTaiwanShareBasisReview({market,ticker});
+    const value=dailyValuationState(market==='TW'&&!status.taiwanValuationCurrent?null:input,status.runId!);
+    if(requestReview){value.stock=null;value.hasModel=false;value.rankingEligible=false;value.estimatedFairValue=null;
+      value.estimatedUpside=null;value.estimatedCalibratedUpside=null;value.upside=null;value.issues=[requestReview.issue];value.shareBasisReview=requestReview;}
     const issues=[...new Set([...(row?JSON.parse(row.issues):['OUTSIDE_REFRESH_UNIVERSE']),...value.issues])];
     if(path==='/api/price-history'&&row?.history) {
       const history=JSON.parse(row.history);
       if(!value.rankingEligible&&history.technicalAnalysis)history.technicalAnalysis.valueTrendResonance=null;
-      return response({...history,...(value.review?{name:value.review.issuerName,earningsReview:value.review}:{}),valuationAvailable:value.hasModel,valuationRankingEligible:value.rankingEligible,issues,freshness:status});
+      return response({...history,...(value.review?{name:value.review.issuerName,earningsReview:value.review}:{}),...(value.shareBasisReview?{shareBasisReview:value.shareBasisReview}:{}),valuationAvailable:value.hasModel,valuationRankingEligible:value.rankingEligible,issues,freshness:status});
     }
     if(!row||row.status!=='ready')return response({error:'此股本次資料不足，未使用舊估值。',issues:row?JSON.parse(row.issues):['OUTSIDE_REFRESH_UNIVERSE'],freshness:status},422);
-    if(!value.hasModel)return response({error:value.review?.reasonZh??'此股缺少適用估值模型，未使用舊估值；仍可查看 K 線。',issues,
-      excludedModels:value.stock?.excludedModels??[],...(value.review?{earningsReview:value.review}:{}),freshness:status},422);
+    if(!value.hasModel)return response({error:value.shareBasisReview?.reasonZh??value.review?.reasonZh??'此股缺少適用估值模型，未使用舊估值；仍可查看 K 線。',issues,
+      excludedModels:value.stock?.excludedModels??[],...(value.review?{earningsReview:value.review}:{}),...(value.shareBasisReview?{shareBasisReview:value.shareBasisReview}:{}),freshness:status},422);
     return response(path==='/api/valuation'?{stock:JSON.parse(row.stock!),cache:'daily-refresh',rankingEligible:value.rankingEligible,
       researchOnly:!value.rankingEligible,estimatedUpside:value.estimatedUpside,upside:value.upside,issues,freshness:status}:{...JSON.parse(row.history!),freshness:status});
   }catch {return response({state:'unavailable',error:'DAILY_DATABASE_READ_FAILED'},503);}

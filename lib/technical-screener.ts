@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import type { DailyCandle } from "./price-history.ts";
 import {
   aggregateCandles,
@@ -466,10 +467,12 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         : (usMarketSnapshot || []).find((r) => r.ticker === item.ticker);
       const name = row?.name || item.ticker;
       const price = Number(row?.price) || (item.market === "TW" ? 50.0 : 25.0);
+      const shareBasisReview=getTaiwanShareBasisReview({market:item.market,ticker:item.ticker});
+      if(shareBasisReview&&category==='value-trend')continue;
       const val = row ? calculateStock(row as unknown as StockInput) : null;
-      const cal = val ? calibrateFairValue(val) : null;
-      const fairValue = cal?.calibratedFairValue ?? price * 1.25;
-      const upside = price > 0 ? (fairValue - price) / price : 0.25;
+      const cal = val && !shareBasisReview ? calibrateFairValue(val) : null;
+      const fairValue = shareBasisReview?null:cal?.calibratedFairValue ?? price * 1.25;
+      const upside = fairValue===null?null:price > 0 ? (fairValue - price) / price : 0.25;
 
       const candles = generateSyntheticHistory(
         item.ticker,
@@ -478,7 +481,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
       );
       const weeklyCandles = aggregateCandles(candles, "week").slice(-104);
       const monthlyCandles = aggregateCandles(candles, "month").slice(-60);
-      const analysis = analyzeTechnicalSetup(candles, upside) ?? {
+      const analysis = analyzeTechnicalSetup(candles, upside??undefined) ?? {
         asOf: candles[candles.length - 1].date,
         close: price,
         ma5: price,
@@ -519,12 +522,12 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         },
         valueTrendResonance: {
           status: item.stage === "candidate" ? "forming" : "confirmed",
-          fairValueUpside: upside,
+          fairValueUpside: upside??0,
           ema15: price * 1.02,
           sma50: price * 0.98,
           trendStatus: "bullish",
-          signalReasonZh: `基本面公允價值具備 +${(upside * 100).toFixed(1)}% 安全邊際，技術面 15EMA ≥ 50SMA 處於右側上升軌道`,
-          signalReasonEn: `Fundamental fair value provides +${(upside * 100).toFixed(1)}% margin of safety combined with right-side golden cross uptrend`,
+          signalReasonZh: `基本面公允價值具備 +${((upside??0) * 100).toFixed(1)}% 安全邊際，技術面 15EMA ≥ 50SMA 處於右側上升軌道`,
+          signalReasonEn: `Fundamental fair value provides +${((upside??0) * 100).toFixed(1)}% margin of safety combined with right-side golden cross uptrend`,
         },
         weeklyRangePosition: 0.35,
         monthlyRangePosition: 0.35,
@@ -556,6 +559,7 @@ export function buildTechnicalSnapshot(): TechnicalSnapshot {
         technicalAlert: "bullish-confirmed",
       };
 
+      if(shareBasisReview)analysis.valueTrendResonance=null;
       const finalActionZh = item.actionGuideZh || defaultActionZh;
       const finalActionEn = item.actionGuideEn || defaultActionEn;
       const stageNameZh = item.stage === "candidate" ? `${patternNameZh} (提前卡位)` : patternNameZh;

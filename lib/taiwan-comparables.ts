@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import type { StockInput } from './valuation.ts';
 import type { ComparableMultiples } from './market-comparables.ts';
 import { isFinancialCompany } from './company-classification.ts';
@@ -25,7 +26,7 @@ export function validTaiwanComparableEvidence(s:StockInput) {
     ||!Array.isArray(p.financialDateRange)||p.financialDateRange.length!==2||!p.financialDateRange.every(validDate)||p.financialDateRange[0]>p.financialDateRange[1]
     ||p.financialDateRange.some(d=>d!==s.financialDataDate)
     ||p.financialDateRange.some(d=>{const age=(Date.parse(s.updatedAt!)-Date.parse(d))/DAY;return age<0||age>180;})
-    ||!Number.isInteger(p.peerCount)||p.peerCount<0||!Array.isArray(p.peerTickers)||!Array.from(p.peerTickers).every(t=>typeof t==='string'&&/^\d{4}$/.test(t))||new Set(p.peerTickers).size!==p.peerCount||p.peerTickers.length!==p.peerCount||p.peerTickers.includes(s.ticker))return false;
+    ||!Number.isInteger(p.peerCount)||p.peerCount<0||!Array.isArray(p.peerTickers)||!Array.from(p.peerTickers).every(t=>typeof t==='string'&&/^\d{4}$/.test(t))||new Set(p.peerTickers).size!==p.peerCount||p.peerTickers.length!==p.peerCount||p.peerTickers.includes(s.ticker)||p.peerTickers.some(t=>getTaiwanShareBasisReview({market:'TW',ticker:t})))return false;
   if(s.taiwanBusinessGroup!==undefined) {
     if(!validTaiwanBusinessGroupReference(s)||p.method!=='tw-business-group-same-session-median'
       ||p.peerGroup!==s.taiwanBusinessGroup.id||p.taiwanBusinessRegistryVersion!==s.taiwanBusinessGroup.registryVersion
@@ -75,6 +76,8 @@ function industryKey(s:StockInput) {
   return industry;
 }
 function dated(s:StockInput) {
+  // Peer provenance is automatic source evidence, never a manual-label override.
+  if(getTaiwanShareBasisReview({...s,source:undefined}))return false;
   if(s.market!=='TW'||s.dataBasis!=='ltm'||s.financialMetrics?.periodBasis!=='ltm'||s.financialMetrics?.currency!=='TWD'
     ||!['period-end-ordinary','provider-as-of-ordinary'].includes(s.financialMetrics?.shareBasis??'')
     ||!validDate(s.updatedAt)||!validDate(s.financialDataDate)||!validTaiwanShareMetadata(s))return false;

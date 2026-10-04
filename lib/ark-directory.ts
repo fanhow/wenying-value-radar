@@ -22,7 +22,7 @@ export type ArkUsSnapshotRow = {
   dataBasis?: "annual" | "ltm" | "estimated";
   epsHistory?: Array<{ value: number; start?: string; end?: string; basis?: "annual" | "ltm" }>;
   financialDataDate?: string | null;
-  dividendPerShare: number;
+  dividendPerShare?: number | null;
   sector: string;
   date: string;
   targetPb?: number | null;
@@ -64,7 +64,6 @@ const manualUsSnapshots: ArkUsSnapshotRow[] = [
     price: 418.47,
     eps: 6.8,
     bvps: 24.96,
-    dividendPerShare: 0,
     sector: "Technology",
     date: "2024-12-31",
   },

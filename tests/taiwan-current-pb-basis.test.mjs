@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {PB_CASES,parseCurrentPbSource,comparePublishedPb,auditCurrentPbBasis} from '../scripts/audit-taiwan-current-pb-basis.mjs';
 import {OFFICIAL_BOOK_SOURCES} from '../scripts/audit-taiwan-official-book.mjs';
+import {PB_BASIS_ACTION_KINDS} from '../lib/taiwan-pb-comparison-basis.ts';
 
 // All fixture values are synthetic, not real company observations.
 const sha=v=>createHash('sha256').update(v).digest('hex');
@@ -70,7 +71,9 @@ function joinedFixture() {
 test('join keeps all five cases, distinguishes corroborated close and cannot infer missing matches',()=>{
   const {input,books,pbs,closes}=joinedFixture(),original=JSON.stringify(input);
   const r=auditCurrentPbBasis(input,books,pbs,closes);assert.equal(r.rows.length,5);
-  assert.ok(r.rows.every(r=>r.officialReferenceComparison.withinHalfUnitAtTwoDecimals&&!r.vendorBookComparison.withinHalfUnitAtTwoDecimals));
+  assert.ok(r.rows.every(r=>r.diagnostic.officialReferenceComparison.withinHalfUnitAtTwoDecimals&&!r.diagnostic.vendorBookComparison.withinHalfUnitAtTwoDecimals));
+  assert.ok(r.rows.every(r=>r.basisStatus==='unverified'&&!r.comparisonEligible
+    &&r.officialReferenceComparison===null&&r.vendorBookComparison===null));
   assert.equal(r.rows[0].quoteSource,'official-close-corroborated');assert.equal(r.rows[2].quoteSource,'frozen-vendor-only');
   assert.equal(JSON.stringify(input),original);
   const missing=auditCurrentPbBasis(input,books,[],[]);assert.ok(missing.rows.every(r=>r.reasons.includes('MISSING_PUBLISHED_PB')&&r.officialReferenceComparison===null));
@@ -103,4 +106,30 @@ test('same price and date cannot corroborate a quote from a different identity',
   }
   const {input,books,pbs,closes}=joinedFixture();input.records[0].market='US';
   assert.equal(auditCurrentPbBasis(input,books,pbs,closes).rows[0].quoteSource,'official-close-present-unverified');
+});
+
+test('caller supplied synthetic basis evidence qualifies only its exact issuer; matched is not PIT',()=>{
+  const {input,books,pbs,closes}=joinedFixture();
+  const instrument={ticker:'6176',exchange:'TWSE',securityType:'ordinary-share'};
+  const observation={instrument,currency:'TWD',financialPeriodEnd:'2026-06-30',equityScope:'parent-ordinary',
+    denominator:'ordinary-outstanding',bookBasisDate:'2026-06-30',shareBasisDate:'2026-06-30',
+    quoteBasisDate:'2026-09-18',bookTreatment:'reported-period-end',shareTreatment:'period-end',
+    appliedShareActionIds:[],appliedBookActionIds:[],sourceIds:['synthetic']};
+  // The invented evidence fixture validates routing/contract semantics only.
+  const evidence={ticker:'6176',board:'TWSE',left:observation,right:structuredClone(observation),
+    sources:[{id:'synthetic',url:'https://example.com/synthetic-basis-proof',rawSha256:sha('synthetic'),
+      retrievedAt:'2026-09-21T02:00:00.000Z',publishedAt:null}],
+    actionCoverage:{instrument,fromDate:'2026-06-30',toDate:'2026-09-18',
+      eventKinds:[...PB_BASIS_ACTION_KINDS],sourceIds:['synthetic'],events:[]}};
+  const original=JSON.stringify(evidence);
+  const rows=auditCurrentPbBasis(input,books,pbs,closes,[evidence]).rows;
+  assert.equal(rows[0].basisStatus,'matched');assert.equal(rows[0].comparisonEligible,true);
+  assert.deepEqual(rows[0].officialReferenceComparison,rows[0].diagnostic.officialReferenceComparison);
+  assert.ok(rows.slice(1).every(row=>row.basisStatus==='unverified'&&!row.comparisonEligible));
+  assert.equal(JSON.stringify(evidence),original);
+  assert.throws(()=>auditCurrentPbBasis(input,books,pbs,closes,[evidence,evidence]),/DUPLICATE_JOIN_KEY/);
+  const wrong=structuredClone(evidence);wrong.left.instrument.ticker='8213';
+  const rejected=auditCurrentPbBasis(input,books,pbs,closes,[wrong]).rows[0];
+  assert.equal(rejected.basisStatus,'invalid');assert.equal(rejected.officialReferenceComparison,null);
+  assert.ok(rejected.diagnostic.officialReferenceComparison);
 });

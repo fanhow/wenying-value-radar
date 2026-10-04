@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import type {StockInput} from './valuation.ts';
 import {dailyValuationState,DAILY_VALUATION_VERSION} from './daily-valuation-state.ts';
 import {getUsEarningsReview} from './us-earnings-review.ts';
@@ -12,7 +13,7 @@ export function currentClientInput(stock:StockInput,status:DailyClientStatus|nul
   if(isUserManagedInput(stock))return true;
   // Retain archived inputs, but a refresh or legacy automatic cache cannot
   // resolve an explicitly reviewed issuer's earnings-basis issue.
-  if(getUsEarningsReview(stock))return false;
+  if(getUsEarningsReview(stock)||getTaiwanShareBasisReview(stock))return false;
   // TW automatic inputs must come from the active, versioned generation.
   // A missing source or an arbitrary price-source label is not a manual import.
   // Preserve the existing US non-daily SEC lookup path in this TW-only fix.

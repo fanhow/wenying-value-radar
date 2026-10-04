@@ -5,6 +5,7 @@ import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {compareTaiwanOfficialBook} from './audit-taiwan-official-book.mjs';
 import {parsePublishedMultiple} from './study-taiwan-historical-multiples.mjs';
+import {assessTaiwanPbComparisonBasis,buildUnverifiedTaiwanPbBasisEvidence} from '../lib/taiwan-pb-comparison-basis.ts';
 
 export const PB_OBSERVATION_DATE='2026-09-18';
 export const PB_CASES=Object.freeze([
@@ -72,17 +73,23 @@ export function comparePublishedPb(price,bvps,publishedPb) {
 function uniqueMap(items,key) {
   const map=new Map();for(const item of items){const k=key(item);if(map.has(k))throw new Error('DUPLICATE_JOIN_KEY');map.set(k,item);}return map;
 }
-export function auditCurrentPbBasis(input,bookCaptures,pbCaptures,closeCaptures) {
+/** Optional evidence is caller/source-checked research data, never inferred from price or BVPS. */
+export function auditCurrentPbBasis(input,bookCaptures,pbCaptures,closeCaptures,basisEvidenceRecords=[]) {
+  if(!Array.isArray(basisEvidenceRecords)||Array.from(basisEvidenceRecords).some(e=>!e||typeof e.ticker!=='string'
+    ||!/^\d{4,6}$/.test(e.ticker)||!['TWSE','TPEx'].includes(e.board)))throw new Error('INVALID_PB_BASIS_RECORDS');
+  const basisMap=uniqueMap(basisEvidenceRecords,e=>`${e.board}:${e.ticker}`);
   const books=compareTaiwanOfficialBook(input,bookCaptures);
   const bookMap=uniqueMap(books.rows.filter(r=>PB_CASES.some(c=>c.ticker===r.ticker)),r=>r.ticker);
   const stockMap=uniqueMap(input.records.filter(r=>PB_CASES.some(c=>c.ticker===r.ticker)),r=>r.ticker);
   const published=uniqueMap(pbCaptures.map(c=>parseCurrentPbSource(c)),r=>r.ticker);
   const closes=uniqueMap(closeCaptures.map(c=>parseCurrentPbSource(c,{close:true})),r=>r.ticker);
-  return {version:'current-pb-basis-audit-v1',researchOnly:true,quoteDate:PB_OBSERVATION_DATE,
+  return {version:'current-pb-basis-audit-v2',researchOnly:true,quoteDate:PB_OBSERVATION_DATE,
     limitations:['Current retrieval is not a point-in-time replay.',
       'Half-unit agreement at two decimals is arithmetic compatibility, not proof of the exact denominator or corporate-action treatment.',
       'Official close was checked only for 6176/8213. Other prices remain frozen Yahoo quotes.',
-      'No implied book, shares, selected multiple, fair value or upside is produced.'],
+      'No implied book, shares, selected multiple, fair value or upside is produced.',
+      'Raw arithmetic remains diagnostic; paired statistics require documented effective book/share bases and action coverage.',
+      'A matched contract does not authenticate sources, prove PIT availability or qualify a formal valuation.'],
     rows:PB_CASES.map(i=>{
       const book=bookMap.get(i.ticker),record=stockMap.get(i.ticker),pb=published.get(i.ticker),close=closes.get(i.ticker),reasons=[];
       if(!book?.comparison)reasons.push('NO_COMPARABLE_OFFICIAL_BOOK');
@@ -96,12 +103,24 @@ export function auditCurrentPbBasis(input,bookCaptures,pbCaptures,closeCaptures)
       const closeDisagrees=!!close&&vendorQuoteValid&&Math.abs(close.value-vendorPrice)>.005;
       if(closeDisagrees)reasons.push('OFFICIAL_CLOSE_DISAGREEMENT');
       const price=close?.value??vendorPrice;
+      const context={instrument:{ticker:i.ticker,exchange:i.board,securityType:'ordinary-share'},
+        financialPeriodEnd:'2026-06-30',quoteDate:PB_OBSERVATION_DATE};
+      const supplied=basisMap.get(`${i.board}:${i.ticker}`);
+      const basis=assessTaiwanPbComparisonBasis({...context,
+        left:supplied?.left??buildUnverifiedTaiwanPbBasisEvidence(context),
+        right:supplied?.right??buildUnverifiedTaiwanPbBasisEvidence(context),
+        sources:supplied?.sources??[],actionCoverage:supplied?.actionCoverage??null});
+      const diagnostic={
+        officialReferenceComparison:reasons.length?null:comparePublishedPb(price,book.comparison.reportedReferenceBVPS,pb.value),
+        vendorBookComparison:reasons.length?null:comparePublishedPb(price,book.comparison.vendorBVPS,pb.value)};
+      const comparisonEligible=!reasons.length&&basis.comparisonEligible;
       return {...i,reasons,published:pb??null,officialClose:close??null,vendorPrice,
         quoteSource:close?(vendorQuoteValid?(closeDisagrees?'official-close-conflict':'official-close-corroborated'):'official-close-present-unverified')
           :vendorQuoteValid?'frozen-vendor-only':'unavailable',
         referenceBVPS:book?.comparison?.reportedReferenceBVPS??null,vendorBVPS:book?.comparison?.vendorBVPS??null,
-        officialReferenceComparison:reasons.length?null:comparePublishedPb(price,book.comparison.reportedReferenceBVPS,pb.value),
-        vendorBookComparison:reasons.length?null:comparePublishedPb(price,book.comparison.vendorBVPS,pb.value)};
+        basisStatus:basis.status,basisReasons:basis.reasons,comparisonEligible,diagnostic,
+        officialReferenceComparison:comparisonEligible?diagnostic.officialReferenceComparison:null,
+        vendorBookComparison:comparisonEligible?diagnostic.vendorBookComparison:null};
     })};
 }
 async function main(args) {

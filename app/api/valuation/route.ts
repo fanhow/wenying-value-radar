@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from '../../../lib/taiwan-share-basis-review';
 import { NextRequest, NextResponse } from "next/server";
 import { clamp, valuationTargets, type StockInput } from "../../../lib/valuation";
 import { fallbackUsSymbols, findArkUsSnapshot, type ArkUsSnapshotRow } from "../../../lib/ark-directory";
@@ -32,6 +33,7 @@ import {
   type YahooChartPayload,
 } from "../../../lib/price-history";
 import { loadUsEarningsReport } from "../../../lib/us-earnings";
+import { secDividendInputs, unclassifiedDividendInputs } from "../../../lib/dividend-source-inputs";
 
 type Market = "TW" | "US";
 
@@ -326,7 +328,7 @@ function valueUsSnapshot(
     epsHistory: snapshot.epsHistory,
     bvps,
     fcfPerShare,
-    dividendPerShare: Math.max(numeric(snapshot.dividendPerShare), 0),
+    ...unclassifiedDividendInputs(snapshot.dividendPerShare, "USD", "內建美股快照股利欄位（口徑未核證）"),
     ...targets,
     ...(lightweight ? {
       targetPb: snapshot.targetPb ?? targets.targetPb,
@@ -449,19 +451,20 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     ["USD"],
     "instant",
   );
-  const sharesMetric = metricFromConcepts(
+  const sharesCandidate = metricFactsFromConcepts(
     facts,
     isUsGaap ? "dei" : taxonomy,
     isUsGaap ? ["EntityCommonStockSharesOutstanding"] : ["NumberOfSharesOutstanding", "NumberOfSharesIssuedAndFullyPaid"],
     ["shares"],
     "instant",
-  ) ?? metricFromConcepts(
+  ) ?? metricFactsFromConcepts(
     facts,
     taxonomy,
     isUsGaap ? ["WeightedAverageNumberOfDilutedSharesOutstanding"] : ["DilutedWeightedAverageShares"],
     ["shares"],
     "duration",
   );
+  const sharesMetric = sharesCandidate?.metric ?? null;
   const operatingCashMetric = metricFromConcepts(
     facts,
     taxonomy,
@@ -557,22 +560,14 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     ["USD"],
     "duration",
   );
-  const dividendPerShareMetric = metricFromConcepts(
-    facts,
+  const dividendInputs = secDividendInputs({
+    companyFacts: facts,
     taxonomy,
-    isUsGaap
-      ? ["CommonStockDividendsPerShareDeclared", "CommonStockDividendsPerShareCashPaid"]
-      : ["DividendsPaidPerShare"],
-    ["USD/shares", "USD / shares"],
-    "duration",
-  );
-  const dividendsPaidMetric = metricFromConcepts(
-    facts,
-    taxonomy,
-    isUsGaap ? ["PaymentsOfDividendsCommonStock", "PaymentsOfDividends"] : ["DividendsPaid"],
-    ["USD"],
-    "duration",
-  );
+    currency: "USD",
+    epsCandidate,
+    sharesCandidate,
+  });
+  const { dividendPerShare, dividendEvidence, dividendEarnings, dividendBasisMetric } = dividendInputs;
 
   const shares = numeric(sharesMetric?.value);
   const eps = numeric(epsMetric?.value);
@@ -582,20 +577,6 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     ? numeric(operatingCashMetric?.value) - Math.abs(numeric(capexMetric?.value))
     : 0;
   const fcfPerShare = shares > 0 && cashFlowsAligned ? trailingFcf / shares : 0;
-  const directDividend = numeric(dividendPerShareMetric?.value);
-  const paidDividendPerShare = shares > 0
-    ? Math.abs(numeric(dividendsPaidMetric?.value)) / shares
-    : 0;
-  const dividendPerShare = Math.max(
-    directDividend || paidDividendPerShare,
-    0,
-  );
-  const dividendBasisMetric = directDividend
-    ? dividendPerShareMetric
-    : paidDividendPerShare
-      ? dividendsPaidMetric
-      : null;
-
   if (!(eps > 0 || bvps > 0 || fcfPerShare > 0)) {
     if (snapshot) return valueUsSnapshot(body, ticker, snapshot, "insufficient");
     throw new Error("公開申報資料不足，暫時無法建立可靠估值");
@@ -700,6 +681,8 @@ async function valueUsStock(body: ValuationRequest, ticker: string) {
     bvps,
     fcfPerShare,
     dividendPerShare,
+    dividendEvidence,
+    dividendEarnings,
     revenuePerShare: perShare(revenue),
     ebitPerShare: perShare(ebitMetric?.value),
     ebitdaPerShare: perShare(ebitda),
@@ -896,7 +879,7 @@ async function valueTwStock(body: ValuationRequest, ticker: string) {
     bvps,
     fcfPerShare: sanitized.fcfPerShare ?? historicalInputs?.fcfPerShare ?? 0,
     normalizedFcfPerShare: sanitized.normalizedFcfPerShare,
-    dividendPerShare: 0,
+    ...unclassifiedDividendInputs(undefined, "TWD", "台股交易所比率及年度財務資料未提供股利觀測"),
     targetPe,
     targetPb,
     targetPsMultiple: sanitized.targetPsMultiple,
@@ -933,6 +916,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "股票代碼格式不正確" }, { status: 400 });
     }
     const market: Market = body.market ?? (/^\d/.test(ticker) ? "TW" : "US");
+    const shareBasisReview=getTaiwanShareBasisReview({market,ticker});
+    if(shareBasisReview)return NextResponse.json({error:shareBasisReview.reasonZh,issues:[shareBasisReview.issue],shareBasisReview},{status:422});
     const canUseCache = !body.refresh && !numeric(body.capturedPrice) && !numeric(body.capturedNav) && !body.capturedName?.trim();
     if (canUseCache) {
       const cached = await readValuationQueryCache(market, ticker);

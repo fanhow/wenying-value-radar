@@ -40,6 +40,9 @@ export type HistoricalMetricPoint = {
 };
 
 export type ConceptMetric = {
+  /** Preserve the selected concept; declared and paid values are not interchangeable. */
+  conceptName: string;
+  taxonomy: string;
   facts: SecFact[];
   metric: FinancialMetric;
 };
@@ -340,7 +343,7 @@ export function metricFactsFromConcepts(
   const candidates: ConceptMetric[] = conceptNames.flatMap((conceptName) => {
     const facts = selectSecFacts(companyFacts, taxonomy, [conceptName], acceptedUnits);
     const metric = mode === "instant" ? latestInstantMetric(facts) : trailingTwelveMonthsMetric(facts);
-    return metric ? [{ facts, metric }] : [];
+    return metric ? [{ conceptName, taxonomy, facts, metric }] : [];
   });
   if (!candidates.length) return null;
 

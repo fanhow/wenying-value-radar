@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import { getRuntimeDatabase } from "./runtime-env.ts";
 import type { Market, StockInput } from "./valuation.ts";
 
@@ -26,6 +27,7 @@ export async function readValuationQueryCache(
   now = new Date(),
   database?: D1Database,
 ) {
+  if(getTaiwanShareBasisReview({market,ticker}))return null;
   const db = databaseOrUndefined(database);
   if (!db) return null;
   try {
@@ -36,7 +38,7 @@ export async function readValuationQueryCache(
     ).bind(market, ticker).first<CachedRow>();
     if (!row || Date.parse(row.expiresAt) <= now.getTime()) return null;
     const stock = JSON.parse(row.payload) as StockInput;
-    return stock?.ticker === ticker && stock.market === market ? stock : null;
+    return stock?.ticker === ticker && stock.market === market && !getTaiwanShareBasisReview({...stock,source:undefined}) ? stock : null;
   } catch {
     return null;
   }
@@ -47,6 +49,7 @@ export async function saveValuationQueryCache(
   now = new Date(),
   database?: D1Database,
 ) {
+  if(getTaiwanShareBasisReview({...stock,source:undefined}))return false;
   const db = databaseOrUndefined(database);
   if (!db) return false;
   const ttlMs = stock.market === "TW" ? 2 * 60 * 60 * 1_000 : 30 * 60 * 1_000;

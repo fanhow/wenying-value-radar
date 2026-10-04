@@ -1,0 +1,31 @@
+{
+  "status": "ARCHIVED_REAL_RESPONSE_FIXED_AS_OF_FIXTURE",
+  "symbol": "8299.TWO",
+  "exchange": "TWO",
+  "currency": "TWD",
+  "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/8299.TWO?interval=1d&range=2y&events=div%2Csplits",
+  "recordedFetchedAt": "2026-09-20T12:53:59.807Z",
+  "originalPath": "/Users/charlie/Documents/Codex_Recovery_20260928/PERSONAL_FINAL_VERIFICATION/restored_snapshot_20260928_073135/C_PROFILE/Documents/wenying/wenying-rotation-verify-20260915/outputs/value-audit-20260920/8299-chart.json",
+  "provenancePath": "/Users/charlie/Documents/Codex_Recovery_20260928/PERSONAL_FINAL_VERIFICATION/restored_snapshot_20260928_073135/C_PROFILE/Documents/wenying/wenying-rotation-verify-20260915/outputs/value-audit-20260920/input-replay.json",
+  "provenanceJsonPointer": "/1/record",
+  "fixturePath": "tests/fixtures/yahoo-8299-chart-20260920.json",
+  "sha256": "47ee058b003620ccd9e7756bdf24c7d28295d9616614fa3b01a1e0a38881fd15",
+  "bytes": 31358,
+  "timestampRows": 489,
+  "allIndicatorArraysAligned": true,
+  "sourceRange": "2y",
+  "sourceInterval": "1d",
+  "timestampFirstUTC": "2024-09-18T01:00:00+00:00",
+  "timestampLastUTC": "2026-09-20T04:00:19+00:00",
+  "testAsOf": "2026-07-30",
+  "testWindow": "last 120 complete candles ending at fixed asOf",
+  "transform": "Truncate timestamp and all aligned indicator arrays/events through fixed asOf; no OHLCV values synthesized or changed. Keep original response byte-for-byte in fixture.",
+  "requestContractLimitation": "Production loader requests range=5y. Its injected offline fetcher supplies the archived 2y daily response for the OTC symbol; this does not validate a live 5y HTTP request. Listed suffix rejection is fixture lookup behavior, not an archived HTTP status.",
+  "sourceLimitations": [
+    "Receipt timestamp and URL come from saved input-replay record, not independent HTTP-header capture.",
+    "Historical response is a preserved Yahoo observation, not independently reconciled TPEx official OHLCV.",
+    "The source was fetched after the test asOf; trimming prevents future bar/event inputs, but cannot remove provider retrospective adjustments.",
+    "The original test title/comment weekly support 1460 was never asserted and is unsupported by replay; fixed120 has weekly keyLevel1475 and selected monthly support1475.",
+    "No live network request performed for diagnosis or fixture creation."
+  ]
+}

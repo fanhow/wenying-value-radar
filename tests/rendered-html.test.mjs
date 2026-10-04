@@ -49,7 +49,7 @@ test("renders development preview metadata", async () => {
   assert.match(html, /方舟運算/);
   assert.doesNotMatch(html, /選擇方舟 App 截圖/);
   assert.doesNotMatch(html, /href="\/#method"/);
-  assert.match(html, /Rev\. 2026\.10\.02\.3/);
+    assert.match(html, /Rev\. 2026\.10\.04\.1/);
   const forbiddenBrand = ["Investing", "Pro"].join("");
   assert.doesNotMatch(html, new RegExp(forbiddenBrand, "i"));
   assert.match(source, /className="table-extend-bar"/);
@@ -91,6 +91,8 @@ test("valuation details expose the bilingual model audit trail", async () => {
   const fundsSource = await readFile(new URL("../app/funds/page.tsx", import.meta.url), "utf8");
 
   assert.match(source, /模型中心公允價值/);
+  assert.match(source, /t\("股權成本 \/ WACC", "Equity cost \/ WACC"\)/);
+  assert.doesNotMatch(source, /<strong>CAPM \{\(selected\.assumptions\.costOfEquity/);
   assert.match(source, /Model Center Fair Value/);
   assert.match(source, /模型家族平衡 · 家族內等權、家族間等權/);
   assert.match(source, /Family-balanced · equal within and across families/);

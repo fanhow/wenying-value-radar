@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview,type TaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import { matchStructuralThemes, type StructuralTheme } from "./market-themes.ts";
 import type { FundBusinessPeProfile, FundPortfolioPeSummary, FundSectorPeProfile, InstitutionalSignal } from "./fund-signal.ts";
 import type { ComparableMultiples } from "./market-comparables.ts";
@@ -9,6 +10,8 @@ import { taiwanEnterpriseAdjustment, validTaiwanComparableEvidence } from './tai
 import { taiwanAnnualEarnings, taiwanEarningsOperationsDivergence, taiwanMaterialMinorityClaims } from './taiwan-valuation-evidence.ts';
 import type { TaiwanBusinessGroupReference } from './taiwan-business-groups.ts';
 import type { TaiwanComparableModelId } from './taiwan-multiple-applicability.ts';
+import { dividendAmount, evaluateDividendResearch, type DividendEvidence, type DividendEarningsEvidence,
+  type DdmResearchAssumptions, type DividendResearchAssessment } from './dividend-valuation.ts';
 
 export type { UsEarningsReport };
 export type Market = "TW" | "US";
@@ -79,6 +82,12 @@ export type StockInput = {
   bvps: number;
   fcfPerShare: number;
   dividendPerShare?: number;
+  /** Declared, paid and earnings-adjusted dividends are separate observations. */
+  dividendEvidence?: DividendEvidence;
+  /** Explicit same-period denominator; never substitute normalized valuation EPS. */
+  dividendEarnings?: DividendEarningsEvidence;
+  /** Optional source-backed research assumptions; no automatic formal inclusion. */
+  ddmResearchAssumptions?: DdmResearchAssumptions;
   targetPe: number;
   targetPb: number;
   targetFcfMultiple: number;
@@ -185,6 +194,7 @@ export type ValuationModel = {
   rangeLow: number;
   rangeHigh: number;
   explanation: string;
+  explanationEn?: string;
 };
 
 export type ExcludedValuationModel = {
@@ -193,6 +203,9 @@ export type ExcludedValuationModel = {
   status: "excluded";
   label: string;
   reason: string;
+  /** Structured research reason avoids treating unknown data as a failed premise. */
+  reasonCode?: string;
+  reasonCategory?: "source-data" | "period-basis" | "assumption" | "policy";
 };
 
 export type ValuationAssumptions = {
@@ -256,6 +269,8 @@ export type ValuationAssumptions = {
 };
 
 export type Stock = StockInput & {
+  ddmResearch?: DividendResearchAssessment;
+  shareBasisReview?: TaiwanShareBasisReview;
   models: ValuationModel[];
   excludedModels: ExcludedValuationModel[];
   assumptions: ValuationAssumptions;
@@ -275,6 +290,8 @@ export type Stock = StockInput & {
   valuationIndependentEvidenceCount?: number;
   historicalCaution: boolean;
   historicalCautionReasons: string[];
+  /** Visible method scope disclosures; these alone do not lower confidence. */
+  valuationMethodNotes?: string[];
   financialFreshness: FinancialFreshness;
   financialAgeDays: number | null;
   marketPricing?: MarketPricingAssessment;
@@ -354,10 +371,13 @@ function createModel(
   low: number,
   high: number,
   explanation: string,
+  explanationEn?: string,
 ): ModelCandidate | null {
   if (!Number.isFinite(value) || value <= 0) return null;
   const range = modelRange(value, low, high);
-  return { id, category, label, ...range, explanation };
+  return { id, category, label, ...range, explanation,
+    ...(explanationEn === undefined ? {} : { explanationEn }),
+  };
 }
 
 function addExcluded(
@@ -440,7 +460,11 @@ export function calculateWacc(input: StockInput) {
     0.045,
     0.25,
   );
-  if (input.discountRate !== undefined) defaulted.push("股權成本採用明確輸入值");
+  if (input.discountRate !== undefined) {
+    defaulted.push(Number.isFinite(Number(input.discountRate))
+      ? "股權成本採用明確輸入值"
+      : "股權成本輸入無效，採 CAPM 計算值");
+  }
   const preTaxCostOfDebt = clamp(
     rate(
       input.preTaxCostOfDebt,
@@ -1000,6 +1024,31 @@ function deriveMarketPricing(
 }
 
 export function calculateStock(input: StockInput, formatNumber = (value: number) => String(value)): Stock {
+  // Incoming review metadata cannot resolve a trusted source case, and an
+  // explicit manual re-entry must not retain an old derived review object.
+  input={...input};delete (input as StockInput & {shareBasisReview?:TaiwanShareBasisReview}).shareBasisReview;
+  const shareBasisReview=getTaiwanShareBasisReview(input);
+  if(shareBasisReview){
+    // No model is evaluated and no per-share input is changed. Numeric zeros
+    // satisfy the legacy Stock shape only; models/review gate make them unavailable.
+    const freshness=classifyFinancialFreshness(input.financialDataDate);
+    const ageDays=financialAgeDays(input.financialDataDate);
+    const assumptions:ValuationAssumptions={beta:0,riskFreeRate:0,marketRiskPremium:0,countryRiskPremium:0,costOfEquity:0,
+      preTaxCostOfDebt:0,afterTaxCostOfDebt:0,taxRate:0,debtWeight:0,equityWeight:0,wacc:0,structuralThemes:[],
+      historicalStartingGrowth:0,structuralGrowthPrior:0,structuralBlendWeight:0,baseTargetPe:0,marketPeAnchor:0,
+      marketPeUpperQuartile:0,marketPeP95:0,marketPricingEnabled:false,marketPricingTriggers:[],marketPricingNote:shareBasisReview.reasonZh,
+      startingGrowth:0,terminalGrowth:0,aggregationMethod:'average',reportedFcfPerShare:input.fcfPerShare,
+      normalizedFcfPerShare:input.fcfPerShare,fcfNormalizationApplied:false,reportedEpsPerShare:input.eps,
+      normalizedEpsPerShare:input.eps,epsNormalizationApplied:false,epsNormalizationMethod:'reported',epsHistoryCount:0,
+      dataBasis:input.dataBasis??'unavailable',financialDataDate:input.financialDataDate,financialFreshness:freshness,
+      financialAgeDays:ageDays,defaulted:[]};
+    return {...input,shareBasisReview,models:[],excludedModels:[],assumptions,wacc:0,discountRate:0,terminalGrowth:0,
+      fairValue:0,rangeLow:0,rangeHigh:0,upside:0,qualityScore:0,risk:'高',valuationConfidence:'low',modelDispersion:null,
+      valuationIndependentEvidenceCount:0,valuationReviewRequired:true,historicalCaution:true,historicalCautionReasons:[shareBasisReview.reasonZh],valuationMethodNotes:[],
+      financialFreshness:freshness,financialAgeDays:ageDays,reportedEpsPerShare:input.eps,normalizedEpsPerShare:input.eps,
+      epsNormalizationApplied:false,epsNormalizationMethod:'reported',epsHistoryCount:0,
+      calibratedFairValue:0,calibratedRangeLow:0,calibratedRangeHigh:0,calibratedUpside:0,calibrationConfidence:'low'};
+  }
   const twComparables = input.market === 'TW' && input.valuationPolicy === 'tw-comparables-v1';
   // Keep per-model rejection evidence even when the overall peer provenance
   // fails validation and its numeric multiples are discarded below.
@@ -1022,7 +1071,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   const valuationEps = epsNormalization.normalizedEpsPerShare;
   const bvps = numeric(input.bvps);
   const reportedFcfPerShare = numeric(input.fcfPerShare);
-  const dividendPerShare = Math.max(numeric(input.dividendPerShare), 0);
+  const dividendPerShare = dividendAmount(input.dividendPerShare);
   const suppliedTargetPe = Math.max(numeric(twComparables ? input.comparableMultiples?.peMedian : input.targetPe), 0);
   const targetPb = Math.max(numeric(twComparables ? input.comparableMultiples?.pbMedian : input.targetPb), 0);
   const suppliedTargetFcfMultiple = Math.max(numeric(input.targetFcfMultiple), 0);
@@ -1135,6 +1184,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       valuationIndependentEvidenceCount: model ? 1 : 0,
       historicalCaution: !model,
       historicalCautionReasons: model ? [] : ["缺少有效 iNAV，沒有適用模型；0 是不可估值占位，不代表公允價值為零。"],
+      valuationMethodNotes: [],
       valuationReviewRequired: !model,
       financialFreshness: freshness,
       financialAgeDays: ageDays,
@@ -1231,6 +1281,9 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   });
   const wacc = waccResult.wacc;
   const equityDiscountRate = waccResult.costOfEquity;
+  const explicitEquityCost = input.discountRate !== undefined && Number.isFinite(Number(input.discountRate));
+  const equityCostLabel = explicitEquityCost ? "明確輸入股權成本" : "CAPM 股權成本";
+  const equityCostLabelEn = explicitEquityCost ? "explicit input cost of equity" : "CAPM cost of equity";
   // CFO-capex is an FCFE-like public cash-flow measure in this project.  For
   // enterprise-value exit DCFs, add after-tax debt carrying cost as a
   // conservative FCFF proxy when both debt and cash are actually reported.
@@ -1636,9 +1689,16 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
           + (structuralBlendWeight > 0
             ? "（結構性趨勢占 " + formatNumber(structuralBlendWeight * 100) + "%）"
             : "")
-          + "；CAPM 股權成本 "
+          + "；" + equityCostLabel + " "
           + formatNumber(equityDiscountRate * 100)
           + "%，永續成長 " + formatNumber(terminalGrowth * 100) + "%。",
+        "Discounts " + years + " years of fading equity free-cash-flow (CFO−Capex) growth and a terminal value; initial growth "
+          + formatNumber(startingGrowth * 100) + "%"
+          + (structuralBlendWeight > 0
+            ? " (structural trend share " + formatNumber(structuralBlendWeight * 100) + "%)"
+            : "")
+          + "; " + equityCostLabelEn + " " + formatNumber(equityDiscountRate * 100)
+          + "%; terminal growth " + formatNumber(terminalGrowth * 100) + "%.",
       ),
       id,
       "intrinsic",
@@ -1835,11 +1895,13 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   );
 
   const fcfToEarnings = valuationEps > 0 ? fcfPerShare / valuationEps : 0;
+  const suppliedEpvNormalizedFcf = numeric(input.normalizedFcfPerShare, NaN);
+  // Reuse the reported-FCF bound for explicit normalization; retain the
+  // existing earnings/FCF blend when numeric input is unavailable.
   const normalizedFcf = Math.max(
-    numeric(
-      input.normalizedFcfPerShare,
-      fcfToEarnings >= 0.5 && fcfToEarnings <= 1.5 ? fcfPerShare * 0.65 + valuationEps * 0.35 : 0,
-    ),
+    Number.isFinite(suppliedEpvNormalizedFcf)
+      ? Math.min(suppliedEpvNormalizedFcf, fcfPerShare)
+      : fcfToEarnings >= 0.5 && fcfToEarnings <= 1.5 ? fcfPerShare * 0.65 + valuationEps * 0.35 : 0,
     0,
   );
   if (!financial && !reit && !assetLight && mature && normalizedFcf > 0) {
@@ -1855,7 +1917,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
         low,
         high,
         "成熟低成長公司以正規化每股股權自由現金流 " + formatNumber(normalizedFcf)
-          + " ÷ CAPM 股權成本 " + formatNumber(equityDiscountRate * 100) + "%。",
+          + " ÷ " + equityCostLabel + " " + formatNumber(equityDiscountRate * 100) + "%。",
       ),
       "epv",
       "intrinsic",
@@ -1971,58 +2033,15 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     );
   }
 
-  const payoutRatio = valuationEps > 0 ? dividendPerShare / valuationEps : 0;
-  const dividendGrowth = clamp(
-    Math.min(terminalGrowth, Math.max(revenueGrowth / 100 * 0.35, 0)),
-    0,
-    Math.max(Math.min(0.04, equityDiscountRate - 0.025), 0),
-  );
-  if (
-    mature
-    && !reit
-    && dividendPerShare > 0
-    && payoutRatio >= 0.2
-    && payoutRatio <= 0.8
-    && equityDiscountRate > dividendGrowth + 0.02
-  ) {
-    const value = dividendPerShare * (1 + dividendGrowth) / (equityDiscountRate - dividendGrowth);
-    const low = dividendPerShare * 0.9 * (1 + Math.max(dividendGrowth - 0.005, 0))
-      / (Math.min(equityDiscountRate + 0.01, 0.22) - Math.max(dividendGrowth - 0.005, 0));
-    const highGrowth = Math.min(dividendGrowth + 0.005, equityDiscountRate - 0.025);
-    const high = dividendPerShare * 1.1 * (1 + highGrowth)
-      / (Math.max(equityDiscountRate - 0.005, highGrowth + 0.02) - highGrowth);
-    addCandidate(
-      createModel(
-        "ddm-stable",
-        "income",
-        "股利折現法",
-        value,
-        low,
-        high,
-        "成熟配息公司：股利 " + formatNumber(dividendPerShare)
-          + "，配息率 " + formatNumber(payoutRatio * 100)
-          + "%，穩定成長 " + formatNumber(dividendGrowth * 100)
-          + "%，以 CAPM 股權成本折現。",
-      ),
-      "ddm-stable",
-      "income",
-      "股利折現法",
-    );
-  } else {
-    addExcluded(
-      excludedModels,
-      "ddm-stable",
-      "income",
-      "股利折現法",
-      reit
-        ? "REIT 優先使用 FFO／AFFO，不使用一般股利折現條件。"
-        : !mature
-        ? "公司未符合成熟低成長條件。"
-        : dividendPerShare <= 0
-          ? "沒有可用股利。"
-          : "配息率不在 20%–80% 的可持續區間，或折現差不足。",
-    );
-  }
+  const ddmResearch = evaluateDividendResearch({ ...input, dividendPerShare });
+  // DDM stays outside the model center and ranking, even with complete research
+  // inputs. A short-period revenue proxy is never a dividend growth assumption.
+  excludedModels.push({ id: "ddm-stable", category: "income", status: "excluded", label: "股利折現法",
+    reasonCode: ddmResearch.issues[0]?.code ?? "DDM_RESEARCH_ONLY",
+    reasonCategory: ddmResearch.issues[0]?.category ?? "policy",
+    reason: (reit ? "REIT 優先使用 FFO／AFFO。" : "")
+    + (ddmResearch.issues.map(issue => issue.reason).join(" ") || "股利研究輸入口徑已配對。")
+    + "股利折現僅保留研究，不納入正式估值中心與排名。" });
 
   // In the relative-only stage, disagreement is disclosed rather than letting
   // the number of EBITDA/EBIT variants erase an independent book/earnings view.
@@ -2123,7 +2142,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
       }
     }
   }
-  if(twComparables)historicalCautionReasons.push('台股'+twPeerScope+'相對估值研究；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
+  const valuationMethodNotes: string[] = [];
+  if(twComparables)valuationMethodNotes.push('台股'+twPeerScope+'相對估值研究；未取得前瞻盈餘、現金流及外部選定倍數，DCF／DDM 尚不計入，不能視為外部模型複製。');
   if(twComparables && comparableMultiples?.method==='tw-industry-same-session-median')historicalCautionReasons.push('目前候選池仍按廣產業分類；ROE 與利潤率相近只支持財務適用性，未核證產品、製程或終端業務可比，僅供研究。');
   if(twComparables && twEnterpriseBridge===null)historicalCautionReasons.push('EV 橋接待核證：供應商現金／短期投資與總負債欄位可能混入受限或營運資產、漏列租賃；保留原始財報與非 EV 模型，不以未核證總額計算 EV。');
   if(earningsOperationsDivergence)historicalCautionReasons.push('營業利益與報告淨利背離；盈餘型模型暫不採用，需核對投資評價及非控制權益。');
@@ -2184,6 +2204,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
 
   const baseStock: Stock = {
     ...input,
+    ddmResearch,
     price,
     eps,
     bvps,
@@ -2213,6 +2234,7 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     valuationIndependentEvidenceCount: informationCount,
     historicalCaution,
     historicalCautionReasons,
+    valuationMethodNotes,
     financialFreshness: freshness,
     financialAgeDays: ageDays,
     marketPricing,

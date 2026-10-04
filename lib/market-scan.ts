@@ -1,4 +1,5 @@
 import { calculateStock, valuationTargets, type Market, type StockInput } from "./valuation.ts";
+import { unclassifiedDividendInputs } from "./dividend-source-inputs.ts";
 import { valuationRankingState } from "./daily-valuation-state.ts";
 import { sanitizeMarketScanRatios } from "./market-scan-sanitizer.ts";
 import {
@@ -208,7 +209,7 @@ export function marketStockFromRatio(row: MarketScanRow, comparableMultiples?: C
     bvps: effectiveBvps,
     fcfPerShare: effectiveFcfPerShare,
     normalizedFcfPerShare: sanitized.normalizedFcfPerShare,
-    dividendPerShare: Math.max(numeric(row.dividendPerShare ?? 0), 0),
+    ...unclassifiedDividendInputs(row.dividendPerShare, market === "TW" ? "TWD" : "USD", "市場掃描股利欄位（口徑未核證）"),
     ...targets,
     revenueGrowth,
     roe,

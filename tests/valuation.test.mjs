@@ -129,7 +129,7 @@ test("calculates CAPM cost of equity and a capital-structure WACC", () => {
   closeTo(result.wacc, 0.1 * (5 / 6) + 0.048 * (1 / 6));
 });
 
-test("discounts FCFE, EPV and dividends with cost of equity rather than WACC", () => {
+test("discounts FCFE and EPV with cost of equity while unsourced dividends remain research-only", () => {
   const common = {
     ...base,
     revenueGrowth: 3,
@@ -147,12 +147,18 @@ test("discounts FCFE, EPV and dividends with cost of equity rather than WACC", (
 
   assert.notEqual(unlevered.wacc, debtWeighted.wacc);
   assert.equal(unlevered.assumptions.costOfEquity, debtWeighted.assumptions.costOfEquity);
-  for (const id of ["dcf-fcf-5y", "dcf-fcf-10y", "epv", "ddm-stable"]) {
+  for (const id of ["dcf-fcf-5y", "dcf-fcf-10y", "epv"]) {
     const first = unlevered.models.find((model) => model.id === id);
     const second = debtWeighted.models.find((model) => model.id === id);
     assert.ok(first, id + " missing from unlevered fixture");
     assert.ok(second, id + " missing from debt-weighted fixture");
     closeTo(first.value, second.value);
+  }
+  for (const stock of [unlevered, debtWeighted]) {
+    assert.equal(stock.models.some((model) => model.id === "ddm-stable"), false);
+    assert.equal(stock.ddmResearch.status, "inputs-unavailable");
+    assert.equal(stock.ddmResearch.fairValue, null);
+    assert.equal(stock.ddmResearch.includedInFormalValuation, false);
   }
 
   const lowerCost = calculateStock({ ...common, debtPerShare: 0, beta: 0.8 });
@@ -238,7 +244,7 @@ test("keeps the legacy constant-growth DCF helper compatible", () => {
   assert.ok(value > 115 && value < 120);
 });
 
-test("excludes EPV and DDM when growth and payout assumptions are not mature", () => {
+test("excludes EPV for high growth while an unsourced dividend remains unavailable for DDM", () => {
   const stock = calculateStock({
     ...base,
     revenueGrowth: 25,
@@ -250,9 +256,10 @@ test("excludes EPV and DDM when growth and payout assumptions are not mature", (
   assert.ok(!stock.models.some((model) => model.id === "ddm-stable"));
   assert.ok(stock.excludedModels.some((model) => model.id === "epv"));
   assert.ok(stock.excludedModels.some((model) => model.id === "ddm-stable"));
+  assert.equal(stock.ddmResearch.status, "inputs-unavailable");
 });
 
-test("uses normalized FCF for EPV and sustainable payout for DDM", () => {
+test("bounds supplied normalized FCF for EPV while an unsourced payout cannot enable DDM", () => {
   const stock = calculateStock({
     ...base,
     revenueGrowth: 3,
@@ -262,8 +269,12 @@ test("uses normalized FCF for EPV and sustainable payout for DDM", () => {
   });
   const epv = stock.models.find((model) => model.id === "epv");
   assert.ok(epv);
-  closeTo(epv.value, 45);
-  assert.ok(stock.models.some((model) => model.id === "ddm-stable"));
+  closeTo(stock.assumptions.normalizedFcfPerShare, 4);
+  closeTo(epv.value, 40);
+  assert.equal(stock.models.some((model) => model.id === "ddm-stable"), false);
+  assert.equal(stock.ddmResearch.status, "inputs-unavailable");
+  assert.equal(stock.ddmResearch.payoutRatio, null);
+  assert.equal(stock.ddmResearch.fairValue, null);
 });
 
 test("balances weights by model family instead of repeating DCF horizons", () => {
@@ -496,7 +507,8 @@ test("does not apply DCF, FCF or EV operating models to financial companies", ()
     "ev-ebit",
   ]);
   assert.ok(stock.models.every((model) => !prohibited.has(model.id)));
-  assert.ok(stock.models.some((model) => model.id === "ddm-stable"));
+  assert.equal(stock.models.some((model) => model.id === "ddm-stable"), false);
+  assert.equal(stock.ddmResearch.status, "inputs-unavailable");
   for (const id of prohibited) assert.ok(stock.excludedModels.some((model) => model.id === id));
 });
 

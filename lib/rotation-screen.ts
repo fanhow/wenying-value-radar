@@ -1,3 +1,4 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import type { StockInput } from './valuation.ts';
 import {getUsEarningsReview} from './us-earnings-review.ts';
 
@@ -16,22 +17,30 @@ export type ResearchCandidate={ticker:string;name:string;market:'TW'|'US';sector
 // Financial firms/REITs require different accounting and are excluded explicitly.
 export function screenFeature(input:ScreenInput):Omit<ResearchCandidate,'valueScore'|'qualityScore'|'growthScore'|'momentumScore'|'score'|'rank'>|null {
   const s=input.stock;
-  if(getUsEarningsReview(s))return null;
-  if(!input.eligible||input.bars<64||!s.updatedAt||!['price','eps','fcfPerShare','roe','debtRatio','revenueGrowth'].every(k=>Number.isFinite(s[k as keyof StockInput])))return null;
+  if(getUsEarningsReview(s)||getTaiwanShareBasisReview({...s,source:undefined}))return null;
+  if(!input.eligible||!Number.isFinite(input.bars)||input.bars<64
+    ||!Number.isFinite(input.close21)||!Number.isFinite(input.close63)
+    ||!s.updatedAt||!['price','eps','fcfPerShare','roe','debtRatio','revenueGrowth'].every(k=>Number.isFinite(s[k as keyof StockInput])))return null;
   if(s.price<=0||s.eps<=0||s.fcfPerShare<=0||s.roe<=0||!input.close21||input.close21<=0||!input.close63||input.close63<=0)return null;
   if(/finance|financial|bank|insurance|reit|real estate|金融|保險|銀行/i.test(`${s.sector} ${s.industry??''}`)||s.market==='TW'&&/^28\d\d$/.test(s.ticker))return null;
-  return {ticker:s.ticker,name:s.name,market:s.market,sector:s.sector,quoteDate:s.updatedAt,price:s.price,
+  const feature={ticker:s.ticker,name:s.name,market:s.market,sector:s.sector,quoteDate:s.updatedAt,price:s.price,
     earningsYield:s.eps/s.price,fcfYield:s.fcfPerShare/s.price,roe:s.roe,debtRatio:s.debtRatio,growth:s.revenueGrowth,
     momentum21:s.price/input.close21-1,momentum63:s.price/input.close63-1};
+  // Finite inputs can still overflow during division; retain no fabricated factors.
+  return finiteFeature(feature)?feature:null;
 }
 type Feature=NonNullable<ReturnType<typeof screenFeature>>;
+const FEATURE_NUMERIC_FIELDS=['price','earningsYield','fcfYield','roe','debtRatio','growth','momentum21','momentum63'] as const;
+function finiteFeature(feature:Feature) {
+  return FEATURE_NUMERIC_FIELDS.every(key=>Number.isFinite(feature[key]));
+}
 function percentile(values:number[],value:number) {
   if(values.length<2)return 50;
   let lower=0,equal=0;for(const n of values){if(n<value)lower++;else if(n===value)equal++;}
   return (lower+(equal-1)/2)/(values.length-1)*100;
 }
 export function rankResearch(features:Feature[],market:'TW'|'US'):ResearchCandidate[] {
-  const rows=features.filter(r=>r.market===market);
+  const rows=features.filter(r=>r.market===market&&finiteFeature(r));
   if(rows.length<10)return []; // No padded top ten or fabricated candidates.
   const fields=['earningsYield','fcfYield','roe','debtRatio','growth','momentum21','momentum63'] as const;
   const distributions=Object.fromEntries(fields.map(k=>[k,rows.map(r=>r[k])]));

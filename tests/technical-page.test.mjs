@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { buildTechnicalSnapshot } from "../lib/technical-screener.ts";
@@ -112,17 +113,71 @@ test("1537 廣隆 and 2354 鴻準 are rejected by Morning Star, 2385 群光 & 82
   assert.ok(!snapshot.stage2Breakout.some((c) => c.ticker === "2727"), "2727 王品 must NOT be in Stage 2 Breakout (15EMA < 50SMA death-cross)");
 });
 
-test("8299 群聯 historical Morning Star candidate (2026-07-30) is recognized at weekly support 1460", async () => {
+test("8299 群聯 historical Morning Star candidate (2026-07-30) uses saved daily history at source-derived support", async (t) => {
   const { loadPublicTechnicalData } = await import("../lib/public-technical-data.ts");
-  const data = await loadPublicTechnicalData("8299", "TW");
+  const fixtureText = await readFile(new URL("./fixtures/yahoo-8299-chart-20260920.json", import.meta.url), "utf8");
+  const receipt = JSON.parse(await readFile(new URL("./fixtures/yahoo-8299-chart-20260920.source.json", import.meta.url), "utf8"));
+  assert.equal(createHash("sha256").update(fixtureText).digest("hex"), receipt.sha256);
+  const payload = JSON.parse(fixtureText);
+  const chart = payload.chart.result[0];
+  assert.equal(chart.meta.symbol, "8299.TWO");
+  assert.equal(chart.meta.exchangeName, "TWO");
+  assert.equal(chart.meta.dataGranularity, "1d");
+  assert.equal(chart.meta.range, "2y");
+
+  // This September capture is a retrospective regression source. Freeze its daily
+  // input at July 30; it does not prove data availability or adjustment basis then.
+  const asOf = "2026-07-30";
+  const throughAsOf = (timestamp) => new Date(timestamp * 1_000).toISOString().slice(0, 10) <= asOf;
+  const originalRowCount = chart.timestamp.length;
+  const includedIndexes = new Set(chart.timestamp.flatMap((timestamp, index) => throughAsOf(timestamp) ? [index] : []));
+  chart.timestamp = chart.timestamp.filter((_, index) => includedIndexes.has(index));
+  for (const rows of Object.values(chart.indicators)) {
+    for (const row of rows) {
+      for (const [name, values] of Object.entries(row)) {
+        if (!Array.isArray(values)) continue;
+        assert.equal(values.length, originalRowCount, `${name} must align with source timestamps`);
+        row[name] = values.filter((_, index) => includedIndexes.has(index));
+      }
+    }
+  }
+  for (const [kind, events] of Object.entries(chart.events ?? {})) {
+    chart.events[kind] = Object.fromEntries(Object.entries(events).filter(([, event]) => throughAsOf(event.date)));
+  }
+  assert.equal(new Date(chart.timestamp.at(-1) * 1_000).toISOString().slice(0, 10), asOf);
+
+  const liveFetch = t.mock.method(globalThis, "fetch", async () => { throw new Error("Live market fetch is forbidden in this historical regression"); });
+  const requestedSymbols = [];
+  let sourceResponses = 0;
+  const data = await loadPublicTechnicalData("8299", "TW", async (request) => {
+    const url = new URL(String(request));
+    const symbol = decodeURIComponent(url.pathname.split("/").at(-1));
+    requestedSymbols.push(symbol);
+    // The loader requests 5y. The archived fixture supplies its documented 2y
+    // daily response; the listed-symbol miss is a fixture lookup, not an HTTP claim.
+    if (symbol !== chart.meta.symbol) throw new Error(`No saved source for ${symbol}`);
+    assert.equal(url.origin, "https://query1.finance.yahoo.com");
+    assert.equal(url.searchParams.get("interval"), "1d");
+    assert.equal(url.searchParams.get("range"), "5y");
+    assert.equal(url.searchParams.get("events"), "div,splits");
+    sourceResponses += 1;
+    return Response.json(payload);
+  });
+  assert.equal(liveFetch.mock.calls.length, 0);
+  assert.deepEqual(requestedSymbols, ["8299.TW", "8299.TWO"]);
+  assert.equal(sourceResponses, 1);
   assert.ok(data && data.candles);
-  const idx30 = data.candles.findIndex((c) => c.date === "2026-07-30");
-  assert.ok(idx30 > 0);
-  const result = analyzeTechnicalSetup(data.candles.slice(0, idx30 + 1));
+  assert.equal(data.symbol, "8299.TWO");
+  assert.equal(data.tradingViewSymbol, "TPEX:8299");
+  assert.equal(data.candles.length, 120);
+  assert.equal(data.candles.at(-1).date, asOf);
+  assert.ok(data.candles.every((candle) => candle.date <= asOf));
+  const result = analyzeTechnicalSetup(data.candles);
   assert.ok(result);
-  // On 7/30, 8299 plunged from 2850 to 1445 right onto weekly support 1460 with a downward gap Doji
   assert.equal(result.candlestickPattern, "morning-star-candidate");
   assert.equal(result.patternStage, "candidate");
+  assert.equal(result.patternAtSupport, true);
+  assert.ok(result.keyLevels.some((level) => level.kind === "support" && level.timeframe === "weekly"));
 });
 
 test("detects textbook Trend Pullback buy point (bottoming -> impulse surge -> orderly pullback -> 3rd test MA convergence)", () => {

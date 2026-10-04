@@ -35,6 +35,18 @@ export function completedCandles(payload: YahooChartPayload, market: 'TW' | 'US'
   const afterClose = minutes >= (market === 'TW' ? 13*60+30 : 16*60);
   return parseYahooDailyCandles(payload, 400).filter(c => (!sessionCeiling || c.date <= sessionCeiling) && (c.date < date || (c.date === date && afterClose)));
 }
+
+function finiteFinancialNumbers(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (value === null || typeof value !== 'object') return true;
+  return Object.values(value).every(finiteFinancialNumbers);
+}
+
+function finiteFinancialNumber(value: number): number {
+  if (!Number.isFinite(value)) throw new Error('NON_FINITE_DERIVED_FINANCIAL_INPUT');
+  return value;
+}
+
 export function quarterlyInputs(payload: SeriesPayload, currency: string, now = new Date()) {
   const values = new Map<string, Map<string, number>>();
   const conflicts = new Set<string>();
@@ -73,7 +85,7 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     // must not reject it, but may never be filled with an older quarter.
     if (!contiguous) return undefined;
     const v = dates.map(d=>values.get('quarterly'+key)?.get(d));
-    return v.every(x=>Number.isFinite(x)) ? (v as number[]).reduce((a,b)=>a+b,0) : undefined;
+    return v.every(x=>Number.isFinite(x)) ? (v as number[]).reduce((a,b)=>finiteFinancialNumber(a+b),0) : undefined;
   };
   const shares=last('OrdinarySharesNumber'), equity=last('StockholdersEquity'), assets=last('TotalAssets'), liabilities=last('TotalLiabilitiesNetMinorityInterest');
   const revenue=sum('TotalRevenue'), ocf=sum('OperatingCashFlow'), capex=sum('CapitalExpenditure');
@@ -85,7 +97,7 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
   const priorContiguous=priorDates.length===4&&priorDates.slice(1).every((d,i)=>{
     const gap=(Date.parse(d)-Date.parse(priorDates[i]))/DAY; return gap>=70&&gap<=110;
   });
-  const priorTtm = previous('trailingTotalRevenue') ?? (priorContiguous?priorDates.reduce((n,d)=>n+values.get('quarterlyTotalRevenue')!.get(d)!,0):undefined);
+  const priorTtm = previous('trailingTotalRevenue') ?? (priorContiguous?priorDates.reduce((n,d)=>finiteFinancialNumber(n+values.get('quarterlyTotalRevenue')!.get(d)!),0):undefined);
   const priorQuarter = previous('quarterlyTotalRevenue');
   const growthBasis = priorTtm && priorTtm>0 ? 'TTM YoY' : 'latest quarter YoY';
   const revenueGrowth = priorTtm && priorTtm>0 ? (revenue/priorTtm-1)*100 : priorQuarter && priorQuarter>0 ? (last('TotalRevenue')!/priorQuarter-1)*100 : undefined;
@@ -115,6 +127,9 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     result.epsHistory=taiwanAnnualEarnings([...(values.get('annualDilutedEPS')?.entries()??[])].map(([end,value])=>({value,end,basis:'annual'})),end);
     const openingEquity=previous('quarterlyStockholdersEquity');
     const averageEquity=openingEquity!==undefined&&openingEquity>0?(openingEquity+equity)/2:undefined;
+    // An overflowing denominator could otherwise become an apparently finite
+    // zero ROE. Check the average when it is actually used for parent-income ROE.
+    if(net!==undefined&&averageEquity!==undefined)finiteFinancialNumber(averageEquity);
     result.roe=net!==undefined?net/(averageEquity??equity)*100:roe;
     Object.assign(result,valuationTargets(revenueGrowth,result.roe,debtRatio));
     result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
@@ -133,6 +148,10 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     result.sourceNote+=`；ROE：${result.financialMetrics.roeBasis}；EBITDA：${result.financialMetrics.ebitdaBasis}；每股流量及淨值採 Yahoo 標示於 ${end} 的普通股數；此 as-of 日期不是已核證生效日，尚未核證為期末或公司行動調整後基礎；EPS 保留供應商稀釋口徑；年度 EPS ${result.epsHistory.length} 期；現金與總負債保留供應商原值，尚未核證受限資產／應收帳款讓售分類及完整租賃，不用於 EV 橋接`;
   }
   result.assetTurnover=revenue/assets; if(equity!==0) result.financialLeverage=assets/equity;
+  // Finite reported points can overflow when summed or divided. Reject this
+  // record before JSON turns Infinity into null or valuation defaults mask it.
+  // Missing optional fields remain missing; do not replace the growth period.
+  if (!finiteFinancialNumbers(result)) throw new Error('NON_FINITE_DERIVED_FINANCIAL_INPUT');
   return result;
 }
 /** Shared ingestion/storage contract. Reject a bad series; never repair OHLC or remove a middle bar. */

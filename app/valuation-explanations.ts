@@ -7,12 +7,36 @@ export function displayValuationReasons(reasons:string[]) {
   return [...new Set(cleaned)];
 }
 
-export type ValuationReasonCategory='source-data'|'peer-comparability'|'assumption';
-export function valuationReasonCategory(reason:string):ValuationReasonCategory {
+export type ValuationReasonCategory='source-data'|'peer-comparability'|'period-basis'|'assumption'|'policy';
+export function valuationReasonCategory(reason:string,explicitCategory?:ValuationReasonCategory):ValuationReasonCategory {
+  if(explicitCategory)return explicitCategory;
   if(/INSUFFICIENT_MATCHED_PEERS|PEER_MULTIPLE_DISPERSION|同業少於 5 家|中間 50%.*高低比/.test(reason))return 'peer-comparability';
   if(/非資料來源缺漏|屬模型適用限制|歸屬假設|尚未驗證|研究假設/.test(reason))return 'assumption';
   if(/缺少|未知|無效|尚未有同期間申報證據|待核證|欄位不完整|資料日期/.test(reason))return 'source-data';
   return 'assumption';
+}
+
+export function englishDividendResearchReason(code?:string):string {
+  const reasons:Record<string,string>={
+    DIVIDEND_AMOUNT_UNAVAILABLE:'A dividend amount is unavailable. Missing data does not mean zero dividends.',
+    INVALID_DIVIDEND_AMOUNT:'The per-share dividend is negative. Its sign and source require review; it was not replaced with zero.',
+    DIVIDEND_SOURCE_BASIS_UNAVAILABLE:'The source does not distinguish declared, paid or adjusted dividends.',
+    ADJUSTED_DIVIDEND_SEPARATE_SCENARIO:'An earnings and retention adjustment is a separate assumption scenario, not an observed declared or paid dividend.',
+    INVALID_DIVIDEND_KIND:'The dividend kind is not supported by an identified source.',
+    DIVIDEND_ANNUAL_PERIOD_UNVERIFIED:'A complete annual or LTM dividend period and currency are unverified. Quarterly or declaration-year data is not silently annualized.',
+    ORDINARY_DIVIDEND_SCOPE_UNVERIFIED:'Ordinary and special dividends have not been separated, so perpetual recurrence cannot be assumed.',
+    OBSERVED_ZERO_DIVIDEND:'The source reports zero ordinary dividends for this period. Zero is retained rather than replaced with another dividend kind.',
+    MATCHED_DIVIDEND_EARNINGS_UNAVAILABLE:'Matched common-share earnings are unavailable. Normalized valuation EPS is not substituted as the payout denominator.',
+    DIVIDEND_EARNINGS_BASIS_MISMATCH:'Dividend and earnings periods, currency, per-share basis or normalization differ. The payout ratio is unavailable.',
+    MATCHED_EARNINGS_NOT_POSITIVE:'Matched common-share earnings are not positive, so an interpretable earnings payout ratio is unavailable.',
+    NON_FINITE_DIVIDEND_PAYOUT:'The payout calculation is non-finite. Per-share units require review.',
+    DDM_ASSUMPTIONS_UNAVAILABLE:'Traceable dividend growth, cost of equity, D0/D1 timing and sustainable payout evidence are unavailable. Revenue growth and CAPM defaults do not substitute.',
+    DIVIDEND_FORWARD_TIMING_MISMATCH:'Payment or forward timing is inconsistent with D0/D1. A paid historical dividend cannot be relabeled as the next dividend.',
+    DDM_RATE_OR_TIMING_INVALID:'Annual decimal rates and D0/D1 timing are invalid, or cost of equity does not exceed dividend growth. Inputs were not clipped or replaced.',
+    NON_FINITE_DDM_RESEARCH_VALUE:'The dividend research calculation is non-finite; its value remains unavailable.',
+    DDM_RESEARCH_ONLY:'The dividend research inputs are matched.',
+  };
+  return (reasons[code??'']??'Dividend sources and assumptions require review.')+' DDM remains research only and is excluded from the formal valuation center and ranking.';
 }
 
 /** Explain the actual TW applicability rejection before generic model fallbacks. */

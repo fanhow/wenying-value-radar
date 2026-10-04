@@ -20,6 +20,9 @@ test('current provider shares and missing legacy labels both receive bilingual c
     assert.match(valuationSourceNote(stock, 'zh'), /股數口徑提醒/);
     assert.match(valuationSourceNote(stock, 'en'), /does not verify period-end shares/);
     assert.match(valuationSourceNote(stock, 'en'), /not, by itself, proof/);
+    assert.match(valuationSourceNote(stock, 'zh'), /營業利益與衍生 EBITDA 目前採供應商口徑/);
+    assert.match(valuationSourceNote(stock, 'en'), /may differ from issuer filings/);
+    assert.doesNotMatch(valuationSourceNote(stock, 'zh'), /8213|3231|3,231/);
   }
 });
 
@@ -29,5 +32,6 @@ test('US and ordinary manual notes retain their existing presentation', () => {
   assert.match(valuationSourceNote(manual,'zh'), /^這是你手動建立的估值/);
   assert.match(valuationSourceNote(manual,'en'), /^This is a manually created valuation/);
   assert.doesNotMatch(valuationSourceNote(manual,'zh'), /股數口徑提醒/);
+  assert.doesNotMatch(valuationSourceNote({...manual,financialMetrics:{}},'en'), /credit impairment/);
   assert.equal(valuationSourceNote({...manual,financialMetrics:{}},'zh'), valuationSourceNote(manual,'zh'));
 });

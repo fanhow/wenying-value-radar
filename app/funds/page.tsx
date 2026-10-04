@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { stockDetailHref } from "../../lib/navigation";
 import { calculateStock, valuationTargets, type Stock, type StockInput } from "../../lib/valuation";
+import { unclassifiedDividendInputs } from "../../lib/dividend-source-inputs";
 import { businessGroupForTicker, fundManagerPeProfiles, fundPortfolioBusinessPeProfiles, fundPortfolioOverlapProfiles, fundPortfolioPeProfiles, fundPortfolioPeSummary, institutionalSignalForTicker, type FundPeReference } from "../../lib/fund-signal";
 import { buildComparableMap } from "../../lib/market-comparables";
 import { normalizeSector } from "../../lib/sector-normalization";
@@ -80,7 +81,7 @@ type MarketRow = {
   dataBasis?: StockInput["dataBasis"];
   epsHistory?: StockInput["epsHistory"];
   financialDataDate?: string | null;
-  dividendPerShare: number;
+  dividendPerShare?: number | null;
   sector: string;
   date: string;
 };
@@ -162,7 +163,7 @@ function valueHolding(
       epsHistory: row.epsHistory,
       bvps: Math.max(row.bvps, 0),
       fcfPerShare,
-      dividendPerShare: Math.max(row.dividendPerShare, 0),
+      ...unclassifiedDividendInputs(row.dividendPerShare, "USD", "基金持股財務快照股利欄位（口徑未核證）"),
       ...targets,
       targetPsMultiple: comparableMultiples?.psMedian ?? undefined,
       targetEvRevenueMultiple: comparableMultiples?.evRevenueMedian ?? undefined,

@@ -15,7 +15,8 @@ import {currentClientInput,isDailyInput,isUserManagedInput,persistableInputs,wit
 import { UsEarningsPanel } from "./us-earnings-panel";
 import { valuationSourceNote } from '../lib/valuation-source-note';
 import {valuationRankingState,effectiveValuationConfidence} from '../lib/daily-valuation-state';
-import {displayValuationReasons,englishApplicabilityReason,valuationReasonCategory,type ValuationReasonCategory} from './valuation-explanations';
+import {getTaiwanShareBasisReview,type TaiwanShareBasisReview} from '../lib/taiwan-share-basis-review';
+import {displayValuationReasons,englishApplicabilityReason,englishDividendResearchReason,valuationReasonCategory,type ValuationReasonCategory} from './valuation-explanations';
 import {selectValuationList,researchRequestQuery,researchScanMayReplace,researchFailureScope,researchRowsAfterInvalidation,researchValuesAfterInvalidation,researchHeadAfterFailure,type ValuationListScope,type ValuationListMarket} from './valuation-lists';
 
 type Filter = "all" | "undervalued" | "overvalued" | "quality" | "risk";
@@ -128,8 +129,32 @@ function ValuationStatusNotice({stock,language}:{stock:Stock;language:Language})
   </div>;
 }
 
+export function ValuationMethodNotice({stock,language}:{stock:Pick<Stock,'valuationMethodNotes'>;language:Language}) {
+  const notes=stock.valuationMethodNotes??[];
+  if(notes.length===0)return null;
+  return <div className="detail-note" role="note" data-valuation-method-notes>
+    <span>i</span><div><strong>{language==='zh'?'估值方法說明':'Valuation method notes'}</strong>
+      {notes.map((note,index)=><p key={index}>{language==='zh'?note:
+        note.startsWith('台股')&&note.includes('相對估值研究；')
+          ?`Taiwan same-session ${note.includes('同日同業務群')?'business-group':'industry'} relative valuation research. Forward earnings, cash flows and externally selected multiples are unavailable; DCF/DDM are not included. This does not replicate an external model.`
+          :note}</p>)}
+    </div>
+  </div>;
+}
+
+export function ShareBasisReviewNotice({review,language,userManaged=false}:{review:TaiwanShareBasisReview;language:Language;userManaged?:boolean}) {
+  const sources=review.sourceUrls.filter(url=>{try{return new URL(url).protocol==='https:';}catch{return false;}});
+  return <div className="confidence-warning" role="status" data-share-basis-review={review.ticker}>
+    <strong>{language==='zh'?'股數口徑待覆核／自動估值暫停':'Share basis under review / automatic valuation paused'}</strong>
+    <p>{language==='zh'?review.reasonZh:'A disclosed change in share count or capital has not been reconciled with the per-share financial inputs and quote basis. Automatic fair value remains unavailable pending review.'}</p>
+    <p>{userManaged?(language==='zh'?'目前保留你提供的手動或方舟資料；這些輸入不代表自動資料覆核已完成。':'Your manual or ARKER inputs remain visible. They do not clear the automatic data review.'):
+      (language==='zh'?'股價與每股財報口徑尚未核對完成，不產生自動公允價值。仍可查看 K 線與加入觀察清單。':'The quote and per-share financial bases remain unreconciled, so no automatic fair value is shown. Price charts and the watchlist remain available.')}</p>
+    {sources.length>0&&<div className="structural-theme-sources">{sources.map((url,index)=><a key={url} href={url} target="_blank" rel="noreferrer">{language==='zh'?`官方來源 ${index+1}`:`Official source ${index+1}`} ↗</a>)}</div>}
+  </div>;
+}
+
 function valuationReasonCategoryLabel(category:ValuationReasonCategory,language:Language) {
-  const labels={'source-data':['資料來源缺口','Source data gaps'],'peer-comparability':['同業可比性限制','Peer comparability limits'],assumption:['模型與研究假設限制','Model and research assumptions']};
+  const labels={'source-data':['資料來源缺口','Source data gaps'],'peer-comparability':['同業可比性限制','Peer comparability limits'],'period-basis':['期間與每股口徑待覆核','Period and per-share basis review'],assumption:['模型與研究假設限制','Model and research assumptions'],policy:['研究用途限制','Research scope limits']};
   return labels[category][language==='zh'?0:1];
 }
 
@@ -284,9 +309,11 @@ type ExcludedValuationModel = Stock["excludedModels"][number];
 
 class ValuationLookupError extends Error {
   excludedModels:ExcludedValuationModel[];
-  constructor(message:string,excludedModels:ExcludedValuationModel[]) {
+  shareBasisReview:TaiwanShareBasisReview|null;
+  constructor(message:string,excludedModels:ExcludedValuationModel[],shareBasisReview:TaiwanShareBasisReview|null=null) {
     super(message);
     this.excludedModels=excludedModels;
+    this.shareBasisReview=shareBasisReview;
   }
 }
 
@@ -296,8 +323,8 @@ const modelCopy: Record<string, { zh: string; en: string; enDescription: string 
   pb: { zh: "股價淨值比法", en: "P/B Method", enDescription: "Applies a target P/B multiple to book value per share." },
   "p-sales": { zh: "P/S 同業倍數法", en: "Peer P/S Method", enDescription: "Applies a trimmed public peer price-to-sales median to revenue per share." },
   "p-fcf": { zh: "自由現金流倍數法", en: "P/FCF Method", enDescription: "Applies a target multiple to free cash flow per share." },
-  "dcf-fcf-5y": { zh: "5 年折現現金流法", en: "5-Year DCF", enDescription: "Discounts five years of fading free-cash-flow growth and a terminal value using CAPM cost of equity." },
-  "dcf-fcf-10y": { zh: "10 年折現現金流法", en: "10-Year DCF", enDescription: "Discounts ten years of fading free-cash-flow growth and a terminal value using CAPM cost of equity." },
+  "dcf-fcf-5y": { zh: "5 年折現現金流法", en: "5-Year DCF", enDescription: "Discounts five years of fading free-cash-flow growth and a terminal value using cost of equity." },
+  "dcf-fcf-10y": { zh: "10 年折現現金流法", en: "10-Year DCF", enDescription: "Discounts ten years of fading free-cash-flow growth and a terminal value using cost of equity." },
   "dcf-ebitda-5y": { zh: "5 年 DCF EBITDA 退出法", en: "5-Year EBITDA Exit DCF", enDescription: "Forecasts public historical EBITDA growth, applies an independent public-peer EV/EBITDA terminal multiple, and discounts the FCFF proxy at WACC." },
   "dcf-ebitda-10y": { zh: "10 年 DCF EBITDA 退出法", en: "10-Year EBITDA Exit DCF", enDescription: "Forecasts public historical EBITDA growth, applies an independent public-peer EV/EBITDA terminal multiple, and discounts the FCFF proxy at WACC." },
   "dcf-revenue-5y": { zh: "5 年 DCF 營收退出法", en: "5-Year Revenue Exit DCF", enDescription: "Forecasts public historical revenue growth, applies an independent public-peer EV/Revenue terminal multiple, and discounts the FCFF proxy at WACC." },
@@ -308,7 +335,7 @@ const modelCopy: Record<string, { zh: string; en: string; enDescription: string 
   epv: { zh: "盈餘能力價值法", en: "Earnings Power Value", enDescription: "Capitalizes normalized free cash flow only when the zero-growth, mature-business test is satisfied." },
   "roe-residual": { zh: "ROE／剩餘收益估值", en: "ROE / Residual Income", enDescription: "Adds book value to the discounted earnings earned above the CAPM cost of equity; no analyst forecast is used." },
   graham: { zh: "Graham 防禦估值", en: "Graham Defensive Value", enDescription: "Uses earnings and book value for mature businesses with suitable leverage and asset intensity." },
-  "ddm-stable": { zh: "穩定成長股利折現法", en: "Stable-Growth DDM", enDescription: "Discounts sustainable dividends only when payout and mature-growth conditions are satisfied." },
+  "ddm-stable": { zh: "穩定成長股利折現法", en: "Stable-Growth DDM", enDescription: "Keeps sourced dividend assumptions for research, outside the formal valuation center and ranking." },
 };
 
 function localizedModelLabel(model: AppliedValuationModel | ExcludedValuationModel, language: Language) {
@@ -319,11 +346,12 @@ function localizedModelLabel(model: AppliedValuationModel | ExcludedValuationMod
 
 function localizedModelExplanation(model: AppliedValuationModel, language: Language) {
   if (language === "zh") return model.explanation;
-  return modelCopy[model.id]?.enDescription
+  return model.explanationEn ?? modelCopy[model.id]?.enDescription
     ?? "Uses the available public financial inputs under this model's applicability rules.";
 }
 
 function englishExclusionReason(model: ExcludedValuationModel) {
+  if(model.id==='ddm-stable')return englishDividendResearchReason(model.reasonCode);
   const applicabilityReason=englishApplicabilityReason(model.reason);
   if(applicabilityReason)return applicabilityReason;
   if (model.reason.includes("對數分布") || model.reason.includes("極端")) {
@@ -332,6 +360,7 @@ function englishExclusionReason(model: ExcludedValuationModel) {
   if (model.id === "pe") return "Positive EPS and a valid target P/E are required.";
   if (model.id === "pb") return "Book-value inputs are missing, or the asset method would systematically understate an asset-light company.";
   if (model.id === "p-fcf") return "Positive free cash flow and a valid multiple are required; this method is not used for financial companies.";
+  if (model.id.startsWith("dcf-fcf-")) return "Equity free cash flow or a valid cost of equity and terminal-growth relationship is missing; standard corporate FCF DCF is not used for financial companies.";
   if (model.id.startsWith("dcf")) return "Free cash flow or a valid WACC and terminal-growth relationship is missing; standard corporate DCF is not used for financial companies.";
   if (model.id.startsWith("ev-")) return "The operating metric or target multiple is missing; standard EV multiples are not used for financial companies.";
   if (model.id === "epv") return "The company does not pass the mature, stable-earnings test, or normalized cash flow is unavailable.";
@@ -339,6 +368,12 @@ function englishExclusionReason(model: ExcludedValuationModel) {
   if (model.id === "graham") return "Earnings, book value, leverage, or asset-intensity conditions are not suitable for this defensive model.";
   if (model.id.startsWith("ddm")) return "Dividend, payout, maturity, or discount-spread conditions are not sustainable enough for this model.";
   return "Required inputs are missing or this model is not appropriate for the company.";
+}
+
+export function ExcludedModelRow({model,language}:{model:ExcludedValuationModel;language:Language}) {
+  return <div className="excluded-model-row"><strong>{localizedModelLabel(model,language)}</strong>
+    <small className="range-hint">{valuationReasonCategoryLabel(valuationReasonCategory(model.reason,model.reasonCategory),language)}</small>
+    <p>{language==='zh'?model.reason:englishExclusionReason(model)}</p></div>;
 }
 
 function formatDataBasis(value: string, language: Language) {
@@ -386,7 +421,9 @@ export default function Home() {
   const [researchSortKey,setResearchSortKey]=useState<SortKey>('upside');
   const [officialMarket,setOfficialMarket]=useState<ValuationListMarket>('all');
   const [researchMarket,setResearchMarket]=useState<ValuationListMarket>('TW');
-  const [selectedTicker, setSelectedTicker] = useState("");
+  const [selectedTicker, setSelectedTickerState] = useState("");
+  const selectedTickerRef=useRef('');
+  const setSelectedTicker=useCallback((ticker:string)=>{selectedTickerRef.current=ticker;setSelectedTickerState(ticker);},[]);
   const [dailyStatus,setDailyStatus]=useState<DailyClientStatus|null>(null);
   const dailyStatusRef=useRef<DailyClientStatus|null>(null);
   const onDailyStatus=useCallback((next:DailyClientStatus)=>{
@@ -400,6 +437,7 @@ export default function Home() {
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   const [lookupExcludedModels,setLookupExcludedModels]=useState<ExcludedValuationModel[]>([]);
+  const [lookupShareBasisReview,setLookupShareBasisReview]=useState<TaiwanShareBasisReview|null>(null);
   const [remoteSymbols, setRemoteSymbols] = useState<RemoteSymbol[]>([]);
   const [marketCandidates, setMarketCandidates] = useState<StockInput[]>([]);
   const [overvaluedCandidates, setOvervaluedCandidates] = useState<StockInput[]>([]);
@@ -579,17 +617,24 @@ export default function Home() {
         }
         const firstCandidate=showTaiwanResearch?research.find(stock=>stock.market==='TW'):candidates[0]??research[0];
         if (!new URLSearchParams(window.location.search).get("ticker") && firstCandidate?.ticker) {
-          setSelectedTicker(current=>current||firstCandidate.ticker);
+          if(!selectedTickerRef.current)setSelectedTicker(firstCandidate.ticker);
+          const refreshRun=dailyStatusRef.current?.runId;
           void fetch("/api/valuation", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ticker: firstCandidate.ticker, market: firstCandidate.market, refresh: true }),
             signal: controller.signal,
           }).then(async (valuationResponse) => {
-            const valuationPayload = await valuationResponse.json() as { stock?: StockInput };
+            const valuationPayload = await valuationResponse.json() as { stock?: StockInput;shareBasisReview?:TaiwanShareBasisReview };
             if(controller.signal.aborted)return;
             if (!valuationResponse.ok || !valuationPayload.stock) {
-              if(valuationResponse.status===422)invalidateDaily(firstCandidate.ticker,firstCandidate.market);
+              if(valuationResponse.status===422) {
+                invalidateDaily(firstCandidate.ticker,firstCandidate.market);
+                if(selectedTickerRef.current===firstCandidate.ticker&&!lookupRequest.current
+                    &&refreshRun===dailyStatusRef.current?.runId&&valuationPayload.shareBasisReview?.ticker===firstCandidate.ticker
+                    &&valuationPayload.shareBasisReview.market===firstCandidate.market)
+                  setLookupShareBasisReview(valuationPayload.shareBasisReview);
+              }
               return;
             }
             if(!currentClientInput(valuationPayload.stock,dailyStatusRef.current))return;
@@ -617,7 +662,7 @@ export default function Home() {
     }
     void loadMarketCandidates();
     return () => controller.abort();
-  }, [dailyStatus?.runId,dailyStatus?.state,invalidateDaily,clearResearch]);
+  }, [dailyStatus?.runId,dailyStatus?.state,invalidateDaily,clearResearch,setSelectedTicker]);
 
   useEffect(()=>{
     if(valuationScope!=='research'||!dailyStatus?.runId||!['complete','partial'].includes(dailyStatus.state))return;
@@ -706,6 +751,8 @@ export default function Home() {
     return [...tw, ...us];
   }, [allOvervaluedRankingStocks, twDisplayLimit, usDisplayLimit]);
   const selected = selectedTicker?stocks.find((stock) => stock.ticker === selectedTicker):stocks[0];
+  const selectedShareBasisReview=lookupShareBasisReview?.ticker===selectedTicker?lookupShareBasisReview:
+    selected?getTaiwanShareBasisReview(selected):selectedTicker?getTaiwanShareBasisReview({ticker:selectedTicker,market:/^\d/.test(selectedTicker)?'TW':'US'}):null;
   const selectedValuation=valuationRankingState(selected);
   const selectedGrowthPremium = selected ? assessGrowthPremium(selected) : null;
   const selectedUpside = selectedValuation.estimatedCalibratedUpside ?? 0;
@@ -852,6 +899,7 @@ export default function Home() {
     setQuery(value);
     setLookupError("");
     setLookupExcludedModels([]);
+    setLookupShareBasisReview(null);
     setRemoteSymbols([]);
     const match = stocks.find((stock) => stock.ticker.toLowerCase() === value.trim().toLowerCase());
     if (match) {
@@ -869,10 +917,11 @@ export default function Home() {
   const selectStock=useCallback((ticker:string)=>{
     retainLoadedInput(ticker);
     lookupRequest.current?.abort();lookupRequest.current=null;setIsLookupLoading(false);
+    setLookupError('');setLookupExcludedModels([]);setLookupShareBasisReview(null);
     setSelectedTicker(ticker);
     setQuery("");
     window.setTimeout(() => document.getElementById("valuation-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  },[retainLoadedInput]);
+  },[retainLoadedInput,setSelectedTicker]);
 
   function openWatchlistStock(ticker: string) {
     selectStock(ticker);
@@ -926,8 +975,10 @@ export default function Home() {
       body: JSON.stringify(candidate),
       signal,
     });
-    const payload = await response.json() as { stock?: StockInput; error?: string;excludedModels?:ExcludedValuationModel[] };
-    if (!response.ok || !payload.stock) throw new ValuationLookupError(payload.error || "暫時無法建立估值",Array.isArray(payload.excludedModels)?payload.excludedModels:[]);
+    const payload = await response.json() as { stock?: StockInput; error?: string;excludedModels?:ExcludedValuationModel[];shareBasisReview?:TaiwanShareBasisReview };
+    const review=payload.shareBasisReview?.ticker===candidate.ticker&&payload.shareBasisReview.market===candidate.market
+      &&payload.shareBasisReview.status==='review-required'&&Array.isArray(payload.shareBasisReview.sourceUrls)?payload.shareBasisReview:null;
+    if (!response.ok || !payload.stock) throw new ValuationLookupError(payload.error || "暫時無法建立估值",Array.isArray(payload.excludedModels)?payload.excludedModels:[],review);
     return payload.stock;
   }
 
@@ -942,6 +993,7 @@ export default function Home() {
     setIsLookupLoading(true);
     setLookupError("");
     setLookupExcludedModels([]);
+    setLookupShareBasisReview(null);
     setSelectedTicker(ticker);
     lookupRequest.current?.abort();
     const controller = new AbortController();
@@ -962,6 +1014,7 @@ export default function Home() {
       if (lookupRequest.current === controller&&startingRun===dailyStatusRef.current?.runId) {
         invalidateDaily(ticker,/^\d/.test(ticker)?'TW':'US');
         setLookupExcludedModels(error instanceof ValuationLookupError&&!controller.signal.aborted?error.excludedModels:[]);
+        setLookupShareBasisReview(error instanceof ValuationLookupError&&!controller.signal.aborted?error.shareBasisReview:null);
         setLookupError(controller.signal.aborted
           ? (language === "zh" ? "查詢超過 12 秒，已停止；請稍後再試。" : "The lookup exceeded 12 seconds and was stopped. Please try again.")
           : safeLookupError(error instanceof Error ? error.message : "", language));
@@ -973,7 +1026,7 @@ export default function Home() {
         setIsLookupLoading(false);
       }
     }
-  }, [language, query, stocks,invalidateDaily,selectStock]);
+  }, [language, query, stocks,invalidateDaily,selectStock,setSelectedTicker]);
 
   useEffect(() => {
     if (!hasLoadedStorage || !dailyStatus || initialTickerHandled.current) return;
@@ -1234,6 +1287,8 @@ export default function Home() {
               <div className="detail-topline"><span className="section-kicker">VALUATION / 01</span><div className="detail-actions"><button type="button" className="detail-refresh" disabled={isLookupLoading} onClick={() => void lookupTicker(selected.ticker, true)}>{isLookupLoading ? t("更新中…", "Updating…") : t("↻ 更新資料", "↻ Refresh data")}</button><button type="button" className={`detail-watch ${watchlist.includes(selected.ticker) ? "watched" : ""}`} onClick={() => toggleWatchlist(selected.ticker)}>{watchlist.includes(selected.ticker) ? t("★ 已觀察", "★ Watching") : t("☆ 加入觀察", "☆ Add to watchlist")}</button></div></div>
               <div className="detail-title-row"><div><span className={`ticker-badge large market-${selected.market.toLowerCase()}`}>{selected.market}</span><div className="detail-ticker">{selected.ticker}</div><p>{stockDescriptor(selected, language)}</p></div><div className="detail-signal-pills"><ConfidencePill confidence={effectiveValuationConfidence(selected)} language={language} /><RiskPill risk={selected.risk} language={language} /><InstitutionalSignalPill signal={selected.institutionalSignal} language={language} />{selectedGrowthPremium && <GrowthPremiumPill assessment={selectedGrowthPremium} language={language} />}</div></div>
               <ValuationStatusNotice stock={selected} language={language} />
+              <ValuationMethodNotice stock={selected} language={language} />
+              {selectedShareBasisReview&&<ShareBasisReviewNotice review={selectedShareBasisReview} language={language} userManaged={isUserManagedInput(selected)}/>}
               <div className="price-hero"><div><span>{t("目前價格", "Current Price")}</span><strong className={selected.isLimitUp ? "limit-up-price" : ""}>{formatPrice(selected.price, selected.market)}</strong>{selected.priceChangePercent !== undefined && <small className={selected.priceChangePercent >= 0 ? "quote-up" : "quote-down"}>{selected.priceChange !== undefined ? `${selected.priceChange >= 0 ? "+" : ""}${formatNumber(selected.priceChange)} ` : ""}({formatSignedPercent(selected.priceChangePercent)}){selected.isLimitUp ? ` · ${t("漲停", "Limit up")}` : ""}</small>}{selected.updatedAt && <small>{t("價格資料日期", "Price data date")} {selected.updatedAt}{selected.priceSource ? ` · ${selected.priceSource}` : ""}</small>}</div><div className={selectedDirection === "up" ? "hero-upside positive-box" : selectedDirection === "down" ? "hero-upside negative-box" : "hero-upside neutral-box"}><span>{!selectedValuation.rankingEligible ? t("研究試算差距", "Research estimate gap") : modelDirectionLabel(selectedDirection, language)}</span><strong>{selectedValuation.hasModel?<><TrendMark direction={selectedDirection} /> <span className={directionTextClass(selectedDirection)}>{formatSignedPercent(selectedUpside)}</span></>:"—"}</strong><small>{!selectedValuation.hasModel?t("無適用模型，未產生估值", "No applicable model; valuation unavailable"):!selectedValuation.rankingEligible ? t("研究試算／不列正式排名", "Research estimate / excluded from ranking") : selectedDirection === "up" ? t("價格低於估值", "Price below fair value") : selectedDirection === "down" ? t("價格高於估值", "Price above fair value") : t("價格與估值差距在 ±5% 內", "Price is within ±5% of fair value")}</small></div></div>
               <InstitutionalSignalPanel signal={selected.institutionalSignal} language={language} />
               {selectedGrowthPremium && <GrowthPremiumPanel assessment={selectedGrowthPremium} stock={selected} language={language} />}
@@ -1251,7 +1306,7 @@ export default function Home() {
                 <div className="valuation-meta-grid">
                   <div><span>{t("校準模型版本", "Calibration Version")}</span><strong>{selected.calibrationMetadata?.modelVersion ?? "2026.08.17-v1.0"}</strong><small>{t("歷史校準版本不是目前資料的準確率。", "A historical calibration version does not establish accuracy on current data.")} <a href="/rotation">{t("查看當次估值差異", "View current comparison")}</a></small></div>
                   {selected.assumptions.comparablePeerCount && selected.assumptions.comparablePeerCount >= 4 && <div><span>{t("公開同業倍數", "Public peer multiples")}</span><strong>{selected.assumptions.comparablePeerGroup ?? selected.assumptions.comparableSector ?? t("同業產業", "Peer sector")} · {selected.assumptions.comparablePeerCount} {t("筆", "peers")}</strong><small>{selected.valuationPolicy==='tw-comparables-v1'?t('同報價日、財報截止日與股數口徑，每種倍數至少 5 個通過適用性檢查的樣本。P/B 核對歸母平均權益 ROE，P/E、P/S 核對同期間利潤率；獲利能力相似的 0.5–2 倍範圍是尚未驗證的研究假設。P/S 另核對非控制權益。已分類業務群不退回廣義產業，分散過大或缺證據時排除。','Each multiple needs at least 5 applicable peers sharing the quote date, financial period and share basis. P/B checks parent-income/average-equity ROE. P/E and P/S check same-period profit margins; the 0.5–2 profitability ratio is an unvalidated research assumption. P/S also checks minority interests. Assigned groups never fall back to broad industries; missing or dispersed evidence is excluded.'):t("優先使用可稽核商業模式群組，缺少倍數時回退廣義產業；P/S、EV 使用 5%–95% 截尾中位數", "Uses a curated business-model group first, then broad-sector fallback; P/S and EV use a 5%–95% trimmed median")} · {selected.assumptions.comparableAsOf ?? "—"}</small><small>{t(`各模型可用樣本：P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/B ${selected.assumptions.comparablePbPeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/營收 ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`, `Usable peers by model: P/E ${selected.assumptions.comparablePePeerCount ?? 0} · P/B ${selected.assumptions.comparablePbPeerCount ?? 0} · P/S ${selected.assumptions.comparablePsPeerCount ?? 0} · EV/Revenue ${selected.assumptions.comparableEvRevenuePeerCount ?? 0} · EV/EBITDA ${selected.assumptions.comparableEvEbitdaPeerCount ?? 0} · EV/EBIT ${selected.assumptions.comparableEvEbitPeerCount ?? 0}`)}</small></div>}
-                  <div><span>CAPM / WACC</span><strong>CAPM {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
+                  <div><span>{t("股權成本 / WACC", "Equity cost / WACC")}</span><strong>{t("股權成本", "Equity cost")} {(selected.assumptions.costOfEquity * 100).toFixed(1)}% · WACC {(selected.assumptions.wacc * 100).toFixed(1)}%</strong><small>β {selected.assumptions.beta.toFixed(2)} · {t("稅後債務成本", "After-tax debt cost")} {(selected.assumptions.afterTaxCostOfDebt * 100).toFixed(1)}%</small></div>
                   <div><span>{t("資料基礎", "Data Basis")}</span><strong>{formatDataBasis(selected.assumptions.dataBasis, language)}</strong>{selected.assumptions.financialDataDate && <small>{t("財務日期", "Financial date")} {selected.assumptions.financialDataDate}</small>}</div>
                   <div><span>{t("資料新鮮度", "Data Freshness")}</span><strong>{formatFinancialFreshness(selected.assumptions.financialFreshness, language)}</strong><small>{selected.assumptions.financialAgeDays === null ? t("無法計算資料年齡", "Age unavailable") : t(`距今約 ${selected.assumptions.financialAgeDays} 天`, `About ${selected.assumptions.financialAgeDays} days old`)}</small></div>
                   {selected.assumptions.fcfNormalizationApplied && <div><span>{t("FCF 正規化", "FCF Normalization")}</span><strong>{formatPrice(selected.assumptions.reportedFcfPerShare, selected.market)} → {formatPrice(selected.assumptions.normalizedFcfPerShare, selected.market)}</strong><small>{t("避免單期現金流重複放大多個模型", "Prevents one-period cash flow from amplifying several models")}</small></div>}
@@ -1277,15 +1332,17 @@ export default function Home() {
                 <div className="detail-section fundamentals"><div className="detail-section-title"><h3>{t("品質與模型狀態", "Quality & Model Status")}</h3><span>{t("模型輸入", "Model inputs")}</span></div><div className="fundamental-grid"><div><span>{t("營收成長", "Revenue Growth")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.revenueGrowth.toFixed(1)}%`}</strong></div><div><span>ROE</span><strong>{selected.roe ? `${selected.roe.toFixed(1)}%` : "—"}</strong></div><div><span>{t("負債比", "Debt Ratio")}</span><strong>{selected.qualityAvailable === false ? "—" : `${selected.debtRatio.toFixed(1)}%`}</strong></div><div><span>{t("模型分歧", "Model dispersion")}</span><strong>{selected.modelDispersion==null?"—":`${(selected.modelDispersion*100).toFixed(2)}%`}</strong><small>{t("固定覆核門檻 ≥35%；以未四捨五入值判定", "Fixed review threshold ≥35%; assessed before rounding")}</small></div><div><span>{t("不確定性", "Uncertainty")}</span><strong>{(selected.uncertainty * 100).toFixed(0)}%</strong></div></div><div className="quality-meter"><div><span>{t("財務品質分數", "Financial quality score")}</span><strong>{selected.qualityAvailable === false ? t("資料不足", "Insufficient data") : `${selected.qualityScore} / 100`}</strong></div><div className="meter"><span style={{ width: `${selected.qualityScore}%` }} /></div></div></div>
                 <DailyCandlestickChart ticker={selected.ticker} market={selected.market} language={language} />
               </div>
-              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <div className="excluded-model-row" key={`excluded-${model.id}`}><strong>{localizedModelLabel(model, language)}</strong><small className="range-hint">{valuationReasonCategoryLabel(valuationReasonCategory(model.reason),language)}</small><p>{language === "zh" ? model.reason : englishExclusionReason(model)}</p></div>)}</div></div>}
+              {selected.excludedModels.length > 0 && <div className="detail-section excluded-models-section"><div className="detail-section-title"><h3>{t("排除模型", "Excluded Models")}</h3><span>{t("未納入中央值", "Not included in the center")}</span></div><div className="excluded-model-list">{selected.excludedModels.map((model) => <ExcludedModelRow key={`excluded-${model.id}`} model={model} language={language}/>)}</div></div>}
               {effectiveValuationConfidence(selected) === "low" && <div className="confidence-warning"><strong>{t("為什麼是低信心？", "Why low confidence?")}</strong><p>{selected.historicalCaution ? t("目前主要依據公開歷史財報；資料日期、模型數量或模型分歧使結果的不確定性較高。畫面保留計算結果供研究，但不做強烈高低估判定。", "The estimate mainly uses public historical filings. Data age, model count, or model dispersion increases uncertainty, so the result remains visible for research without a strong valuation call.") : t("目前公開資料缺少足夠的現金流、成長或負債資訊，因此只能提供初步參考。", "Public cash-flow, growth, or leverage data is incomplete, so this is only a preliminary reference.")}</p></div>}
               <div className="detail-note"><span>i</span><p>{valuationSourceNote(selected, language)}</p></div>
             </aside>
           )}
           {!selected&&selectedTicker&&<aside id="valuation-detail" className="detail-panel panel" aria-label={t('個股資料狀態','Stock data status')}>
-            <h2>{selectedTicker}</h2><p role="status">{isLookupLoading?t('正在核對當前批次估值…','Checking the current valuation generation…'):
+            <h2>{selectedTicker}</h2>{selectedShareBasisReview&&<ShareBasisReviewNotice review={selectedShareBasisReview} language={language}/>}
+            {(!selectedShareBasisReview||isLookupLoading)&&<p role="status">{isLookupLoading?t('正在核對當前批次估值…','Checking the current valuation generation…'):
               lookupError||t('估值模型不足或待覆核，未顯示舊估值。仍可查看 K 線。','Valuation unavailable or under review. Old values are hidden; price charts remain available.')}</p>
-            {lookupExcludedModels.length>0&&<div className="detail-section excluded-models-section"><h3>{t('模型排除原因','Why models are excluded')}</h3><div className="excluded-model-list">{lookupExcludedModels.map(model=><div className="excluded-model-row" key={model.id}><strong>{localizedModelLabel(model,language)}</strong><small className="range-hint">{valuationReasonCategoryLabel(valuationReasonCategory(model.reason),language)}</small><p>{language==='zh'?model.reason:englishExclusionReason(model)}</p></div>)}</div></div>}
+            }
+            {lookupExcludedModels.length>0&&<div className="detail-section excluded-models-section"><h3>{t('模型排除原因','Why models are excluded')}</h3><div className="excluded-model-list">{lookupExcludedModels.map(model=><ExcludedModelRow key={model.id} model={model} language={language}/>)}</div></div>}
             <button type="button" disabled={isLookupLoading} onClick={()=>void lookupTicker(selectedTicker,true)}>{t('重新查詢','Retry')}</button>
             <button type="button" onClick={()=>toggleWatchlist(selectedTicker)}>{watchlist.includes(selectedTicker)?t('移除觀察','Remove from watchlist'):t('加入觀察','Add to watchlist')}</button>
             <DailyCandlestickChart ticker={selectedTicker} market={/^\d/.test(selectedTicker)?'TW':'US'} language={language}/>

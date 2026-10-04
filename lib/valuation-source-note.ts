@@ -17,5 +17,8 @@ export function valuationSourceNote(stock: Pick<StockInput, 'market' | 'source' 
   const caution = language === 'zh'
     ? '股數口徑提醒：供應商日期標籤不代表已核證的期末股數；每股淨值與流量可能已按公司行動調整。EPS 另保留供應商稀釋口徑，不能只憑它與淨利／普通股數的差異判定資料錯誤。'
     : 'Share-basis caution: a provider date label does not verify period-end shares. Per-share book value and flows may be corporate-action adjusted. EPS retains the provider diluted basis; a difference from net income divided by ordinary shares is not, by itself, proof of an error.';
-  return `${corrected} ${caution}`;
+  const operatingBasis = language === 'zh'
+    ? '營業利益與衍生 EBITDA 目前採供應商口徑；信用減損等列項的分類可能與公司申報不同，尚未逐檔核對。'
+    : 'Operating income and derived EBITDA retain the provider basis. Classification of credit impairment and other line items may differ from issuer filings and has not been verified for each company.';
+  return `${corrected} ${caution} ${operatingBasis}`;
 }

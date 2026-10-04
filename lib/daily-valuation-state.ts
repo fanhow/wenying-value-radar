@@ -1,9 +1,10 @@
+import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import {calculateStock, type Stock, type StockInput} from './valuation.ts';
 import {getUsEarningsReview} from './us-earnings-review.ts';
 
 // Bump when the production TW engine or business registry changes. Legacy
 // generations may retain financials/OHLC, but cannot silently use old targets.
-export const DAILY_VALUATION_VERSION = 'tw-comparables-2026-10-02-research-v3';
+export const DAILY_VALUATION_VERSION = 'tw-comparables-2026-10-03-method-notes-v4';
 
 /** A calculable estimate is research evidence, not automatic ranking eligibility. */
 export function valuationRankingState(stock:Stock|null|undefined) {
@@ -14,6 +15,7 @@ export function valuationRankingState(stock:Stock|null|undefined) {
     && typeof fairValue==='number' && Number.isFinite(fairValue) && fairValue>0
     && typeof rawUpside==='number' && Number.isFinite(rawUpside);
   const issues:string[]=[];
+  if(stock?.shareBasisReview)issues.push(stock.shareBasisReview.issue);
   if(!hasModel)issues.push('VALUATION_MODEL_UNAVAILABLE');
   else {
     if(stock!.valuationReviewRequired===true)issues.push('VALUATION_REVIEW_REQUIRED');
@@ -38,12 +40,14 @@ export function dailyValuationState(input:StockInput|null|undefined, runId?:stri
   // A source-reviewed earnings basis is not a new fair value. Keep the raw
   // input for audit/OHLC, but do not calculate or expose a misleading value.
   const review=getUsEarningsReview(input);
-  if(review)return {...valuationRankingState(null),stock:null,issues:[review.issue],review};
+  if(review)return {...valuationRankingState(null),stock:null,issues:[review.issue],review,shareBasisReview:null};
+  const shareBasisReview=getTaiwanShareBasisReview(input?{...input,source:undefined}:input);
+  if(shareBasisReview)return {...valuationRankingState(null),stock:null,issues:[shareBasisReview.issue],review:null,shareBasisReview};
   const current=!!input && (input.market!=='TW' ||
     (input.valuationPolicy==='tw-comparables-v1' && input.dailyValuationVersion===DAILY_VALUATION_VERSION
       && !!input.dailyRunId && (!runId || input.dailyRunId===runId)));
   const stock=current?calculateStock(input!):null;
   const state=valuationRankingState(stock);
   const issues=!input?['VALUATION_INPUT_UNAVAILABLE']:!current?['TW_DAILY_VALUATION_REFRESH_REQUIRED']:state.issues;
-  return {...state,stock,issues,review:null};
+  return {...state,stock,issues,review:null,shareBasisReview:null};
 }

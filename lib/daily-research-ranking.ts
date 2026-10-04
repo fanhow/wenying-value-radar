@@ -1,3 +1,4 @@
+import {TAIWAN_SHARE_BASIS_REVIEW_VERSION} from './taiwan-share-basis-review.ts';
 import { DAILY_VALUATION_VERSION, dailyValuationState } from './daily-valuation-state.ts';
 import type { StockInput } from './valuation.ts';
 import {US_EARNINGS_REVIEW_VERSION} from './us-earnings-review.ts';
@@ -6,7 +7,7 @@ import {US_EARNINGS_REVIEW_VERSION} from './us-earnings-review.ts';
 export const DAILY_RESEARCH_CACHE_VERSION = 'native-research-2026-10-02-v1';
 export const DAILY_RESEARCH_SEAL_VERSION = 'research-cohort-seal-2026-10-02-v1';
 export type DailyResearchCache = {
-  version:string; valuationVersion:string; usReviewVersion:string; runId:string; quoteDate:string;
+  version:string; valuationVersion:string; usReviewVersion:string; taiwanShareBasisReviewVersion:string; runId:string; quoteDate:string;
   inputDigest:string; hasModel:boolean; rankingEligible:boolean;
   estimatedFairValue:number|null; estimatedUpside:number|null;
   estimatedCalibratedUpside:number|null; nativeFairValue:number|null;
@@ -36,7 +37,7 @@ async function inputDigest(input:StockInput) {
 export const dailyResearchStockDigest=(input:StockInput)=>digest(input);
 export const dailyResearchCohortDigest=(runId:string,market:'TW'|'US',quoteDate:string,members:[string,string][])=>digest({
   version:DAILY_RESEARCH_SEAL_VERSION,cacheVersion:DAILY_RESEARCH_CACHE_VERSION,valuationVersion:DAILY_VALUATION_VERSION,
-  usReviewVersion:US_EARNINGS_REVIEW_VERSION,runId,market,quoteDate,members});
+  usReviewVersion:US_EARNINGS_REVIEW_VERSION,taiwanShareBasisReviewVersion:TAIWAN_SHARE_BASIS_REVIEW_VERSION,runId,market,quoteDate,members});
 function stateValues(state:State) {
   return {hasModel:state.hasModel,rankingEligible:state.rankingEligible,
     estimatedFairValue:state.estimatedFairValue,estimatedUpside:state.estimatedUpside,
@@ -50,13 +51,13 @@ function stateValues(state:State) {
 /** Called once per input by the server, before the sealed generation publishes. */
 export async function withDailyResearchCache(input:StockInput,runId:string,state=dailyValuationState(input,runId)):Promise<StockInput> {
   return {...input,dailyResearch:{version:DAILY_RESEARCH_CACHE_VERSION,valuationVersion:DAILY_VALUATION_VERSION,
-    usReviewVersion:US_EARNINGS_REVIEW_VERSION,runId,quoteDate:input.updatedAt??'',inputDigest:await inputDigest(input),...stateValues(state)}};
+    usReviewVersion:US_EARNINGS_REVIEW_VERSION,taiwanShareBasisReviewVersion:TAIWAN_SHARE_BASIS_REVIEW_VERSION,runId,quoteDate:input.updatedAt??'',inputDigest:await inputDigest(input),...stateValues(state)}};
 }
 /** Finalize verifies every server-generated cache, including excluded/formal rows. */
 export async function currentDailyResearchCache(input:StockInput,runId:string,quoteDate:string,state=dailyValuationState(input,runId)) {
   const cache=input.dailyResearch;
   if(!cache||cache.version!==DAILY_RESEARCH_CACHE_VERSION||cache.valuationVersion!==DAILY_VALUATION_VERSION
-    ||cache.usReviewVersion!==US_EARNINGS_REVIEW_VERSION
+    ||cache.taiwanShareBasisReviewVersion!==TAIWAN_SHARE_BASIS_REVIEW_VERSION||cache.usReviewVersion!==US_EARNINGS_REVIEW_VERSION
     ||cache.runId!==runId||cache.quoteDate!==quoteDate||input.updatedAt!==quoteDate)return false;
   const values=stateValues(state);
   return Object.entries(values).every(([key,value])=>JSON.stringify(cache[key as keyof DailyResearchCache])===JSON.stringify(value))
