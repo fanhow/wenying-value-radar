@@ -382,8 +382,15 @@ export async function handleRefreshWrite(request:Request,db:D1Database|undefined
         summary[market].total=m.targets.filter(t=>t.market===market).length;
         summary[market].ready=counts.results?.find(r=>r.market===market&&r.status==='ready')?.n??0;
         summary[market].unavailable=counts.results?.find(r=>r.market===market&&r.status==='unavailable')?.n??0;
-        if(summary[market].ready+summary[market].unavailable!==summary[market].total)throw new Error('INCOMPLETE_BATCHES');
-        if(summary[market].ready<Math.min(100,Math.ceil(summary[market].total*0.2)))throw new Error('INSUFFICIENT_MARKET_COVERAGE');
+      }
+      const requiredReady={TW:Math.min(100,Math.ceil(summary.TW.total*0.2)),US:Math.min(100,Math.ceil(summary.US.total*0.2))};
+      for(const market of ['TW','US'] as const) {
+        // Report both markets before an early coverage rejection. Only safe
+        // manifest dates and counts leave the server; no source payloads do.
+        const rejected=(error:string)=>response({error,diagnostics:{phase:'finalize',failingMarket:market,
+          coverage:summary,requiredReady,expectedSessions:{TW:m.expectedSessions.TW,US:m.expectedSessions.US}}},400);
+        if(summary[market].ready+summary[market].unavailable!==summary[market].total)return rejected('INCOMPLETE_BATCHES');
+        if(summary[market].ready<requiredReady[market])return rejected('INSUFFICIENT_MARKET_COVERAGE');
       }
       // Seal the complete cohort before validation. Late in-flight uploads have
       // an SQL state guard, so they cannot mutate a validating/published run.

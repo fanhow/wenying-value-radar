@@ -6,6 +6,7 @@ import { officialSession } from './refresh-calendar.ts';
 import { taiwanAnnualEarnings } from './taiwan-valuation-evidence.ts';
 import { validTaiwanShareMetadata } from './taiwan-share-metadata.ts';
 import {getUsEarningsReview} from './us-earnings-review.ts';
+import { summarizeQuoteDiagnostics, type QuoteDiagnostics } from './daily-quote-diagnostics.ts';
 
 export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string };
 export type RefreshRecord = {
@@ -14,6 +15,8 @@ export type RefreshRecord = {
   stock?: StockInput; history?: ReturnType<typeof historyResult>;
   sources: string[];
   rankingEligible?: boolean;
+  /** CI-only metadata; deliberately excluded from JSON uploads/raw-replay payloads. */
+  quoteDiagnostics?: QuoteDiagnostics;
 };
 type Point = { asOfDate?: string; periodType?: string; currencyCode?: string; reportedValue?: { raw?: number } };
 type SeriesPayload = { timeseries?: { error?: unknown; result?: Array<{ meta?: { type?: string[] }; [key: string]: unknown }> } };
@@ -194,12 +197,34 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const [chartResult, financialResult] = await Promise.allSettled([json(chartUrl,fetcher),json(financialUrl,fetcher)]);
     if(chartResult.status==='rejected')throw chartResult.reason;
     const chart=chartResult.value;
+    // Diagnostic metadata is consumed explicitly by CI, not by the upload or
+    // frozen raw-replay payload. Preserve the existing serialized record bytes.
+    let quoteDiagnostics=summarizeQuoteDiagnostics(chart,expectedDate);
+    Object.defineProperty(record,'quoteDiagnostics',{value:quoteDiagnostics,
+      writable:true,configurable:true,enumerable:false});
     const currency=chart?.chart?.result?.[0]?.meta?.currency;
-    if(currency!==(target.market==='TW'?'TWD':'USD')) throw new Error('QUOTE_CURRENCY_UNSUPPORTED');
-    const candles=completedCandles(chart,target.market,now,expectedDate), latest=candles.at(-1);
+    if(currency!==(target.market==='TW'?'TWD':'USD')) {
+      quoteDiagnostics.failureReason='QUOTE_CURRENCY_UNSUPPORTED';
+      throw new Error('QUOTE_CURRENCY_UNSUPPORTED');
+    }
+    let candles: ReturnType<typeof completedCandles>;
+    try {
+      candles=completedCandles(chart,target.market,now,expectedDate);
+      record.quoteDiagnostics=quoteDiagnostics=summarizeQuoteDiagnostics(chart,expectedDate,parseYahooDailyCandles(chart,400),candles);
+    } catch(error) {
+      quoteDiagnostics.failureReason='QUOTE_PARSE_FAILED';
+      throw error;
+    }
+    const latest=candles.at(-1);
     record.quoteDate=latest?.date;
-    if(candles.length<60 || !latest || latest.date!==expectedDate) throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
-    if(!validRefreshCandles(candles,expectedDate))throw new Error('INVALID_CAUSAL_HISTORY');
+    if(candles.length<60 || !latest || latest.date!==expectedDate) {
+      quoteDiagnostics.failureReason=!latest?'NO_VALID_COMPLETED_CANDLES':candles.length<60?'INSUFFICIENT_COMPLETED_HISTORY':'LATEST_COMPLETED_SESSION_MISMATCH';
+      throw new Error('QUOTE_NOT_LATEST_COMPLETED_SESSION');
+    }
+    if(!validRefreshCandles(candles,expectedDate)) {
+      quoteDiagnostics.failureReason='INVALID_CAUSAL_HISTORY';
+      throw new Error('INVALID_CAUSAL_HISTORY');
+    }
     record.history=historyResult(target.ticker,target.market,symbol,candles,null,name);
     // This flag is the liquidity filter shared by technical scans and rankings;
     // rankings additionally require status=ready. US size still needs shares.

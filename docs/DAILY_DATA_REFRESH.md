@@ -10,6 +10,9 @@
 - 批次全部有結果且各市場達最低覆蓋才原子切換；缺資料股票排除。08:00 後若未有當日成功批次，API 回傳 503 並顯示過期，不靜默退回內建值。
 - `/api/daily-status` 提供完成時間及覆蓋率；`/api/market-scan`、`/api/valuation`、`/api/price-history`、`/api/technical-scan`、`/api/rotation-audit` 讀取同一批次。輪動比較的外部參考是明示日期的研究觀察，絕不作為現行估值或排行榜的輸入。
 - 更新入口額外驗證專用寫入密鑰。GitHub Secrets：`WENYING_SITE_TOKEN`、`WENYING_REFRESH_SECRET`；後者同時存入 Sites secret。不可把密鑰寫進原始碼或日誌。
+- CI 在送出批次前記錄 `collector_complete`，失敗時記錄 `refresh_failed`：台美市場 total／checked／ready／unavailable／missing、各原因計數與原始／解析／已完成日期分布。固定診斷樣本為 TWSE 1101、TPEx 6488、US AAPL，只記日期、timestamp、OHLC 缺欄計數與棒數，沒有資料時明示 null／unknown，不記完整股票、財務 payload、headers 或憑證。
+- `quoteDiagnostics.observedQuoteDate` 是完成時段及 expected session 上限過濾後的末棒日期；`rawLatestDate` 是供應商末 timestamp 的 UTC 日期，`parsedLatestDate` 是 OHLC 解析後末棒日期。診斷不修補 K 線、不轉換日期口徑，也不更改有效性判定；歷史不足、沒有有效棒、日期不符等以獨立 `failureReason` 說明，原 `issues` 錯誤碼維持相容。
+- finalize 在缺批次或覆蓋不足時仍回 HTTP 400，增加 `diagnostics`：failingMarket、兩市場 coverage、requiredReady 與 expectedSessions。失敗不切 head、不保存成功 summary；collector 會保存此安全摘要，即使未成功 published 也可診斷。這些紀錄保存在 CI logs；`quoteDiagnostics` 是記憶體中的 non-enumerable 欄位，由 CI 明確投影輸出，不加入原 JSON upload／凍結資料重播 payload。D1 schema 與 records 持久欄位不變，過去失敗批次無法由本修正補回原始日期。
 - GitHub Actions 排程需在 default branch，公開倉庫長期無活動可能停用。失敗見 Actions 通知／執行頁；08:00 選股仍須先檢查 daily-status，失敗明確通知使用者。
 - 手動重跑：`gh workflow run daily-data-refresh.yml --repo fanhow/wenying-value-radar`。
 - 08:00 任務先讀 `/api/daily-status`，再執行 `node --experimental-strip-types scripts/daily-selection-report.mjs --expected-tw YYYY-MM-DD --expected-us YYYY-MM-DD`（網站憑證經 stdin）。報告存入 `outputs/daily-selection/runs/`；核對排行、估值與技術 API 的同一批次 runId，避免更新途中混讀。
