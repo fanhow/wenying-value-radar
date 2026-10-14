@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {fetchRefreshRecord,expectedSession} from '../lib/daily-refresh-data.ts';
 import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts';
+import {VERIFIED_HELD_REFRESH_TARGETS} from '../lib/verified-held-refresh-scope.ts';
 import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import {summarizeCollector,safeCoverageDiagnostics,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
 
@@ -32,8 +33,8 @@ export function createRefreshApi(runId,{token,key,fetcher=fetch,wait=sleep}) {
 export async function loadUniverse() {
   const snapshot=JSON.parse(await readFile(new URL('../lib/market-scan-snapshot.json',import.meta.url),'utf8'));
   const us=JSON.parse(await readFile(new URL('../lib/us-market-snapshot.json',import.meta.url),'utf8'));
-  const rows=[...snapshot.taiwanUniverse.map(s=>({...s,market:'TW'})),...us.map(s=>({...s,market:'US'}))];
-  const targets=[...new Map(rows.filter(s=>s.market==='TW'?/^\d{4}$/.test(s.ticker):/^[A-Z][A-Z0-9.-]{0,11}$/.test(s.ticker)).map(s=>[`${s.market}:${s.ticker}`,{ticker:s.ticker,name:s.name,market:s.market,sector:s.sector??(s.market==='TW'?'台灣上市公司':'Other'),industry:s.industry,listingBoard:s.listingBoard}])).values()];
+  const rows=[...snapshot.taiwanUniverse.map(s=>({...s,market:'TW'})),...us.map(s=>({...s,market:'US'})),...VERIFIED_HELD_REFRESH_TARGETS];
+  const targets=[...new Map(rows.filter(s=>s.market==='TW'?/^\d{4}$/.test(s.ticker):/^[A-Z][A-Z0-9.-]{0,11}$/.test(s.ticker)).map(s=>[`${s.market}:${s.ticker}`,{ticker:s.ticker,name:s.name,market:s.market,sector:s.sector??(s.market==='TW'?'台灣上市公司':'Other'),industry:s.industry,listingBoard:s.listingBoard,...('securityIdentity' in s?{securityIdentity:s.securityIdentity}:{})}])).values()];
   return targets;
 }
 export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=process.env.WENYING_REFRESH_SECRET,

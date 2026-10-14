@@ -1,13 +1,15 @@
+import {validTsmcOfficialInput} from './tsmc-tifrs-official-inputs.ts';
 import type {StockInput} from './valuation.ts';
 
 /** Metadata consistency only: a provider as-of date is not a verified effective date. */
-export function validTaiwanShareMetadata(stock:Pick<StockInput,'financialMetrics'|'financialDataDate'>) {
+export function validTaiwanShareMetadata(stock:Pick<StockInput,'financialMetrics'|'financialDataDate'>&Partial<StockInput>) {
   const metrics=stock.financialMetrics;
   if(!metrics)return true;
   if(metrics.shareBasis===undefined||metrics.shareBasis==='period-end-ordinary') {
     // Read compatibility for old captures; this does not certify period-end shares.
     return metrics.shareAsOfDate===undefined&&metrics.shareSourceField===undefined;
   }
+  if(metrics.shareBasis==='issuer-period-end-ordinary-rounded')return validTsmcOfficialInput(stock);
   if(metrics.shareBasis!=='provider-as-of-ordinary')return false;
   const date=metrics.shareAsOfDate;
   return metrics.currency==='TWD'&&metrics.periodBasis==='ltm'

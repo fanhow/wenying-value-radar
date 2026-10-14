@@ -1,3 +1,4 @@
+import {validTsmcOfficialInput} from './tsmc-tifrs-official-inputs.ts';
 import {getTaiwanShareBasisReview} from './taiwan-share-basis-review.ts';
 import type { StockInput } from './valuation.ts';
 import type { ComparableMultiples } from './market-comparables.ts';
@@ -79,7 +80,7 @@ function dated(s:StockInput) {
   // Peer provenance is automatic source evidence, never a manual-label override.
   if(getTaiwanShareBasisReview({...s,source:undefined}))return false;
   if(s.market!=='TW'||s.dataBasis!=='ltm'||s.financialMetrics?.periodBasis!=='ltm'||s.financialMetrics?.currency!=='TWD'
-    ||!['period-end-ordinary','provider-as-of-ordinary'].includes(s.financialMetrics?.shareBasis??'')
+    ||!['period-end-ordinary','provider-as-of-ordinary','issuer-period-end-ordinary-rounded'].includes(s.financialMetrics?.shareBasis??'')
     ||!validDate(s.updatedAt)||!validDate(s.financialDataDate)||!validTaiwanShareMetadata(s))return false;
   const age=(Date.parse(s.updatedAt!)-Date.parse(s.financialDataDate!))/DAY;
   return Number.isFinite(age)&&age>=0&&age<=180&&positive(s.price)&&positive(s.financialMetrics.sharesOutstanding)
@@ -91,15 +92,17 @@ export function compactTaiwanComparableSource(s:StockInput):StockInput {
     fcfPerShare:s.fcfPerShare,targetPe:s.targetPe,targetPb:s.targetPb,targetFcfMultiple:s.targetFcfMultiple,
     revenueGrowth:s.revenueGrowth,roe:s.roe,debtRatio:s.debtRatio,uncertainty:s.uncertainty};
   const fields=['industry','updatedAt','financialDataDate','dataBasis','qualityAvailable','revenuePerShare',
-    'ebitdaPerShare','ebitPerShare','debtPerShare','cashPerShare','taiwanBusinessGroup'] as const;
+    'ebitdaPerShare','ebitPerShare','debtPerShare','cashPerShare','taiwanBusinessGroup',
+    'sourceInputPolicy','dataCompleteness','netMargin','netMarginUnit','assetTurnover','financialLeverage'] as const;
   for(const field of fields)if(field in s)Object.assign(source,{[field]:s[field]});
+  if(validTsmcOfficialInput(s)){source.officialFinancialAdapter=structuredClone(s.officialFinancialAdapter!);source.epsHistory=s.epsHistory?.map(point=>({...point}));}
   if(s.taiwanBusinessGroup&&typeof s.taiwanBusinessGroup==='object')source.taiwanBusinessGroup={
     id:s.taiwanBusinessGroup.id,registryVersion:s.taiwanBusinessGroup.registryVersion};
   const m=s.financialMetrics;
   if(m!==undefined) {
     source.financialMetrics=m?{currency:m.currency,periodBasis:m.periodBasis,shareBasis:m.shareBasis,roeBasis:m.roeBasis,growthBasis:m.growthBasis}:m;
     if(m)for(const field of ['sharesOutstanding','shareAsOfDate','shareSourceField','nonControllingBookPerShare',
-      'ebitdaBasis','netIncomePerShare','enterpriseBridgeEvidence'] as const)
+      'ebitdaBasis','netIncomePerShare','enterpriseBridgeEvidence','epsBasis','epsSourceField','epsAsOfDate','fcfBasis','ordinarySharesPerSecurity','revenueGrowthQuarterYoY'] as const)
       if(field in m)Object.assign(source.financialMetrics!,{[field]:m[field]});
     const e=m?.enterpriseBridgeEvidence;
     if(e&&typeof e==='object')source.financialMetrics!.enterpriseBridgeEvidence={sourceType:e.sourceType,sourceUrl:e.sourceUrl,
@@ -118,7 +121,14 @@ export function createTaiwanComparableIndex(stocks:Iterable<StockInput>):TaiwanC
     const e=s.financialMetrics?.enterpriseBridgeEvidence;
     return [e!==undefined,e?.sourceType,e?.sourceUrl,e?.publishedDate,e?.periodEnd,e?.currency,e?.sharesOutstanding,e?.cashAndInvestments,e?.debtIncludingLeases,e?.cashScope,e?.debtScope];
   };
-  const signature=(s:StockInput)=>JSON.stringify([s.name,s.industry,s.market,s.updatedAt,s.financialDataDate,s.dataBasis,s.price,s.eps,s.bvps,s.roe,s.qualityAvailable,s.financialMetrics?.roeBasis,s.revenuePerShare,s.ebitdaPerShare,s.ebitPerShare,s.debtPerShare,s.cashPerShare,s.financialMetrics?.currency,s.financialMetrics?.sharesOutstanding,s.financialMetrics?.periodBasis,typeof s.financialMetrics?.shareBasis,s.financialMetrics?.shareBasis,typeof s.financialMetrics?.shareAsOfDate,s.financialMetrics?.shareAsOfDate,typeof s.financialMetrics?.shareSourceField,s.financialMetrics?.shareSourceField,s.financialMetrics?.nonControllingBookPerShare,s.financialMetrics?.ebitdaBasis,s.financialMetrics?.netIncomePerShare,bridgeSignature(s),s.taiwanBusinessGroup!==undefined,s.taiwanBusinessGroup?.id,s.taiwanBusinessGroup?.registryVersion]);
+  const canonicalProof=(value:unknown):unknown=>Array.isArray(value)?value.map(canonicalProof):value&&typeof value==='object'
+    ?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0).map(([key,v])=>[key,canonicalProof(v)])):value;
+  // These new fields affect dated/issuer-share eligibility. Conflicting
+  // duplicate provenance must not be selected by input order. Preserve the
+  // exact original signature for archived sources with neither new field.
+  const officialSignature=(s:StockInput)=>s.sourceInputPolicy===undefined&&s.officialFinancialAdapter===undefined?[]:
+    [typeof s.sourceInputPolicy,s.sourceInputPolicy,validTsmcOfficialInput(s),canonicalProof(s.officialFinancialAdapter)];
+  const signature=(s:StockInput)=>JSON.stringify([s.name,s.industry,s.market,s.updatedAt,s.financialDataDate,s.dataBasis,s.price,s.eps,s.bvps,s.roe,s.qualityAvailable,s.financialMetrics?.roeBasis,s.revenuePerShare,s.ebitdaPerShare,s.ebitPerShare,s.debtPerShare,s.cashPerShare,s.financialMetrics?.currency,s.financialMetrics?.sharesOutstanding,s.financialMetrics?.periodBasis,typeof s.financialMetrics?.shareBasis,s.financialMetrics?.shareBasis,typeof s.financialMetrics?.shareAsOfDate,s.financialMetrics?.shareAsOfDate,typeof s.financialMetrics?.shareSourceField,s.financialMetrics?.shareSourceField,s.financialMetrics?.nonControllingBookPerShare,s.financialMetrics?.ebitdaBasis,s.financialMetrics?.netIncomePerShare,bridgeSignature(s),s.taiwanBusinessGroup!==undefined,s.taiwanBusinessGroup?.id,s.taiwanBusinessGroup?.registryVersion,...officialSignature(s)]);
   for(const input of stocks) {
     const stock=compactTaiwanComparableSource(input);
     const previous=unique.get(stock.ticker);

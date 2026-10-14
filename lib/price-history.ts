@@ -10,7 +10,7 @@ export type DailyCandle = {
 export type YahooChartPayload = {
   chart?: {
     result?: Array<{
-      meta?: { symbol?: string; exchangeName?: string; fullExchangeName?: string };
+      meta?: { symbol?: string; exchangeName?: string; fullExchangeName?: string;currency?:string;instrumentType?:string;quoteType?:string;firstTradeDate?:number };
       events?: {
         splits?: Record<string, {
           date?: number;

@@ -213,7 +213,9 @@ test('Taiwan bridge safeguards do not change USD ingestion or US valuation',()=>
   const usd=payload([series('quarterlyCashCashEquivalentsAndShortTermInvestments',[point('2026-06-30',100)]),series('quarterlyTotalDebt',[point('2026-06-30',20)])]);
   for(const item of usd.timeseries.result)for(const p of item[item.meta.type[0]])p.currencyCode='USD';
   const raw=quarterlyInputs(usd,'USD',now);
-  assert.equal(raw.cashPerShare,10);assert.equal(raw.debtPerShare,2);assert.equal(raw.financialMetrics,undefined);
+  assert.equal(raw.cashPerShare,10);assert.equal(raw.debtPerShare,2);
+  assert.equal(raw.financialMetrics.currency,'USD');assert.equal(raw.financialMetrics.epsBasis,'quarter-eps-sum-proxy');
+  assert.equal(raw.financialMetrics.epsSourceField,'quarterlyDilutedEPS');assert.equal(raw.financialMetrics.epsAsOfDate,'2026-06-30');
   const input={...stock('TEST'),market:'US',priceSource:undefined,financialMetrics:undefined};
   const a=calculateStock(input),b=calculateStock({...input,financialMetrics:stock('1000').financialMetrics});
   assert.deepEqual(a.models,b.models);assert.equal(a.fairValue,b.fairValue);

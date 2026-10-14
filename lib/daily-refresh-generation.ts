@@ -17,7 +17,7 @@ export function prepareTaiwanRefreshGeneration(records:RefreshRecord[],runId:str
     if(!validTaiwanShareMetadata(r.stock))throw new Error('INVALID_TAIWAN_SHARE_METADATA');
     const issue=taiwanPerShareIssue(r.stock);
     if(issue)throw new Error(issue);
-    return {...r,stock:withTaiwanBusinessGroup({...r.stock,valuationPolicy:'tw-comparables-v1',
+    return {...r,stock:withTaiwanBusinessGroup({...r.stock,sourceInputPolicy:'verified-input-scope-2026-10-14-v2',valuationPolicy:'tw-comparables-v1',
       dailyValuationVersion:DAILY_VALUATION_VERSION,dailyRunId:runId,comparableMultiples:undefined})};
   });
   const stocks=prepared.flatMap(r=>r.market==='TW'&&r.status==='ready'&&r.stock?[r.stock]:[]);

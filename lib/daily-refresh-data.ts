@@ -1,3 +1,5 @@
+import {tsmcTifrsInputs,TSMC_TIFRS_SOURCES,validTsmcOfficialInput} from './tsmc-tifrs-official-inputs.ts';
+import {fetchCbcQuoteDateFx,CBC_QUOTE_DATE_FX_SOURCE} from './cbc-quote-date-fx.ts';
 import { valuationTargets, calculateStock, type StockInput } from './valuation.ts';
 import { parseYahooDailyCandles, type YahooChartPayload, type DailyCandle } from './price-history.ts';
 import { aggregateCandles, analyzeTechnicalSetup } from './technical-analysis.ts';
@@ -7,8 +9,9 @@ import { taiwanAnnualEarnings } from './taiwan-valuation-evidence.ts';
 import { validTaiwanShareMetadata } from './taiwan-share-metadata.ts';
 import {getUsEarningsReview} from './us-earnings-review.ts';
 import { summarizeQuoteDiagnostics, type QuoteDiagnostics } from './daily-quote-diagnostics.ts';
+import {verifiedHeldHistory,verifiedHeldRefreshTarget,type VerifiedHeldSecurityIdentity} from './verified-held-refresh-scope.ts';
 
-export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string };
+export type RefreshTarget = { ticker: string; name: string; market: 'TW' | 'US'; sector: string; listingBoard?: 'TWSE' | 'TPEx'; industry?: string;securityIdentity?:VerifiedHeldSecurityIdentity };
 export type RefreshRecord = {
   ticker: string; market: 'TW' | 'US'; status: 'ready' | 'unavailable'; issues: string[];
   fetchedAt: string; quoteDate?: string; financialDate?: string;
@@ -104,7 +107,10 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
   const priorQuarter = previous('quarterlyTotalRevenue');
   const growthBasis = priorTtm && priorTtm>0 ? 'TTM YoY' : 'latest quarter YoY';
   const revenueGrowth = priorTtm && priorTtm>0 ? (revenue/priorTtm-1)*100 : priorQuarter && priorQuarter>0 ? (last('TotalRevenue')!/priorQuarter-1)*100 : undefined;
+  const directEps=values.get('trailingDilutedEPS')?.get(end);
   const annualEps=sum('DilutedEPS'), bvps=equity/shares;
+  const epsBasis=directEps!==undefined?'provider-direct-ttm-diluted':'quarter-eps-sum-proxy';
+  const epsSourceField=directEps!==undefined?'trailingDilutedEPS':'quarterlyDilutedEPS';
   if (annualEps===undefined || revenueGrowth===undefined || equity<=0) throw new Error('EPS_GROWTH_OR_POSITIVE_EQUITY_UNAVAILABLE');
   const roe=annualEps/bvps*100, debtRatio=liabilities/assets*100;
   const result: Partial<StockInput> = { eps:annualEps, bvps, fcfPerShare:(ocf-Math.abs(capex))/shares,
@@ -124,6 +130,14 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
   ];
   for (const [key,value] of optional) if (value !== undefined) Object.assign(result,{[key]:value/shares});
   const net=sum('NetIncome'); if(net!==undefined&&revenue>0) result.netMargin=net/revenue*100;
+  // Preserve actual selection lineage; do not infer it from the final EPS.
+  result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
+    shareAsOfDate:end,shareSourceField:'quarterlyOrdinarySharesNumber',sharesOutstanding:shares,
+    roeBasis:'eps-ending-bvps',growthBasis:priorTtm&&priorTtm>0?'ttm-yoy':'quarter-yoy',
+    revenueGrowthTtmYoY:priorTtm&&priorTtm>0?(revenue/priorTtm-1)*100:undefined,
+    revenueGrowthQuarterYoY:priorQuarter&&priorQuarter>0?(last('TotalRevenue')!/priorQuarter-1)*100:undefined,
+    netIncomePerShare:net===undefined?undefined:net/shares,epsBasis,epsSourceField,epsAsOfDate:end,
+    fcfBasis:'provider-cfo-minus-capital-expenditure'};
   if(currency==='TWD') {
     // Keep the provider's reported EPS unchanged. Annual observations are
     // separate non-overlapping periods, never four overlapping TTM samples.
@@ -135,7 +149,7 @@ export function quarterlyInputs(payload: SeriesPayload, currency: string, now = 
     if(net!==undefined&&averageEquity!==undefined)finiteFinancialNumber(averageEquity);
     result.roe=net!==undefined?net/(averageEquity??equity)*100:roe;
     Object.assign(result,valuationTargets(revenueGrowth,result.roe,debtRatio));
-    result.financialMetrics={currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
+    result.financialMetrics={...result.financialMetrics,currency,periodBasis:'ltm',shareBasis:'provider-as-of-ordinary',
       shareAsOfDate:end,shareSourceField:'quarterlyOrdinarySharesNumber',
       roeBasis:net===undefined?'eps-ending-bvps':averageEquity===undefined?'parent-income-ending-equity':'parent-income-average-equity',
       growthBasis:priorTtm&&priorTtm>0?'ttm-yoy':'quarter-yoy',
@@ -197,6 +211,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const [chartResult, financialResult] = await Promise.allSettled([json(chartUrl,fetcher),json(financialUrl,fetcher)]);
     if(chartResult.status==='rejected')throw chartResult.reason;
     const chart=chartResult.value;
+    if(target.market==='TW'&&target.ticker==='2330'&&chart?.chart?.result?.[0]?.meta?.symbol!==symbol)throw new Error('QUOTE_IDENTITY_MISMATCH');
     // Diagnostic metadata is consumed explicitly by CI, not by the upload or
     // frozen raw-replay payload. Preserve the existing serialized record bytes.
     let quoteDiagnostics=summarizeQuoteDiagnostics(chart,expectedDate);
@@ -209,7 +224,7 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     }
     let candles: ReturnType<typeof completedCandles>;
     try {
-      candles=completedCandles(chart,target.market,now,expectedDate);
+      candles=verifiedHeldHistory(target.ticker,target.market,chart?.chart?.result?.[0]?.meta,completedCandles(chart,target.market,now,expectedDate));
       record.quoteDiagnostics=quoteDiagnostics=summarizeQuoteDiagnostics(chart,expectedDate,parseYahooDailyCandles(chart,400),candles);
     } catch(error) {
       quoteDiagnostics.failureReason='QUOTE_PARSE_FAILED';
@@ -231,7 +246,18 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     record.rankingEligible=target.market==='TW'&&latest.volume>=100000&&latest.close*latest.volume>=5000000;
     if(financialResult.status==='rejected')throw financialResult.reason;
     const financial=financialResult.value;
-    const inputs=quarterlyInputs(financial,currency,now);
+    if(verifiedHeldRefreshTarget(target.ticker,target.market)&&(!Array.isArray(financial?.timeseries?.result)
+      ||financial.timeseries.result.some((item:{meta?:{symbol?:unknown}})=>
+        !Array.isArray(item.meta?.symbol)||item.meta.symbol.length!==1||item.meta.symbol[0]!==symbol)))throw new Error('FINANCIAL_IDENTITY_MISMATCH');
+    let inputs:Partial<StockInput>;
+    if(target.ticker==='2330'&&target.market==='TW'||target.ticker==='TSM'&&target.market==='US') {
+      const fx=target.ticker==='TSM'?await fetchCbcQuoteDateFx(expectedDate,now,fetcher):undefined;
+      const official=tsmcTifrsInputs(target.ticker,financial,expectedDate,now,fx??undefined);
+      if(!official)throw new Error('OFFICIAL_TIFRS_INPUT_OR_QUOTE_FX_UNAVAILABLE');
+      inputs={...official,...valuationTargets(official.revenueGrowth!,official.roe!,official.debtRatio!)};
+      record.sources.push(...TSMC_TIFRS_SOURCES,...(fx?[CBC_QUOTE_DATE_FX_SOURCE]:[]));
+      record.issues.push('OFFICIAL_FINANCIAL_ADAPTER_RESEARCH_ONLY');
+    } else inputs=quarterlyInputs(financial,currency,now);
     const perShareIssue=target.market==='TW'?taiwanPerShareIssue(inputs):null;
     if(perShareIssue)throw new Error(perShareIssue);
     record.financialDate=inputs.financialDataDate;
@@ -242,8 +268,9 @@ export async function fetchRefreshRecord(target: RefreshTarget, expectedDate: st
     const upside=target.market==='TW'||review?null:calibrateFairValue(calculateStock(stock)).calibratedUpside;
     if(review)record.issues.push(review.issue);
     record.stock=stock; record.history=historyResult(target.ticker,target.market,symbol,candles,upside,name); record.status='ready';
-    const shares = (financial.timeseries?.result??[]).find((r: {meta?:{type?:string[]}})=>r.meta?.type?.[0]==='quarterlyOrdinarySharesNumber')?.quarterlyOrdinarySharesNumber?.find((p:Point)=>p.asOfDate===inputs.financialDataDate)?.reportedValue?.raw;
-    record.rankingEligible=target.market==='TW'?latest.volume>=100000&&latest.close*latest.volume>=5000000:latest.close>=3&&latest.volume>=100000&&Number(shares)*latest.close>=500000000;
+    const providerShares = (financial.timeseries?.result??[]).find((r: {meta?:{type?:string[]}})=>r.meta?.type?.[0]==='quarterlyOrdinarySharesNumber')?.quarterlyOrdinarySharesNumber?.find((p:Point)=>p.asOfDate===inputs.financialDataDate)?.reportedValue?.raw;
+    const shares=validTsmcOfficialInput(stock)?inputs.financialMetrics?.sharesOutstanding:providerShares;
+    record.rankingEligible=target.market==='TW'?latest.volume>=100000&&latest.close*latest.volume>=5000000:latest.close>=3&&latest.volume>=100000&&Number(validTsmcOfficialInput(stock)?Number(shares)/stock.officialFinancialAdapter!.ordinarySharesPerSecurity:shares)*latest.close>=500000000;
   } catch(error) { record.issues=[error instanceof Error?error.message:'UPSTREAM_UNAVAILABLE']; }
   return record;
 }

@@ -109,6 +109,7 @@ export type StockInput = {
   source?: "示範資料" | "手動輸入" | "自動資料" | "方舟截圖";
   sourceNote?: string;
   qualityAvailable?: boolean;
+  sourceInputPolicy?: string;
   riskOverride?: RiskLevel;
   dataCompleteness?: DataCompleteness;
 
@@ -135,16 +136,21 @@ export type StockInput = {
     currency: string;
     periodBasis: "ltm";
     /** Legacy period-end label is read-compatible, not independent verification. */
-    shareBasis: "period-end-ordinary" | "provider-as-of-ordinary";
+    shareBasis: "period-end-ordinary" | "provider-as-of-ordinary" | "issuer-period-end-ordinary-rounded";
     /** Date assigned by the provider; not a verified share-count effective date. */
     shareAsOfDate?: string;
-    shareSourceField?: "quarterlyOrdinarySharesNumber";
+    shareSourceField?: "quarterlyOrdinarySharesNumber" | "issuer-reported-thousand-ordinary-shares";
     roeBasis: "parent-income-average-equity" | "parent-income-ending-equity" | "eps-ending-bvps";
+    epsBasis?: "provider-direct-ttm-diluted" | "quarter-eps-sum-proxy";
+    epsSourceField?: "trailingDilutedEPS" | "quarterlyDilutedEPS" | "issuer-published-period-diluted-eps-bridge";
+    epsAsOfDate?: string;
+    fcfBasis?: "provider-cfo-minus-capital-expenditure" | "issuer-cfo-minus-tw-broad-cash-capex";
     growthBasis: "ttm-yoy" | "quarter-yoy";
     revenueGrowthTtmYoY?: number;
     revenueGrowthQuarterYoY?: number;
     netIncomePerShare?: number;
     sharesOutstanding?: number;
+    ordinarySharesPerSecurity?: number;
     /** Book NCI, not its market value. Large minority claims need separate valuation. */
     nonControllingBookPerShare?: number;
     ebitdaBasis?: "operating-income-plus-cashflow-da" | "unavailable";
@@ -163,6 +169,7 @@ export type StockInput = {
   targetFfoMultiple?: number;
   dataBasis?: "annual" | "ltm" | "historical" | "estimated" | "market-ratio";
   financialDataDate?: string;
+  officialFinancialAdapter?:import('./tsmc-tifrs-official-inputs.ts').TsmcOfficialAdapter;
   institutionalSignal?: InstitutionalSignal;
   fundPortfolioPe?: FundPortfolioPeSummary;
   /** Optional same-sector P/E profile from the latest six-fund top holdings. */

@@ -67,7 +67,7 @@ async function ok(response,expectedStatus=200) {
   const body=await response.json();assert.equal(response.status,expectedStatus,JSON.stringify(body));return body;
 }
 const sourceStock=stock=>Object.fromEntries(Object.entries(stock).filter(([key])=>!['valuationPolicy','dailyValuationVersion',
-  'dailyRunId','comparableMultiples','taiwanBusinessGroup','dailyResearch'].includes(key)));
+  'dailyRunId','comparableMultiples','taiwanBusinessGroup','dailyResearch','sourceInputPolicy'].includes(key)));
 const key=row=>row.market+':'+row.ticker;
 async function sources(root) {
   const rows=[],proofs=[];

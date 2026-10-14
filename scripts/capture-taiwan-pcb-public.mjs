@@ -112,7 +112,19 @@ export async function evaluatePublicCapture(directory,input) {
   // contract exactly; never add metadata or coerce finite financial values.
   const persisted=JSON.parse(rawInput.toString('utf8')).records;
   assert.deepEqual(JSON.parse(JSON.stringify(input.records)),persisted,'Evaluation input differs from the persisted capture');
-  assert.deepEqual(JSON.parse(JSON.stringify(regenerated)),persisted,'Frozen raw bodies must reproduce every original collector record without metadata repair');
+  // Preserve all historical numbers, dates and source values. These fixed
+  // captures predate four selection fields; verify new lineage separately,
+  // then compare the original projection without writing back to the capture.
+  const historicalProjection=JSON.parse(JSON.stringify(regenerated));
+  for(const row of historicalProjection)if(row.stock) {
+    const metrics=row.stock.financialMetrics;
+    assert.ok(['provider-direct-ttm-diluted','quarter-eps-sum-proxy'].includes(metrics.epsBasis));
+    assert.equal(metrics.epsSourceField,metrics.epsBasis==='provider-direct-ttm-diluted'?'trailingDilutedEPS':'quarterlyDilutedEPS');
+    assert.equal(metrics.epsAsOfDate,row.stock.financialDataDate);
+    assert.equal(metrics.fcfBasis,'provider-cfo-minus-capital-expenditure');
+    for(const field of ['epsBasis','epsSourceField','epsAsOfDate','fcfBasis'])delete metrics[field];
+  }
+  assert.deepEqual(historicalProjection,persisted,'Frozen raw bodies must reproduce every original collector record without metadata repair');
   let officialBook=[],bookIssue=null;
   try {for(const [board,url] of [['TWSE',BOOK_URL],['TPEx',TPEX_BOOK_URL]]) {const c=body(url);if(c)officialBook.push(...parseOfficialBookCapture({board,sourceURL:url,retrievedAt:c.retrievedAt,rawBody:c.rawBody}).rows);}}
   catch(error){bookIssue=error.message;}
