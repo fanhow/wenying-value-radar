@@ -20,7 +20,8 @@ export function createRefreshApi(runId,{token,key,fetcher=fetch,wait=sleep}) {
   return async function api(body) {
     for(let attempt=0;attempt<3;attempt++) {
       try {
-        const r=await fetcher(base+'/api/data-refresh',{method:'POST',headers:{'Content-Type':'application/json','OAI-Sites-Authorization':`Bearer ${token}`,'X-WenYing-Refresh-Key':key},body:JSON.stringify({runId,...body}),signal:AbortSignal.timeout(45000)});
+        // Complete-cohort validation can outlast an ordinary upload; keep its acknowledgement wait bounded.
+        const r=await fetcher(base+'/api/data-refresh',{method:'POST',headers:{'Content-Type':'application/json','OAI-Sites-Authorization':`Bearer ${token}`,'X-WenYing-Refresh-Key':key},body:JSON.stringify({runId,...body}),signal:AbortSignal.timeout(body.action==='finalize'?180000:45000)});
         const result=await r.json().catch(()=>({error:`HTTP_${r.status}`}));
         if(!r.ok)throw new RefreshUploadError(r.status,result);
         return result;
