@@ -262,7 +262,13 @@ async function taiwanExpectedSession(now:Date,fetcher:typeof fetch) {
   const calendar=await officialSession('TW',now,fetcher);
   if((now.getTime()-Date.parse(calendar.date))/DAY>14)throw new Error('SESSION_REFERENCE_UNAVAILABLE');
   const checks:Array<{symbol:string;source:string;latest:string|null;issue:string|null}>=[];
-  for(const symbol of ['0050.TW','^TWII']) {
+  const missingExpectedClose=new Set<string>();
+  for(const symbol of ['0050.TW','^TWII','2330.TW']) {
+    // The fixed third quote checks the session only. Use it solely when both
+    // original references explicitly lack that session's close, never to
+    // bypass identity, currency, calendar, access or rate-limit failures.
+    if(symbol==='2330.TW'&&(missingExpectedClose.size!==2
+      ||!checks.every(c=>c.issue==='REFERENCE_EXPECTED_OHLC_MISSING')))break;
     const source=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1mo`;
     const check={symbol,source,latest:null as string|null,issue:null as string|null};
     checks.push(check);
@@ -274,13 +280,15 @@ async function taiwanExpectedSession(now:Date,fetcher:typeof fetch) {
       if(!Array.isArray(timestamps)||!timestamps.length||!timestamps.every((t:unknown)=>typeof t==='number'&&Number.isSafeInteger(t)&&Number.isFinite(new Date(t*1000).getTime())))throw new Error('REFERENCE_TIMESTAMPS_INVALID');
       const dates=timestamps.map((t:number)=>new Date(t*1000).toISOString().slice(0,10));
       if(!dates.every((date:string,i:number)=>isoDate(date)&&(i===0||date>dates[i-1])))throw new Error('REFERENCE_TIMESTAMPS_INVALID');
+      const expectedIndex=dates.indexOf(calendar.date);
+      if(expectedIndex>=0&&result.indicators?.quote?.[0]?.close?.[expectedIndex]===null)missingExpectedClose.add(symbol);
       const candle=completedCandles(payload,'TW',now,calendar.date).at(-1);
       check.latest=candle?.date??null;
       if(!candle||candle.date!==calendar.date)throw new Error('REFERENCE_EXPECTED_OHLC_MISSING');
       if(![candle.open,candle.high,candle.low,candle.close].every(v=>Number.isFinite(v)&&v>0)
         ||candle.high<Math.max(candle.open,candle.close)||candle.low>Math.min(candle.open,candle.close))throw new Error('REFERENCE_OHLC_INVALID');
       return {date:calendar.date,source,calendarSource:calendar.source,
-        basis:'official exchange calendar checked against complete OHLC; fixed 0050.TW then ^TWII references; exact date required',checkedAt:now.toISOString(),referenceChecks:checks};
+        basis:'official exchange calendar checked against complete OHLC; fixed 0050.TW then ^TWII, with 2330.TW only after both expected closes are missing; exact date required',checkedAt:now.toISOString(),referenceChecks:checks};
     } catch(error) {
       const message=error instanceof Error?error.message:'';
       // Do not turn an explicit access/rate-limit/provider denial into a fallback probe.
