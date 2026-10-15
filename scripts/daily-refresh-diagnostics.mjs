@@ -1,4 +1,5 @@
 import {isoDate} from '../lib/daily-refresh-data.ts';
+import {safeRawQuoteTail} from '../lib/raw-quote-tail-diagnostics.ts';
 
 const markets=['TW','US'];
 const samples=[['TW','1101'],['TW','6488'],['US','AAPL']];
@@ -53,7 +54,37 @@ export function safeQuoteDiagnostics(value) {
     'expectedSessionRawBars','expectedSessionIncompleteOhlcBars','invalidTimestampCount'])result[key]=count(value[key]);
   result.missingOhlcByField=Object.fromEntries(['open','high','low','close'].map(key=>[key,count(value.missingOhlcByField?.[key])]));
   result.failureReason=value.failureReason==null?null:quoteFailureCodes.has(value.failureReason)?value.failureReason:'UNCLASSIFIED_ERROR';
+  result.rawTail=safeRawQuoteTail(value.rawTail);
   return result;
+}
+
+export const QUOTE_FAILURE_SAMPLE_LIMITS=Object.freeze({perMarketReason:1,total:12,maxJsonBytes:24576});
+// Samples explain individual failures, not population prevalence. No names/positions/URLs.
+export function boundedQuoteFailureSamples(records) {
+  const candidates=records.flatMap(record=>{
+    if(record?.status!=='unavailable'||!markets.includes(record.market)||typeof record.ticker!=='string'
+      ||!(record.market==='TW'?/^\d{4}$/:/^[A-Z][A-Z0-9.-]{0,11}$/).test(record.ticker))return [];
+    const quote=safeQuoteDiagnostics(record.quoteDiagnostics);
+    if(!quote||!quoteFailureCodes.has(quote.failureReason))return [];
+    return [{market:record.market,ticker:record.ticker,status:'unavailable',
+      issues:[...new Set(record.issues??[])].map(diagnosticErrorCode),quoteDiagnostics:quote}];
+  }).sort((a,b)=>{
+    // Prioritize the raw-to-parsed tail gap this observation is intended to explain.
+    const tailGap=quote=>quote.rawLatestDate===quote.expectedSessionDate&&quote.parsedLatestDate!==quote.expectedSessionDate?0:1;
+    const left=`${a.market}:${a.quoteDiagnostics.failureReason}:${tailGap(a.quoteDiagnostics)}:${a.ticker}`;
+    const right=`${b.market}:${b.quoteDiagnostics.failureReason}:${tailGap(b.quoteDiagnostics)}:${b.ticker}`;
+    return left<right?-1:left>right?1:0;
+  });
+  const selected=[],groups=new Map();
+  for(const candidate of candidates) {
+    const group=`${candidate.market}:${candidate.quoteDiagnostics.failureReason}`;
+    if((groups.get(group)??0)>=QUOTE_FAILURE_SAMPLE_LIMITS.perMarketReason||selected.length>=QUOTE_FAILURE_SAMPLE_LIMITS.total)continue;
+    if(new TextEncoder().encode(JSON.stringify([...selected,candidate])).length>QUOTE_FAILURE_SAMPLE_LIMITS.maxJsonBytes)continue;
+    selected.push(candidate);groups.set(group,(groups.get(group)??0)+1);
+  }
+  return {quoteFailureSamples:selected,quoteFailureSampling:{...QUOTE_FAILURE_SAMPLE_LIMITS,
+    eligibleCount:candidates.length,selectedCount:selected.length,omittedCount:candidates.length-selected.length,
+    selection:'ASCII-market-reason-raw-to-parsed-gap-first-ticker',representativeness:'not_representative'}};
 }
 
 export function safeCoverageDiagnostics(value) {
@@ -103,5 +134,5 @@ export function summarizeCollector(records,targets,expectedSessions) {
       issues:[...new Set(record?.issues??[])].map(diagnosticErrorCode),quoteDiagnostics:safeQuoteDiagnostics(record?.quoteDiagnostics)};
   });
   return {coverage,expectedSessions:Object.fromEntries(markets.map(market=>[market,date(expectedSessions[market])])),
-    issues,quoteDates,quoteFailureReasons,quoteSamples};
+    issues,quoteDates,quoteFailureReasons,quoteSamples,...boundedQuoteFailureSamples(records)};
 }

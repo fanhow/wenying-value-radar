@@ -76,10 +76,10 @@ function assertMetadataOnly(summary) {
     'expectedSessionDate', 'observedQuoteDate', 'rawLatestTimestamp', 'rawLatestDate', 'parsedLatestDate',
     'rawBarCount', 'parsedBarCount', 'completedBarCount', 'minimumBars', 'missingOhlcByField',
     'invalidOhlcRangeCount', 'expectedSessionRawBars', 'expectedSessionIncompleteOhlcBars',
-    'invalidTimestampCount', 'failureReason',
+    'invalidTimestampCount', 'failureReason', 'rawTail',
   ].sort());
   assert.deepEqual(Object.keys(summary.missingOhlcByField), ['open', 'high', 'low', 'close']);
-  assert.ok(JSON.stringify(summary).length < 1000);
+  assert.ok(JSON.stringify(summary).length < 4500);
   assert.ok(!Object.values(summary).some(value => Array.isArray(value)));
 }
 

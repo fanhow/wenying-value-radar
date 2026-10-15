@@ -1,4 +1,5 @@
 import type { DailyCandle, YahooChartPayload } from './price-history.ts';
+import { observeRawQuoteTail, type RawQuoteTailDiagnostics } from './raw-quote-tail-diagnostics.ts';
 
 export type QuoteDiagnosticFailureReason =
   | 'NO_VALID_COMPLETED_CANDLES'
@@ -26,6 +27,7 @@ export type QuoteDiagnostics = {
   expectedSessionIncompleteOhlcBars: number;
   invalidTimestampCount: number;
   failureReason: QuoteDiagnosticFailureReason | null;
+  rawTail: RawQuoteTailDiagnostics;
 };
 
 const OHLC_FIELDS = ['open', 'high', 'low', 'close'] as const;
@@ -69,6 +71,7 @@ export function summarizeQuoteDiagnostics(
     expectedSessionIncompleteOhlcBars: 0,
     invalidTimestampCount: 0,
     failureReason: null,
+    rawTail: observeRawQuoteTail(payload),
   };
   for (let index = 0; index < timestamps.length; index++) {
     const date = timestampDate(timestamps[index]);
