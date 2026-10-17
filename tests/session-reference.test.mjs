@@ -79,6 +79,6 @@ test('holiday weekend and pre-close decisions exclude later candles in either re
 });
 test('US session path retains SPY and never requests Taiwan fallback',async()=>{
   const usCalendar='<table><tr><th>Holiday</th><th>2026</th></tr>'+['January 1','January 19','February 16','April 3','May 25','June 19','July 3','September 7','November 26','December 25'].map(d=>`<tr><td>Good Friday</td><td>${d}</td></tr>`).join('')+'</table>';
-  const calls=[];const fetcher=async url=>{calls.push(url);return url.includes('nyse.com')?new Response(usCalendar):Response.json(chart('SPY'));};
+  const calls=[];const fetcher=async url=>{calls.push(url);const payload=chart('SPY');payload.chart.result[0].meta.currency='USD';return url.includes('nyse.com')?new Response(usCalendar):Response.json(payload);};
   assert.equal((await expectedSession('US',now,fetcher)).date,'2026-09-24');assert.equal(calls.length,2);assert.ok(calls.some(u=>u.includes('/SPY?')));assert.ok(calls.every(u=>!u.includes('TWII')));
 });

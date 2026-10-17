@@ -6,6 +6,7 @@ import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts
 import {VERIFIED_HELD_REFRESH_TARGETS} from '../lib/verified-held-refresh-scope.ts';
 import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import {summarizeCollector,safeCoverageDiagnostics,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
+import {safeSessionPreflightFailure} from '../lib/session-reference-diagnostics.ts';
 
 const base='https://stable-value.fanhow.chatgpt.site';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -37,12 +38,25 @@ export async function loadUniverse() {
   const targets=[...new Map(rows.filter(s=>s.market==='TW'?/^\d{4}$/.test(s.ticker):/^[A-Z][A-Z0-9.-]{0,11}$/.test(s.ticker)).map(s=>[`${s.market}:${s.ticker}`,{ticker:s.ticker,name:s.name,market:s.market,sector:s.sector??(s.market==='TW'?'台灣上市公司':'Other'),industry:s.industry,listingBoard:s.listingBoard,...('securityIdentity' in s?{securityIdentity:s.securityIdentity}:{})}])).values()];
   return targets;
 }
+export async function verifySessionPreflight(now,fetcher,verifySession=expectedSession,log=message=>console.log(message)) {
+  let firstFailure;
+  const markets=['TW','US'];
+  const results=await Promise.allSettled(markets.map(async market=>{
+    try {return await verifySession(market,now,fetcher);}
+    catch(error){firstFailure??=error;throw error;}
+  }));
+  if(results.some(r=>r.status==='rejected')) {
+    log(JSON.stringify(safeSessionPreflightFailure(now,results.map((r,i)=>({...r,market:markets[i]})))));
+    throw firstFailure;
+  }
+  return results.map(r=>r.value);
+}
 export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=process.env.WENYING_REFRESH_SECRET,
   runId=`daily_${randomUUID()}`,fetcher=fetch,wait=sleep,clock=()=>new Date(),verifySession=expectedSession,
   loadTargets=loadUniverse,fetchRecord=fetchRefreshRecord,log=message=>console.log(message)}={}) {
   if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
   const api=createRefreshApi(runId,{token,key,fetcher,wait});
-  const now=clock(),[tw,us]=await Promise.all([verifySession('TW',now,fetcher),verifySession('US',now,fetcher)]);
+  const now=clock(),[tw,us]=await verifySessionPreflight(now,fetcher,verifySession,log);
   log(JSON.stringify({event:'sessions_verified',TW:tw,US:us}));
   const targets=await loadTargets();
   const manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},

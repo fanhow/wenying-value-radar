@@ -1,0 +1,21 @@
+{
+  "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=5d",
+  "observedAtUTC": "2026-10-17T01:45:56.796Z",
+  "capture": "normal Chrome visible JSON text and parsed JSON; not HTTP wire bytes",
+  "historical43Payload": false,
+  "symbol": "SPY",
+  "currency": "USD",
+  "range": "5d",
+  "sessionDateUTC": "2026-10-16",
+  "rowIndex": 4,
+  "quotePointer": "/chart/result/0/indicators/quote/0",
+  "OHLC": {
+    "open": 773.239990234375,
+    "high": 773.25,
+    "low": 760.6400146484375,
+    "close": 763.25
+  },
+  "volume": 64035200,
+  "oneSourceOneRow": true,
+  "sourceGrounding": "Existing app/api/valuation Yahoo chart range=5d path; one bounded read-only comparison, not runtime fallback on429."
+}

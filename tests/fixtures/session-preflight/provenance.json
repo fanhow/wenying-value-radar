@@ -1,0 +1,96 @@
+{
+  "kind": "observed-current-public-reference-fixtures",
+  "capture": "normal Chrome visible JSON/DOM, not HTTP wire bytes",
+  "historicalRun43Payload": false,
+  "sourceRawKeptUnchanged": true,
+  "files": [
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-local-repair-20261017/root/current-reference-observation-v1/SPY-visible-payload.json",
+      "fixture": "SPY-visible-payload.json",
+      "bytes": 7165,
+      "sha256": "6af51cbe3fd2821aa0e68c4d2a92635482569268cc1dfa18d373725e251f12f1",
+      "observation": {
+        "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1mo",
+        "observedAtUTC": "2026-10-17T01:26:18.975Z",
+        "capture": "authorized-normal-Chrome-visible-JSON; not HTTP wire bytes",
+        "historicalRun43Payload": false
+      }
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-local-repair-20261017/root/current-reference-observation-v1/0050-TW-visible-payload.json",
+      "fixture": "0050-TW-visible-payload.json",
+      "bytes": 6692,
+      "sha256": "f34e48c087b688d3ebdcbc6e502b8dbb213e0fa89ab7c157d9a5f394d3d82f37",
+      "observation": {
+        "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/0050.TW?interval=1d&range=1mo",
+        "observedAtUTC": "2026-10-17T01:26:25.024Z",
+        "capture": "authorized-normal-Chrome-visible-JSON; not HTTP wire bytes",
+        "historicalRun43Payload": false
+      }
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-local-repair-20261017/root/current-reference-observation-v1/TWII-visible-payload.json",
+      "fixture": "TWII-visible-payload.json",
+      "bytes": 6395,
+      "sha256": "c461763cf67a29ab43e06297f0acac5c42741b231b99e1fe9218dc76bd0bb200",
+      "observation": {
+        "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=1d&range=1mo",
+        "observedAtUTC": "2026-10-17T01:26:38.578Z",
+        "capture": "authorized-normal-Chrome-visible-JSON; not HTTP wire bytes",
+        "historicalRun43Payload": false
+      }
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-local-repair-20261017/root/current-reference-observation-v1/2330-TW-visible-payload.json",
+      "fixture": "2330-TW-visible-payload.json",
+      "bytes": 5553,
+      "sha256": "f87890f89bda54781a38c38958eaf7e4ebff8be7f37d6701e165c5834b902a03",
+      "observation": {
+        "sourceUrl": "https://query1.finance.yahoo.com/v8/finance/chart/2330.TW?interval=1d&range=1mo",
+        "observedAtUTC": "2026-10-17T01:26:54.406Z",
+        "capture": "authorized-normal-Chrome-visible-JSON; not HTTP wire bytes",
+        "historicalRun43Payload": false,
+        "probeAllowedBy": "Both original TW references have explicit null close for 2026-10-16; same fixed third reference already present in source."
+      }
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-readonly-20261017/root/weekend-comparison-v1/twse-calendar-visible-2026.json",
+      "fixture": "TWSE-2026-visible-calendar.json",
+      "bytes": 3671,
+      "sha256": "deccebc88837c11c052d67f0278a782273bd2b91096978fd3888f496520cdf96",
+      "captureLimit": "Current official calendar rendered DOM, not historical response; see original calendar source evidence"
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-readonly-20261017/root/weekend-comparison-v1/nyse-visible-holiday-table.html",
+      "fixture": "NYSE-visible-holiday-table.html",
+      "bytes": 1520,
+      "sha256": "0d64e4678d1bbf99689748e5efc0fc2cc2ceac0a4c5d7fb12c5e34575213ff46",
+      "captureLimit": "Current official calendar rendered DOM, not historical response; see original calendar source evidence"
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-source-availability-20261017/root/SPY-5d-visible-payload.json",
+      "fixture": "SPY-5d-visible-payload.json",
+      "bytes": 3455,
+      "sha256": "d53213cf047e7b657af13b4b7d7fe13f15cd533a7926fe8e54858af8f6f26815",
+      "captureLimit": "Normal Chrome rendered JSON/text observation, not HTTP wire bytes; separate5d surface; no merged OHLC."
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-source-availability-20261017/root/SPY-5d-visible-json.txt",
+      "fixture": "SPY-5d-visible-json.txt",
+      "bytes": 1723,
+      "sha256": "236c593cde0d43302b82fae58e383cb31a60944b7da21c797992455fa4812766",
+      "captureLimit": "Normal Chrome rendered JSON/text observation, not HTTP wire bytes; separate5d surface; no merged OHLC."
+    },
+    {
+      "source": "/Users/charlie/Documents/穩盈400/evidence/scheduled-failure-source-availability-20261017/root/SPY-5d-observation-v1.json",
+      "fixture": "SPY-5d-observation-v1.json",
+      "bytes": 730,
+      "sha256": "d361b66b0286b07feb8697701f56a139b6f514a82d8c465fe14ff4c8e7bd9d74",
+      "captureLimit": "Normal Chrome rendered JSON/text observation, not HTTP wire bytes; separate5d surface; no merged OHLC."
+    }
+  ],
+  "mutationsOnlyInExplicitSyntheticTestClones": true,
+  "replayClockUTC": "2026-10-17T01:26:18.975Z",
+  "replayClockBasis": "SPY observation clock only; individual source observations remain separately tagged",
+  "v2Extension": "Fixed same-SPY5d observed body. Prior six fixture source bytes unchanged; fixture test default secondary repeats explicit primary unless overridden to observed5d."
+}
