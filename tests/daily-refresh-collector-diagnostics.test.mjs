@@ -27,19 +27,20 @@ function fixture(finalizeStatus=400) {
   const fetcher=async(url,options)=>{
     if(String(url).endsWith('/api/daily-status')) {
       calls.push({action:'readback'});
-      return Response.json({runId:'offline_collector_run',state:'partial'});
+      return Response.json({runId:'offline_collector_run',state:'partial',expectedSessions:{TW:expected,US:expected}});
     }
     const body=JSON.parse(options.body);calls.push(body);
     assert.ok(['begin','batch','finalize','fail'].includes(body.action));
     if(body.action==='finalize')return Response.json(finalizeStatus===400
       ?{error:'INSUFFICIENT_MARKET_COVERAGE',diagnostics:finalizeDiagnostics,secret}
       :{runId:body.runId,state:'partial',coverage:finalizeDiagnostics.coverage,secret},{status:finalizeStatus});
-    return Response.json({accepted:body.records?.length??0,state:'running'});
+    return Response.json(body.action==='begin'?{runId:body.runId,state:'running'}
+      :body.action==='fail'?{runId:body.runId,state:'failed'}:{accepted:body.records?.length??0});
   };
   const options={token:secret,key:secret,runId:'offline_collector_run',clock,fetcher,
     verifySession:async()=>({date:expected,source:'synthetic',calendarSource:'synthetic'}),
     loadTargets:async()=>targets,fetchRecord:async target=>rows.find(row=>row.ticker===target.ticker),
-    wait:async ms=>waits.push(ms),log:line=>logs.push(line)};
+    wait:async ms=>waits.push(ms),random:()=>0,log:line=>logs.push(line)};
   return {options,logs,calls,waits};
 }
 
@@ -63,10 +64,10 @@ test('finalize rejection preserves collector counts, three sample dates and safe
   assert.equal(failed.finalizeDiagnostics.requiredReady.TW,1);
   assert.ok(events.findIndex(event=>event.event==='collector_complete')<events.findIndex(event=>event.event==='refresh_failed'));
   assert.equal(events.some(event=>event.event==='published'),false);
-  assert.equal(calls.filter(call=>call.action==='finalize').length,3);
+  assert.equal(calls.filter(call=>call.action==='finalize').length,1);
   assert.equal(calls.at(-1).action,'fail');
   assert.equal(calls.some(call=>call.action==='readback'),false);
-  assert.deepEqual(waits,[150,3000,6000]);
+  assert.deepEqual(waits,[150]);
   assert.ok(!logs.join('\n').includes(secret));
   assert.ok(!logs.join('\n').includes('privateFinancialValue'));
 });
@@ -75,7 +76,9 @@ test('an old server without diagnostics still yields the collector failure summa
   const {options,logs}=fixture();
   options.fetcher=async(_url,options)=>{
     const body=JSON.parse(options.body);
-    return Response.json(body.action==='finalize'?{error:'INSUFFICIENT_MARKET_COVERAGE'}:{},
+    return Response.json(body.action==='finalize'?{error:'INSUFFICIENT_MARKET_COVERAGE'}
+      :body.action==='begin'?{runId:body.runId,state:'running'}
+      :body.action==='fail'?{state:'failed'}:{accepted:body.records?.length??0},
       {status:body.action==='finalize'?400:200});
   };
   await assert.rejects(runDailyRefresh(options),/UPLOAD_400_INSUFFICIENT_MARKET_COVERAGE/);
@@ -109,19 +112,23 @@ test('a rate-limit abort records missing targets and does not proceed to batch/f
   assert.deepEqual(calls.map(call=>call.action),['begin','fail']);
 });
 
-test('a bad readback still fails rather than accepting the published response alone',async()=>{
-  const {options,logs}=fixture(200),original=options.fetcher;
+test('a bad readback still fails without publishing or failing an acknowledged run',async()=>{
+  const {options,logs,calls}=fixture(200),original=options.fetcher;
+  let readbacks=0;
   options.fetcher=async(url,args)=>String(url).endsWith('/api/daily-status')
-    ?Response.json({runId:'previous_generation',state:'partial'}):original(url,args);
+    ?(readbacks++,Response.json({runId:'previous_generation',state:'partial',expectedSessions:{TW:expected,US:expected}}))
+    :original(url,args);
   await assert.rejects(runDailyRefresh(options),/READBACK_VERIFICATION_FAILED/);
   assert.equal(logs.map(JSON.parse).at(-1).error,'READBACK_VERIFICATION_FAILED');
+  assert.equal(readbacks,1);assert.equal(calls.some(call=>call.action==='fail'),false);
+  assert.equal(logs.map(JSON.parse).some(event=>event.event==='published'),false);
 });
 
 test('non-JSON and untrusted response fields cannot leak into diagnostic errors',async()=>{
   const waits=[],api=createRefreshApi('offline_run',{token:secret,key:secret,wait:async ms=>waits.push(ms),
     fetcher:async()=>new Response(secret,{status:400})});
   await assert.rejects(api({action:'finalize'}),/UPLOAD_400_HTTP_400/);
-  assert.deepEqual(waits,[3000,6000]);
+  assert.deepEqual(waits,[]);
   const error=new RefreshUploadError(400,{error:secret+' '+secret,diagnostics:finalizeDiagnostics,secret});
   assert.equal(error.message,'UPLOAD_400_UNCLASSIFIED_ERROR');
   assert.ok(!JSON.stringify(error.diagnostics).includes(secret));

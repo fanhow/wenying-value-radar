@@ -5,32 +5,12 @@ import {fetchRefreshRecord,expectedSession} from '../lib/daily-refresh-data.ts';
 import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts';
 import {VERIFIED_HELD_REFRESH_TARGETS} from '../lib/verified-held-refresh-scope.ts';
 import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
-import {summarizeCollector,safeCoverageDiagnostics,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
+import {summarizeCollector,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
 import {safeSessionPreflightFailure} from '../lib/session-reference-diagnostics.ts';
+import {createRefreshApi,RefreshUploadError,readRefreshStatus,assertRefreshReadback,safeRefreshFailure} from './daily-refresh-request.mjs';
+export {createRefreshApi,RefreshUploadError} from './daily-refresh-request.mjs';
 
-const base='https://stable-value.fanhow.chatgpt.site';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-export class RefreshUploadError extends Error {
-  constructor(status,result) {
-    const code=result?.error==null?'FAILED':diagnosticErrorCode(result.error);
-    super(`UPLOAD_${status}_${code}`);
-    this.name='RefreshUploadError';
-    this.diagnostics=safeCoverageDiagnostics(result?.diagnostics);
-  }
-}
-export function createRefreshApi(runId,{token,key,fetcher=fetch,wait=sleep}) {
-  return async function api(body) {
-    for(let attempt=0;attempt<3;attempt++) {
-      try {
-        // Complete-cohort validation can outlast an ordinary upload; keep its acknowledgement wait bounded.
-        const r=await fetcher(base+'/api/data-refresh',{method:'POST',headers:{'Content-Type':'application/json','OAI-Sites-Authorization':`Bearer ${token}`,'X-WenYing-Refresh-Key':key},body:JSON.stringify({runId,...body}),signal:AbortSignal.timeout(body.action==='finalize'?180000:45000)});
-        const result=await r.json().catch(()=>({error:`HTTP_${r.status}`}));
-        if(!r.ok)throw new RefreshUploadError(r.status,result);
-        return result;
-      }catch(e){if(attempt===2)throw e;await wait((attempt+1)*3000);}
-    }
-  };
-}
 export async function loadUniverse() {
   const snapshot=JSON.parse(await readFile(new URL('../lib/market-scan-snapshot.json',import.meta.url),'utf8'));
   const us=JSON.parse(await readFile(new URL('../lib/us-market-snapshot.json',import.meta.url),'utf8'));
@@ -53,17 +33,19 @@ export async function verifySessionPreflight(now,fetcher,verifySession=expectedS
 }
 export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=process.env.WENYING_REFRESH_SECRET,
   runId=`daily_${randomUUID()}`,fetcher=fetch,wait=sleep,clock=()=>new Date(),verifySession=expectedSession,
-  loadTargets=loadUniverse,fetchRecord=fetchRefreshRecord,log=message=>console.log(message)}={}) {
-  if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
-  const api=createRefreshApi(runId,{token,key,fetcher,wait});
-  const now=clock(),[tw,us]=await verifySessionPreflight(now,fetcher,verifySession,log);
-  log(JSON.stringify({event:'sessions_verified',TW:tw,US:us}));
-  const targets=await loadTargets();
-  const manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
-    universeSource:['Existing WenYing Taiwan equity directory and US equity directory; new listings require directory maintenance',tw.source,us.source,tw.calendarSource,us.calendarSource]};
-  let began=false;const collected=[];
+  loadTargets=loadUniverse,fetchRecord=fetchRefreshRecord,random=Math.random,log=message=>console.log(message)}={}) {
+  let phase='preflight',began=false,finalizeAcknowledged=false,targets=[],manifest;
+  const collected=[];
+  const api=createRefreshApi(runId,{token,key,fetcher,wait,random,now:()=>clock().getTime(),log});
   try {
-    await api({action:'begin',manifest});began=true;
+    if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
+    const now=clock(),[tw,us]=await verifySessionPreflight(now,fetcher,verifySession,log);
+    log(JSON.stringify({event:'sessions_verified',TW:tw,US:us}));
+    targets=await loadTargets();
+    manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
+      universeSource:['Existing WenYing Taiwan equity directory and US equity directory; new listings require directory maintenance',tw.source,us.source,tw.calendarSource,us.calendarSource]};
+    phase='begin';await api({action:'begin',manifest});began=true;
+    phase='collect';
     let done=0,ready=0;const reasons={};
     // A fixed, small pool and pause avoid an unbounded burst to the public data provider.
     for(let offset=0;offset<targets.length;offset+=8) {
@@ -77,18 +59,20 @@ export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=
       await wait(150);
     }
     log(JSON.stringify({event:'collector_complete',runId,...summarizeCollector(collected,targets,manifest.expectedSessions)}));
-    const generation=prepareTaiwanRefreshGeneration(collected,runId);
-    for(const records of refreshUploadBatches(generation,runId))await api({action:'batch',records});
-    const result=await api({action:'finalize'});
-    log(JSON.stringify({event:'published',...safePublishedResult(result,reasons,runId)}));
-    const check=await fetcher(base+'/api/daily-status',{headers:{'OAI-Sites-Authorization':`Bearer ${token}`},cache:'no-store'});
-    const status=await check.json();if(!check.ok||status.runId!==runId||!['complete','partial'].includes(status.state))throw new Error('READBACK_VERIFICATION_FAILED');
+    phase='prepare';const generation=prepareTaiwanRefreshGeneration(collected,runId);
+    phase='batch';for(const records of refreshUploadBatches(generation,runId))await api({action:'batch',records});
+    phase='finalize';await api({action:'finalize'});finalizeAcknowledged=true;
+    phase='readback';const status=assertRefreshReadback(await readRefreshStatus({token,fetcher,attempts:2,wait,random,now:()=>clock().getTime(),log}),runId,manifest.expectedSessions);
+    log(JSON.stringify({event:'published',phase,...safePublishedResult(status,reasons,runId)}));
     log('Private website readback verified. Only allowlisted diagnostic metadata is written to CI logs; no stock payloads or credentials.');
   } catch(e) {
-    log(JSON.stringify({event:'refresh_failed',runId,error:diagnosticErrorCode(e.message),
-      ...summarizeCollector(collected,targets,manifest.expectedSessions),
+    log(JSON.stringify({event:'refresh_failed',runId,phase,...safeRefreshFailure(e),
+      ...summarizeCollector(collected,targets,manifest?.expectedSessions??{}),
       finalizeDiagnostics:e instanceof RefreshUploadError?e.diagnostics:null}));
-    if(began)await api({action:'fail',error:e.message}).catch(()=>{});throw e;
+    if(began&&!finalizeAcknowledged&&!e?.preserveRun
+      &&!(e instanceof RefreshUploadError&&[401,403].includes(e.status)))
+      await api({action:'fail',error:diagnosticErrorCode(e.message)}).catch(()=>{});
+    throw e;
   }
 }
 export function refreshUploadBatches(records,runId) {

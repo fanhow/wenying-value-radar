@@ -39,7 +39,7 @@ test('finalize receives a slow acknowledgement after the ordinary budget without
 
 test('begin, batch and fail still abort slow responses and stop after the existing three attempts',async t=>{
   const budgets=scaledBudgets(t),waits=[],actions=[];
-  const api=createRefreshApi('synthetic_ordinary_budget',{token,key,wait:async ms=>waits.push(ms),fetcher:async(_url,options)=>{
+  const api=createRefreshApi('synthetic_ordinary_budget',{token,key,random:()=>0,wait:async ms=>waits.push(ms),fetcher:async(_url,options)=>{
     actions.push(JSON.parse(options.body).action);
     return delayedResponse(options.signal,{ok:true});
   }});
@@ -49,14 +49,26 @@ test('begin, batch and fail still abort slow responses and stop after the existi
   assert.deepEqual(actions,['begin','begin','begin','batch','batch','batch','fail','fail','fail']);
 });
 
-test('a longer finalize wait preserves authoritative rejection and the existing bounded retry limit',async t=>{
+test('a longer finalize wait preserves authoritative rejection without retrying a permanent contract failure',async t=>{
   const budgets=scaledBudgets(t),waits=[];let requests=0;
   const api=createRefreshApi('synthetic_rejected_finalize',{token,key,wait:async ms=>waits.push(ms),fetcher:async()=>{
     requests++;return Response.json({error:'GENERATION_PEER_EVIDENCE_MISMATCH'},{status:400});
   }});
   await assert.rejects(api({action:'finalize'}),error=>error instanceof RefreshUploadError
     &&error.message==='UPLOAD_400_GENERATION_PEER_EVIDENCE_MISMATCH'&&error.diagnostics===null);
-  assert.equal(requests,3);
-  assert.deepEqual(budgets,[180000,180000,180000]);
-  assert.deepEqual(waits,[3000,6000]);
+  assert.equal(requests,1);
+  assert.deepEqual(budgets,[180000]);
+  assert.deepEqual(waits,[]);
+});
+
+test('a finalize timeout reads back the same accepted run without another finalize or fail',async t=>{
+  const budgets=scaledBudgets(t),waits=[],actions=[],runId='synthetic_uncertain_finalize';
+  const payload={runId,state:'partial',coverage:{total:20,TW:{total:10,ready:8,unavailable:2},US:{total:10,ready:9,unavailable:1}}};
+  const api=createRefreshApi(runId,{token,key,random:()=>0,wait:async ms=>waits.push(ms),fetcher:async(_url,options)=>{
+    if(options.body){actions.push(JSON.parse(options.body).action);return delayedResponse(options.signal,payload,250);}
+    actions.push('readback');return Response.json(payload);
+  }});
+  assert.deepEqual(await api({action:'finalize'}),payload);
+  assert.deepEqual(actions,['finalize','readback']);
+  assert.deepEqual(budgets,[180000,15000]);assert.deepEqual(waits,[]);
 });
