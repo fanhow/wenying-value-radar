@@ -1,6 +1,7 @@
 import {diagnosticErrorCode,safeCoverageDiagnostics} from './daily-refresh-diagnostics.mjs';
+import {REFRESH_SITE_BASE_URL} from './daily-refresh-snapshot.mjs';
 
-const base='https://stable-value.fanhow.chatgpt.site';
+const base=REFRESH_SITE_BASE_URL;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const transportCodes=new Set(['ECONNRESET','ECONNREFUSED','ETIMEDOUT','EAI_AGAIN','ENOTFOUND',
   'UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT','UND_ERR_SOCKET']);

@@ -40,6 +40,7 @@ function runnerFixture({post,get,record,session}={}) {
     return get?get(options,calls):Response.json(validStatus());
   };
   const options={token:SECRET,key:SECRET,runId:RUN,clock,fetcher,random:()=>0,
+    materializeSnapshot:async()=>({published:true}),
     wait:async ms=>waits.push(ms),log:s=>logs.push(s),loadTargets:async()=>targets,
     verifySession:session??(async()=>({date:expected.TW,source:'synthetic://reference',calendarSource:'synthetic://calendar'})),
     fetchRecord:async target=>{

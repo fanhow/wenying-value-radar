@@ -38,6 +38,7 @@ function fixture(finalizeStatus=400) {
       :body.action==='fail'?{runId:body.runId,state:'failed'}:{accepted:body.records?.length??0});
   };
   const options={token:secret,key:secret,runId:'offline_collector_run',clock,fetcher,
+    materializeSnapshot:async()=>({published:true}),
     verifySession:async()=>({date:expected,source:'synthetic',calendarSource:'synthetic'}),
     loadTargets:async()=>targets,fetchRecord:async target=>rows.find(row=>row.ticker===target.ticker),
     wait:async ms=>waits.push(ms),random:()=>0,log:line=>logs.push(line)};

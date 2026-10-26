@@ -8,6 +8,7 @@ import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import {summarizeCollector,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
 import {safeSessionPreflightFailure} from '../lib/session-reference-diagnostics.ts';
 import {createRefreshApi,RefreshUploadError,readRefreshStatus,assertRefreshReadback,safeRefreshFailure} from './daily-refresh-request.mjs';
+import {materializeResearchSnapshot,safeSnapshotFailure} from './daily-refresh-snapshot.mjs';
 export {createRefreshApi,RefreshUploadError} from './daily-refresh-request.mjs';
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -33,7 +34,8 @@ export async function verifySessionPreflight(now,fetcher,verifySession=expectedS
 }
 export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=process.env.WENYING_REFRESH_SECRET,
   runId=`daily_${randomUUID()}`,fetcher=fetch,wait=sleep,clock=()=>new Date(),verifySession=expectedSession,
-  loadTargets=loadUniverse,fetchRecord=fetchRefreshRecord,random=Math.random,log=message=>console.log(message)}={}) {
+  loadTargets=loadUniverse,fetchRecord=fetchRefreshRecord,random=Math.random,log=message=>console.log(message),
+  materializeSnapshot=materializeResearchSnapshot}={}) {
   let phase='preflight',began=false,finalizeAcknowledged=false,targets=[],manifest;
   const collected=[];
   const api=createRefreshApi(runId,{token,key,fetcher,wait,random,now:()=>clock().getTime(),log});
@@ -63,8 +65,24 @@ export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=
     phase='batch';for(const records of refreshUploadBatches(generation,runId))await api({action:'batch',records});
     phase='finalize';await api({action:'finalize'});finalizeAcknowledged=true;
     phase='readback';const status=assertRefreshReadback(await readRefreshStatus({token,fetcher,attempts:2,wait,random,now:()=>clock().getTime(),log}),runId,manifest.expectedSessions);
-    log(JSON.stringify({event:'published',phase,...safePublishedResult(status,reasons,runId)}));
+    log(JSON.stringify({event:'published',publication:'financial',phase,...safePublishedResult(status,reasons,runId)}));
+    let snapshotPublished=false;
+    try {
+      const snapshot=await materializeSnapshot({runId,token,key,fetcher,wait,now:()=>clock().getTime(),
+        expectedSessions:manifest.expectedSessions,expectedValuationVersion:DAILY_VALUATION_VERSION,
+        expectedCount:status.coverage?.TW?.ready});
+      snapshotPublished=snapshot?.published===true;
+      if(!snapshotPublished)throw new Error('SNAPSHOT_READBACK_INVALID');
+      log(JSON.stringify({event:'research_snapshot_published',runId,financialPublished:true,
+        revision:snapshot.revision,scanCount:snapshot.scanCount,verifiedCount:snapshot.verifiedCount,
+        expectedCount:snapshot.expectedCount,researchSnapshotVersion:snapshot.researchSnapshotVersion,quoteDate:snapshot.quoteDate}));
+    } catch(error) {
+      // Financial finalization/readback already succeeded. This additive job
+      // must never issue fail or turn an accepted financial head into failure.
+      log(JSON.stringify({event:'research_snapshot_failed',runId,financialPublished:true,...safeSnapshotFailure(error)}));
+    }
     log('Private website readback verified. Only allowlisted diagnostic metadata is written to CI logs; no stock payloads or credentials.');
+    return {runId,financialPublished:true,researchSnapshotPublished:snapshotPublished};
   } catch(e) {
     log(JSON.stringify({event:'refresh_failed',runId,phase,...safeRefreshFailure(e),
       ...summarizeCollector(collected,targets,manifest?.expectedSessions??{}),
