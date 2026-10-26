@@ -3,6 +3,19 @@ on:
   schedule:
     - cron: '30 22,23 * * *'
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation to run
+        type: choice
+        required: true
+        default: daily-refresh
+        options:
+          - daily-refresh
+          - research-snapshot
+      snapshot_run_id:
+        description: Accepted financial run ID for research-snapshot only
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -18,7 +31,15 @@ jobs:
         with:
           node-version: '22.18.0'
       - name: Refresh original private website and verify readback
+        if: ${{ inputs.operation != 'research-snapshot' }}
         env:
           WENYING_SITE_TOKEN: ${{ secrets.WENYING_SITE_TOKEN }}
           WENYING_REFRESH_SECRET: ${{ secrets.WENYING_REFRESH_SECRET }}
         run: node --experimental-strip-types scripts/daily-refresh.mjs
+      - name: Materialize research snapshot for an accepted financial run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'research-snapshot' }}
+        env:
+          WENYING_SITE_TOKEN: ${{ secrets.WENYING_SITE_TOKEN }}
+          WENYING_REFRESH_SECRET: ${{ secrets.WENYING_REFRESH_SECRET }}
+          WENYING_SNAPSHOT_RUN_ID: ${{ inputs.snapshot_run_id }}
+        run: node --experimental-strip-types scripts/materialize-research-snapshot.mjs "$WENYING_SNAPSHOT_RUN_ID"
