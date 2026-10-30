@@ -1,8 +1,10 @@
 import test from 'node:test';
+import {fixedValuationClock} from './helpers/fixed-valuation-clock.mjs';
 import assert from 'node:assert/strict';
 import {calculateStock} from '../lib/valuation.ts';
 import {selectValuationList,researchRequestQuery,researchScanMayReplace,researchFailureScope,researchRowsAfterInvalidation,researchValuesAfterInvalidation,researchHeadAfterFailure} from '../app/valuation-lists.ts';
 
+fixedValuationClock('2026-10-02T12:00:00Z');
 const input={ticker:'CONTROL',name:'Control',market:'US',sector:'Industrials',price:100,eps:10,bvps:40,
   fcfPerShare:9,revenueGrowth:3,roe:15,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,
   uncertainty:.25,dataBasis:'ltm',dataCompleteness:'complete',financialDataDate:'2026-06-30',updatedAt:'2026-10-01'};

@@ -107,16 +107,18 @@ test(`actual injected ${scenario} blocks universe/body and all begin/batch/final
   if(scenario==='TW-fail-US-pass')payloads.SPY=completeSyntheticSpy();
   if(scenario!=='US-fail-TW-pass')quote(payloads['2330.TW']).close[last(payloads['2330.TW'])]=null;
   const f=sources(payloads),logs=[];let targets=0,records=0;
-  await assert.rejects(runDailyRefresh({token:'SYNTHETIC_ONLY',key:'SYNTHETIC_ONLY',fetcher:f.fetcher,clock:now,
+  await assert.rejects(runDailyRefresh({token:'SYNTHETIC_ONLY',key:'SYNTHETIC_ONLY',fetcher:f.fetcher,clock:now,wait:async()=>{},
     loadTargets:async()=>{targets++;return[];},fetchRecord:async()=>{records++;throw Error('must not collect');},log:s=>logs.push(s)}),/REFERENCE_/);
   assert.equal(targets,0);assert.equal(records,0);assert.equal(f.calls.filter(c=>c.method!=='GET').length,0);
-  assert.equal(logs.length,1);const log=JSON.parse(logs[0]);assert.equal(log.event,'session_preflight_failed');
+  const failures=logs.map(JSON.parse).filter(log=>log.event==='session_preflight_failed');
+  assert.equal(failures.length,1);const log=failures[0];
+  assert.equal(logs.map(JSON.parse).filter(log=>log.event==='refresh_failed').length,1);
   assert.deepEqual(log.markets.map(m=>m.status),scenario==='US-fail-TW-pass'?['verified','failed']:scenario==='TW-fail-US-pass'?['failed','verified']:['failed','failed']);
   if(scenario!=='TW-fail-US-pass')assert.equal(log.markets[1].diagnostics.references[0].expectedOhlc.ohlcKinds.close,'null');
   if(scenario!=='US-fail-TW-pass')assert.equal(log.markets[0].diagnostics.references.length,3);
   assert.deepEqual(f.writes,{begin:0,batch:0,finalize:0,fail:0,unknown:0});
-  assert.ok(Buffer.byteLength(logs[0])<=SESSION_DIAGNOSTIC_LIMITS.maxJsonBytes);
-  assert.ok(!logs[0].includes('https://')&&!logs[0].includes('SYNTHETIC_ONLY'));
+  assert.ok(Buffer.byteLength(JSON.stringify(log))<=SESSION_DIAGNOSTIC_LIMITS.maxJsonBytes);
+  assert.ok(!logs.join('\n').includes('https://')&&!logs.join('\n').includes('SYNTHETIC_ONLY'));
 });
 
 test('two market failures retain both outcomes and original first rejection without raw messages in logs',async()=>{

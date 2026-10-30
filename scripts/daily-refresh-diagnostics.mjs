@@ -9,6 +9,7 @@ const errorCodes=new Set([
   'REFRESH_REQUEST_ID_OVERRIDE','FINALIZE_OUTCOME_UNCONFIRMED',
   'GENERATION_HEAD_ACTIVATION_NOT_CONFIRMED','GENERATION_SOURCE_POLICY_MISMATCH','PRODUCER_POLICY_SELECTION_FORBIDDEN',
   'DERIVATION_CERTIFICATE_MISMATCH','ACTIVE_GENERATION_REBUILD_FORBIDDEN',
+  'FINALIZE_CLEANUP_DEFERRED','DERIVED_HISTORY_UNAVAILABLE','DERIVED_PATCH_PAYLOAD_TOO_LARGE',
   'UNCLASSIFIED_ERROR','FAILED','UPSTREAM_UNAVAILABLE','REFRESH_FAILED','MISSING_REFRESH_CREDENTIALS',
   'PROVIDER_RATE_LIMITED','READBACK_VERIFICATION_FAILED','RECORD_PAYLOAD_TOO_LARGE',
   'CORE_FINANCIAL_FIELDS_MISSING','EPS_GROWTH_OR_POSITIVE_EQUITY_UNAVAILABLE',
@@ -89,6 +90,13 @@ export function boundedQuoteFailureSamples(records) {
   return {quoteFailureSamples:selected,quoteFailureSampling:{...QUOTE_FAILURE_SAMPLE_LIMITS,
     eligibleCount:candidates.length,selectedCount:selected.length,omittedCount:candidates.length-selected.length,
     selection:'ASCII-market-reason-raw-to-parsed-gap-first-ticker',representativeness:'not_representative'}};
+}
+
+// Independent of coverage diagnostics; never retain arbitrary response text.
+export function safeFinalizeDiagnostics(value) {
+  const stages=new Set(['load','coverage','seal','peers','research-seal','activation','confirmation','cleanup']);
+  if(!stages.has(value?.stage)||!['rejected','unknown','published'].includes(value?.outcome))return null;
+  return {stage:value.stage,outcome:value.outcome};
 }
 
 export function safeCoverageDiagnostics(value) {

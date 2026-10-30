@@ -36,7 +36,7 @@ export function effectiveValuationConfidence(stock:Pick<Stock,'valuationConfiden
   return stock.valuationConfidence;
 }
 
-export function dailyValuationState(input:StockInput|null|undefined, runId?:string) {
+export function dailyValuationState(input:StockInput|null|undefined, runId?:string, now = Date.now()) {
   // A source-reviewed earnings basis is not a new fair value. Keep the raw
   // input for audit/OHLC, but do not calculate or expose a misleading value.
   const review=getUsEarningsReview(input);
@@ -46,7 +46,7 @@ export function dailyValuationState(input:StockInput|null|undefined, runId?:stri
   const current=!!input && (input.market!=='TW' ||
     (input.valuationPolicy==='tw-comparables-v1' && input.dailyValuationVersion===DAILY_VALUATION_VERSION
       && !!input.dailyRunId && (!runId || input.dailyRunId===runId)));
-  const stock=current?calculateStock(input!):null;
+  const stock=current?calculateStock(input!,undefined,now):null;
   const state=valuationRankingState(stock);
   const issues=!input?['VALUATION_INPUT_UNAVAILABLE']:!current?['TW_DAILY_VALUATION_REFRESH_REQUIRED']:state.issues;
   return {...state,stock,issues,review:null,shareBasisReview:null};

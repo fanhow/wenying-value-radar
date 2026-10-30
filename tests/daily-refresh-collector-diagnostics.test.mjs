@@ -1,3 +1,4 @@
+import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runDailyRefresh,createRefreshApi,RefreshUploadError} from '../scripts/daily-refresh.mjs';
@@ -27,7 +28,7 @@ function fixture(finalizeStatus=400) {
   const fetcher=async(url,options)=>{
     if(String(url).endsWith('/api/daily-status')) {
       calls.push({action:'readback'});
-      return Response.json({runId:'offline_collector_run',state:'partial',expectedSessions:{TW:expected,US:expected}});
+      return Response.json({valuationVersion:DAILY_VALUATION_VERSION,runId:'offline_collector_run',state:'partial',expectedSessions:{TW:expected,US:expected}});
     }
     const body=JSON.parse(options.body);calls.push(body);
     assert.ok(['begin','batch','finalize','fail'].includes(body.action));

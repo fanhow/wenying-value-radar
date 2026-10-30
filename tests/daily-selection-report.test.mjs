@@ -11,6 +11,32 @@ const stock={ticker:'CONTROL',name:'Source-review control',market:'US',sector:'I
 const history={candles:[{date,close:100}],freshness:{runId:'source_review_fixture'},
   technicalAnalysis:{asOf:date,valueTrendResonance:{status:'confirmed'}}};
 
+test('explicit report observation date reaches the model even when the wall clock is later',t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-30T12:00:00Z')});
+  const before=structuredClone({stock,history});
+  const result=evaluate(stock,history,date,now);
+  assert.equal(result.financialStatus,'RECENT_PERIOD_NOT_LATEST_FILING_VERIFIED');
+  assert.equal(result.status,'READY_FOR_SOURCE_REVIEW');
+  assert.equal(result.rankingEligible,true);
+  assert.deepEqual({stock,history},before);
+});
+
+test('current and explicitly later report observations still reject aging or stale financials',t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-30T12:00:00Z')});
+  const current=evaluate(stock,history,date);
+  assert.ok(current.issues.includes('FINANCIAL_AGING'));
+  assert.equal(current.rankingEligible,false);assert.equal(current.model,null);
+  for(const [observation,issue] of [
+    ['2026-10-29T00:00:00Z','FINANCIAL_AGING'],
+    ['2027-02-26T00:00:00Z','FINANCIAL_STALE'],
+    ['2026-06-29T00:00:00Z','FINANCIAL_FUTURE_DATE'],
+  ]) {
+    const result=evaluate(stock,history,date,new Date(observation));
+    assert.ok(result.issues.includes(issue));assert.equal(result.rankingEligible,false);
+    assert.equal(result.model,null);assert.equal(result.technical.valueTrendResonance,null);
+  }
+});
+
 test('source-qualified US report preserves valid research estimates without formally selecting low-confidence stocks',()=>{
   const low={...stock,ticker:'LOWCASE',revenueGrowth:10,roe:25},before=structuredClone(history);
   const result=evaluate(low,history,date,now);

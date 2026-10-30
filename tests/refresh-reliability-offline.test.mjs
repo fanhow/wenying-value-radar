@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {loadCandidate} from '../test-support/load-candidate.mjs';
+import {sessionTrace,beginReference,referenceOhlcFacts,attachSessionDiagnostics} from '../lib/session-reference-diagnostics.ts';
 
 const loadedRequest=await loadCandidate('request'),loadedRunner=await loadCandidate('runner');
 const request=loadedRequest.module,runner=loadedRunner.module;
@@ -11,7 +12,7 @@ const expected={TW:'2026-10-23',US:'2026-10-23'};
 const clock=()=>new Date('2026-10-26T06:30:00Z');
 const manifest={valuationVersion:'engineering-only',targets:[{ticker:'1101',market:'TW'}],expectedSessions:expected};
 const coverage={total:2,TW:{total:1,ready:1,unavailable:0},US:{total:1,ready:1,unavailable:0}};
-const validStatus=()=>({runId:RUN,state:'partial',expectedSessions:{...expected},coverage});
+const validStatus=()=>({valuationVersion:'tw-comparables-2026-10-03-method-notes-v4',runId:RUN,state:'partial',expectedSessions:{...expected},coverage});
 const ack=(action,body)=>action==='begin'?{runId:RUN,state:'running'}:action==='batch'?{accepted:body.records.length}
   :action==='finalize'?{runId:RUN,state:'partial',coverage}:{runId:RUN,state:'failed'};
 const parsedEvents=logs=>logs.filter(s=>s.startsWith('{')).map(JSON.parse);
@@ -50,6 +51,46 @@ function runnerFixture({post,get,record,session}={}) {
     }};
   return {options,calls,waits,logs,records};
 }
+
+function recoverableSessionFailure(market,now) {
+  const trace=sessionTrace(market,now);trace.expectedSessionDate=expected[market];
+  const row=beginReference(trace,market==='TW'?'^TWII':'SPY');
+  Object.assign(row,{rawBarCount:2,rawLatestDate:expected[market],parsedLatestDate:'2026-10-22',expectedRawIndex:1,
+    expectedOhlc:referenceOhlcFacts({open:[100,100],high:[110,110],low:[90,90],close:[105,null]},1),
+    issue:'REFERENCE_EXPECTED_OHLC_MISSING'});
+  return attachSessionDiagnostics(new Error(market==='TW'?'REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR':'REFERENCE_EXPECTED_OHLC_MISSING'),trace);
+}
+
+test('runner retries only missing session OHLC before one begin and one collection',async()=>{
+  const attempts={TW:0,US:0};
+  const f=runnerFixture({session:async(market,now)=>{
+    attempts[market]++;
+    if(market==='TW'&&attempts.TW===1)throw recoverableSessionFailure(market,now);
+    return {date:expected[market],source:'synthetic://reference',calendarSource:'synthetic://calendar'};
+  }});
+  const advance=f.options.wait;
+  f.options.wait=async ms=>{
+    if(ms===30000){assert.equal(f.calls.length,0);assert.equal(f.records.length,0);}
+    await advance(ms);
+  };
+  await runner.runDailyRefresh(f.options);
+  assert.deepEqual(attempts,{TW:2,US:1});assert.deepEqual(f.waits,[30000,150]);
+  assert.equal(f.calls.filter(c=>c.action==='begin').length,1);
+  assert.equal(f.calls.filter(c=>c.action==='finalize').length,1);
+  assert.equal(f.calls.some(c=>c.action==='fail'),false);assert.equal(f.records.length,2);
+  assert.ok(!f.logs.join('\n').includes(SECRET));
+});
+test('runner exhausted preflight preserves the existing head without any Sites request or collection',async()=>{
+  const attempts={TW:0,US:0};
+  const f=runnerFixture({session:async(market,now)=>{attempts[market]++;throw recoverableSessionFailure(market,now);}});
+  await assert.rejects(runner.runDailyRefresh(f.options));
+  assert.deepEqual(attempts,{TW:3,US:3});assert.deepEqual(f.waits,[30000,90000]);
+  assert.equal(f.calls.length,0);assert.equal(f.records.length,0);
+  const events=parsedEvents(f.logs);
+  assert.equal(events.find(event=>event.event==='refresh_failed').phase,'preflight');
+  assert.equal(events.some(event=>event.event==='published'),false);
+  assert.equal(events.filter(event=>event.event==='session_preflight_failed').length,1);
+});
 
 function brokenBody(status,error) {
   return new Response(new ReadableStream({start(controller){controller.error(error);}}),
@@ -598,4 +639,66 @@ test('runner acknowledged finalize plus wrong dated readback remains failed but 
   assert.equal(f.calls.some(c=>c.action==='fail'),false);
   const events=parsedEvents(f.logs);assert.equal(events.some(e=>e.event==='published'),false);
   assert.equal(events.find(e=>e.event==='refresh_failed').phase,'readback');
+});
+
+for(const code of [SECRET,'GENERATION_HEAD_ACTIVATION_NOT_CONFIRMED','FINALIZE_OUTCOME_UNCONFIRMED'])
+  test(`legacy uncertain finalize 400 reconciles only by GET: ${code===SECRET?'unclassified':code}`,async()=>{
+    const f=apiFixture(({body})=>body?Response.json({error:code,privatePayload:SECRET},{status:400}):Response.json(validStatus()));
+    assert.equal((await f.api({action:'finalize'})).state,'partial');
+    assert.equal(f.calls.filter(c=>c.body).length,1);assert.equal(f.calls.filter(c=>!c.body).length,1);
+    assert.ok(!f.logs.join('\n').includes(SECRET));
+  });
+
+test('legacy unknown 400 with a different active head remains preserved, never resubmitted or published',async()=>{
+  const f=runnerFixture({post:body=>body.action==='finalize'?Response.json({error:SECRET},{status:400}):Response.json(ack(body.action,body)),
+    get:()=>Response.json({...validStatus(),runId:'prior_generation'})});
+  await assert.rejects(runner.runDailyRefresh(f.options),error=>error.preserveRun===true);
+  assert.equal(f.calls.filter(c=>c.action==='finalize').length,1);assert.equal(f.calls.filter(c=>c.action==='readback').length,2);
+  assert.equal(f.calls.some(c=>c.action==='fail'),false);
+  assert.equal(parsedEvents(f.logs).some(e=>e.event==='published'),false);assert.ok(!f.logs.join('\n').includes(SECRET));
+});
+
+for(const patch of [{expectedSessions:{TW:'2020-01-01',US:expected.US}},{valuationVersion:'wrong-version'},{valuationVersion:undefined}])
+  test(`matching run but mismatched begin contract cannot reconcile: ${JSON.stringify(patch)}`,async()=>{
+    const f=runnerFixture({post:body=>body.action==='finalize'?Response.json({error:SECRET},{status:400}):Response.json(ack(body.action,body)),
+      get:()=>Response.json({...validStatus(),...patch})});
+    await assert.rejects(runner.runDailyRefresh(f.options),e=>e.preserveRun===true);
+    assert.equal(f.calls.some(c=>c.action==='fail'),false);assert.equal(f.calls.filter(c=>c.action==='finalize').length,1);
+    assert.equal(parsedEvents(f.logs).some(e=>e.event==='published'),false);
+  });
+
+test('unknown 400 recovers the exact published head then continues the separate research snapshot workflow',async()=>{
+  let snapshots=0;
+  const f=runnerFixture({post:body=>body.action==='finalize'?Response.json({error:SECRET},{status:400}):Response.json(ack(body.action,body))});
+  f.options.materializeSnapshot=async()=>{snapshots++;return {published:true};};
+  const result=await runner.runDailyRefresh(f.options);
+  assert.equal(result.financialPublished,true);assert.equal(result.researchSnapshotPublished,true);assert.equal(snapshots,1);
+  assert.equal(f.calls.filter(c=>c.action==='finalize').length,1);assert.equal(f.calls.some(c=>c.action==='fail'),false);
+  assert.equal(parsedEvents(f.logs).filter(e=>e.event==='published').length,1);
+});
+
+test('only allowlisted cleanup warnings and finalize stages reach producer logs',async()=>{
+  const f=apiFixture(()=>Response.json({runId:RUN,activeRunId:RUN,state:'partial',warnings:['FINALIZE_CLEANUP_DEFERRED',SECRET],
+    finalize:{stage:'cleanup',outcome:'published',sql:SECRET},privatePayload:SECRET}));
+  await f.api({action:'finalize'});
+  assert.deepEqual(parsedEvents(f.logs),[{event:'refresh_finalize_warning',phase:'finalize',warning:'FINALIZE_CLEANUP_DEFERRED'}]);
+  const error=new RefreshUploadError(503,{error:SECRET,finalize:{stage:'confirmation',outcome:'unknown',sql:SECRET}});
+  assert.deepEqual(request.safeRefreshFailure(error).finalize,{stage:'confirmation',outcome:'unknown'});
+  assert.ok(!JSON.stringify(request.safeRefreshFailure(error)).includes(SECRET));
+  const bad=new RefreshUploadError(503,{error:SECRET,finalize:{stage:SECRET,outcome:'unknown'}});
+  assert.equal(request.safeRefreshFailure(bad).finalize,undefined);
+});
+
+test('definitive 400 validation and access denial never reconcile even if response claims unknown outcome',async()=>{
+  for(const [status,code] of [[400,'INSUFFICIENT_MARKET_COVERAGE'],[401,SECRET],[403,SECRET]]) {
+    const f=apiFixture(()=>Response.json({error:code,finalize:{stage:'coverage',outcome:'unknown'}},{status}));
+    await assert.rejects(f.api({action:'finalize'}),e=>e instanceof RefreshUploadError&&e.status===status);
+    assert.equal(f.calls.length,1);assert.equal(f.calls.filter(c=>!c.body).length,0);
+  }
+});
+
+test('a mismatched explicit activeRunId in an ACK requires a matching readback',async()=>{
+  const f=apiFixture(({body})=>Response.json(body?{runId:RUN,activeRunId:'other_run',state:'partial'}:validStatus()));
+  assert.equal((await f.api({action:'finalize'})).state,'partial');
+  assert.equal(f.calls.filter(c=>c.body).length,1);assert.equal(f.calls.filter(c=>!c.body).length,1);
 });

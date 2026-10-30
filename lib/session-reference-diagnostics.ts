@@ -82,6 +82,43 @@ export function attachSessionDiagnostics(error:unknown,trace:SessionTrace) {
   else {const wrapped=new Error(e.message);Object.defineProperty(wrapped,'sessionDiagnostics',{value,enumerable:false});return wrapped;}
   return e;
 }
+/** Retry only validated reference rows with empty OHLC on the pinned session.
+ * Sanitization is for logging, not authorization: inspect every original row so
+ * filtering/truncation cannot hide a permanent failure. An absent date abstains;
+ * it never supplies evidence that waiting can repair the expected session. */
+export function retryableSessionDate(error:any,market:'TW'|'US',now:Date):string|null {
+  const code=sessionDiagnosticCode(error?.message),trace=error?.sessionDiagnostics;
+  if(code!=='REFERENCE_EXPECTED_OHLC_MISSING'
+    &&!(market==='TW'&&code==='REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR'))return null;
+  if(!trace||trace.market!==market||trace.observedAt!==now.toISOString()
+    ||!date(trace.expectedSessionDate)||!Array.isArray(trace.references)
+    ||!trace.references.length||trace.references.length>SESSION_DIAGNOSTIC_LIMITS[market])return null;
+  let hasEmptyExpectedRow=false;
+  const seen=new Set<string>();
+  for(const row of trace.references) {
+    if(!row||!symbols[market].some(symbol=>symbol===row.symbol)
+      ||!(row.range==='1mo'||market==='US'&&row.range==='5d')
+      ||seen.has(`${row.symbol}:${row.range}`)||row.issue!=='REFERENCE_EXPECTED_OHLC_MISSING'
+      ||count(row.rawBarCount)===null||row.rawBarCount===0||!date(row.rawLatestDate)
+      ||row.parsedLatestDate!==null&&(!date(row.parsedLatestDate)||row.parsedLatestDate>=trace.expectedSessionDate))return null;
+    seen.add(`${row.symbol}:${row.range}`);
+    if(row.expectedRawIndex===null) {
+      if(row.expectedOhlc!==null)return null;
+      continue;
+    }
+    const facts=row.expectedOhlc;
+    if(count(row.expectedRawIndex)===null||row.expectedRawIndex>=row.rawBarCount
+      ||row.rawLatestDate<trace.expectedSessionDate||!facts
+      ||!Array.isArray(facts.missingFields)||!facts.missingFields.length
+      ||!Array.isArray(facts.nonPositiveFields)||facts.nonPositiveFields.length
+      ||!Array.isArray(facts.rangeViolations)||facts.rangeViolations.length)return null;
+    const empty=fields.filter(field=>['null','absent'].includes(facts.ohlcKinds?.[field]));
+    if(!fields.every(field=>['finite-number','null','absent'].includes(facts.ohlcKinds?.[field]))
+      ||empty.length!==facts.missingFields.length||!empty.every(field=>facts.missingFields.includes(field)))return null;
+    hasEmptyExpectedRow=true;
+  }
+  return hasEmptyExpectedRow?trace.expectedSessionDate:null;
+}
 export function safeSessionPreflightFailure(now:Date,outcomes:Array<{market:'TW'|'US';status:'fulfilled'|'rejected';value?:any;reason?:any}>) {
   const markets=outcomes.slice(0,2).filter(o=>o&&['TW','US'].includes(o.market)).map(o=>({market:o.market,status:o.status==='fulfilled'?'verified':'failed',
     verifiedSessionDate:o.status==='fulfilled'?date(o.value?.date):null,

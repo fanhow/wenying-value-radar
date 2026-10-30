@@ -56,7 +56,7 @@ export function evaluate(stock, history, expected, now = new Date()) {
   let rankingEligible = false;
   if (stock && !blocking.length) {
     try {
-      const state = dailyValuationState(stock,history?.freshness?.runId);
+      const state = dailyValuationState(stock,history?.freshness?.runId,now.getTime());
       issues.push(...state.issues);
       rankingEligible = state.rankingEligible;
       if(state.hasModel)model = { fairValue:state.estimatedFairValue,upside:state.upside,

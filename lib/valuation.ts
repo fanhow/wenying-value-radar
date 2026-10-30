@@ -1030,7 +1030,9 @@ function deriveMarketPricing(
   };
 }
 
-export function calculateStock(input: StockInput, formatNumber = (value: number) => String(value)): Stock {
+// One observation instant governs every financial-age read in this calculation.
+// Omitted observations use the current clock, never the quote or batch date.
+export function calculateStock(input: StockInput, formatNumber = (value: number) => String(value), now = Date.now()): Stock {
   // Incoming review metadata cannot resolve a trusted source case, and an
   // explicit manual re-entry must not retain an old derived review object.
   input={...input};delete (input as StockInput & {shareBasisReview?:TaiwanShareBasisReview}).shareBasisReview;
@@ -1038,8 +1040,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
   if(shareBasisReview){
     // No model is evaluated and no per-share input is changed. Numeric zeros
     // satisfy the legacy Stock shape only; models/review gate make them unavailable.
-    const freshness=classifyFinancialFreshness(input.financialDataDate);
-    const ageDays=financialAgeDays(input.financialDataDate);
+    const freshness=classifyFinancialFreshness(input.financialDataDate,now);
+    const ageDays=financialAgeDays(input.financialDataDate,now);
     const assumptions:ValuationAssumptions={beta:0,riskFreeRate:0,marketRiskPremium:0,countryRiskPremium:0,costOfEquity:0,
       preTaxCostOfDebt:0,afterTaxCostOfDebt:0,taxRate:0,debtWeight:0,equityWeight:0,wacc:0,structuralThemes:[],
       historicalStartingGrowth:0,structuralGrowthPrior:0,structuralBlendWeight:0,baseTargetPe:0,marketPeAnchor:0,
@@ -1091,8 +1093,8 @@ export function calculateStock(input: StockInput, formatNumber = (value: number)
     ?? (input.qualityAvailable === false ? "limited" : "complete");
   const dataBasis = input.dataBasis ?? (dataCompleteness === "complete" ? "annual" : "historical");
   const financialDataDate = input.financialDataDate ?? input.updatedAt;
-  const freshness = classifyFinancialFreshness(financialDataDate);
-  const ageDays = financialAgeDays(financialDataDate);
+  const freshness = classifyFinancialFreshness(financialDataDate,now);
+  const ageDays = financialAgeDays(financialDataDate,now);
 
   if (input.assetType === "ETF") {
     const fairValue = Math.max(eps, 0);

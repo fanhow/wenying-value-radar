@@ -1,3 +1,4 @@
+import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -95,17 +96,24 @@ test('all 18 synthetic collection results, generation and upload batches are byt
   const generation=prepareTaiwanRefreshGeneration(records,golden.runId);
   assert.equal(JSON.stringify(generation),golden.generationJson);assert.equal(JSON.stringify(refreshUploadBatches(generation,golden.runId)),golden.batchJson);
 });
-test('actual collector entry emits bounded safe failures while every begin/batch/finalize request body remains baseline-exact',async()=>{
+test('actual collector entry preserves baseline payloads with the established request identity serialization',async()=>{
   const cases=caseNames.map((n,i)=>fixtureCase(n,i)),logs=[],requests=[];
   await runDailyRefresh({token:'SYNTHETIC_TOKEN',key:'SYNTHETIC_KEY',runId:golden.runId,clock:()=>refreshTime,wait:async()=>{},log:line=>logs.push(line),
     verifySession:async()=>({date:expected,source:'synthetic',calendarSource:'synthetic'}),loadTargets:async()=>cases.map(c=>c.target),
     fetchRecord:async target=>{const c=cases.find(c=>c.target.ticker===target.ticker);return fetchRefreshRecord(c.target,expected,refreshTime,c.fetcher);},
     fetcher:async(url,opts)=>{
-      if(String(url).endsWith('/api/daily-status'))return Response.json({runId:golden.runId,state:'partial'});
+      if(String(url).endsWith('/api/daily-status'))return Response.json({valuationVersion:DAILY_VALUATION_VERSION,runId:golden.runId,state:'partial',expectedSessions:{TW:expected,US:expected}});
       const body=JSON.parse(opts.body);requests.push(opts.body);
+      if(body.action==='begin')return Response.json({runId:golden.runId,state:'running'});
       return Response.json(body.action==='finalize'?{runId:golden.runId,state:'partial',coverage:{total:cases.length,TW:{total:0,ready:0,unavailable:0},US:{total:cases.length,ready:1,unavailable:cases.length-1}}}:{accepted:body.records?.length??0});
-    }});
-  assert.deepEqual(requests,golden.apiRequestBodies);
+    },materializeSnapshot:async()=>({published:true})});
+  // The later reliability layer freezes the payload before retry and writes
+  // runId last. Preserve every pinned payload field and exact remaining bytes.
+  const wireBaseline=golden.apiRequestBodies.map(raw=>{
+    const {runId,...payload}=JSON.parse(raw);return JSON.stringify({...payload,runId});
+  });
+  assert.deepEqual(requests,wireBaseline);
+  assert.deepEqual(requests.map(JSON.parse),golden.apiRequestBodies.map(JSON.parse));
   const complete=logs.filter(l=>l.startsWith('{')).map(JSON.parse).find(e=>e.event==='collector_complete');
   assert.ok(complete.quoteFailureSamples.length>0);assert.ok(complete.quoteFailureSamples.length<=12);
   assert.ok(complete.quoteFailureSamples.some(r=>r.quoteDiagnostics.rawTail.rows.some(row=>row.ohlcKinds.close==='null')));

@@ -6,7 +6,7 @@ import {prepareTaiwanRefreshGeneration} from '../lib/daily-refresh-generation.ts
 import {VERIFIED_HELD_REFRESH_TARGETS} from '../lib/verified-held-refresh-scope.ts';
 import {DAILY_VALUATION_VERSION} from '../lib/daily-valuation-state.ts';
 import {summarizeCollector,safePublishedResult,diagnosticErrorCode} from './daily-refresh-diagnostics.mjs';
-import {safeSessionPreflightFailure} from '../lib/session-reference-diagnostics.ts';
+import {safeSessionPreflightFailure,retryableSessionDate,sessionDiagnosticCode,attachSessionDiagnostics} from '../lib/session-reference-diagnostics.ts';
 import {createRefreshApi,RefreshUploadError,readRefreshStatus,assertRefreshReadback,safeRefreshFailure} from './daily-refresh-request.mjs';
 import {materializeResearchSnapshot,safeSnapshotFailure} from './daily-refresh-snapshot.mjs';
 export {createRefreshApi,RefreshUploadError} from './daily-refresh-request.mjs';
@@ -19,18 +19,45 @@ export async function loadUniverse() {
   const targets=[...new Map(rows.filter(s=>s.market==='TW'?/^\d{4}$/.test(s.ticker):/^[A-Z][A-Z0-9.-]{0,11}$/.test(s.ticker)).map(s=>[`${s.market}:${s.ticker}`,{ticker:s.ticker,name:s.name,market:s.market,sector:s.sector??(s.market==='TW'?'台灣上市公司':'Other'),industry:s.industry,listingBoard:s.listingBoard,...('securityIdentity' in s?{securityIdentity:s.securityIdentity}:{})}])).values()];
   return targets;
 }
-export async function verifySessionPreflight(now,fetcher,verifySession=expectedSession,log=message=>console.log(message)) {
-  let firstFailure;
-  const markets=['TW','US'];
-  const results=await Promise.allSettled(markets.map(async market=>{
-    try {return await verifySession(market,now,fetcher);}
-    catch(error){firstFailure??=error;throw error;}
-  }));
-  if(results.some(r=>r.status==='rejected')) {
-    log(JSON.stringify(safeSessionPreflightFailure(now,results.map((r,i)=>({...r,market:markets[i]})))));
-    throw firstFailure;
+export async function verifySessionPreflight(now,fetcher,verifySession=expectedSession,log=message=>console.log(message),wait=sleep) {
+  // This is the only delayed retry owner for preflight. Existing fixed reference
+  // fallbacks stay inside expectedSession; no collector or Sites write is retried.
+  const at=now.getTime(),anchor=new Date(at),markets=['TW','US'],delays=[30000,90000];
+  const results=[],pinnedDates=new Map();
+  let pending=[0,1];
+  for(let attempt=0;attempt<=delays.length;attempt++) {
+    const failureOrder=[];
+    const current=await Promise.allSettled(pending.map(async index=>{
+      try {
+        const market=markets[index],value=await verifySession(market,new Date(at),fetcher);
+        if(pinnedDates.has(market)&&value?.date!==pinnedDates.get(market))
+          throw new Error('REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR');
+        return value;
+      } catch(error) {failureOrder.push(index);throw error;}
+    }));
+    pending.forEach((index,i)=>{results[index]=current[i];});
+    const failed=results.flatMap((result,index)=>result.status==='rejected'?[index]:[]);
+    if(!failed.length)return results.map(result=>result.value);
+    const retryDates=new Map(failed.map(index=>[index,retryableSessionDate(results[index].reason,markets[index],anchor)]));
+    // Preserve first-rejection order among terminal failures, as before retries.
+    const permanent=failureOrder.find(index=>{
+      const date=retryDates.get(index),pinned=pinnedDates.get(markets[index]);
+      return !date||pinned&&date!==pinned;
+    });
+    if(permanent!==undefined||attempt===delays.length) {
+      if(permanent!==undefined&&retryDates.get(permanent)&&pinnedDates.has(markets[permanent]))
+        results[permanent]={status:'rejected',reason:attachSessionDiagnostics(
+          new Error('REFERENCE_DISAGREES_WITH_EXCHANGE_CALENDAR'),results[permanent].reason.sessionDiagnostics)};
+      log(JSON.stringify(safeSessionPreflightFailure(anchor,results.map((r,i)=>({...r,market:markets[i]})))));
+      throw results[permanent??failureOrder[0]].reason;
+    }
+    for(const index of failed)pinnedDates.set(markets[index],retryDates.get(index));
+    log(JSON.stringify({event:'session_preflight_retry',observedAt:anchor.toISOString(),clockBasis:'caller-preflight-clock',
+      attempt:attempt+1,nextAttempt:attempt+2,waitMs:delays[attempt],markets:failed.map(index=>({
+        market:markets[index],expectedSessionDate:pinnedDates.get(markets[index]),error:sessionDiagnosticCode(results[index].reason?.message)}))}));
+    await wait(delays[attempt]);
+    pending=failed;
   }
-  return results.map(r=>r.value);
 }
 export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=process.env.WENYING_REFRESH_SECRET,
   runId=`daily_${randomUUID()}`,fetcher=fetch,wait=sleep,clock=()=>new Date(),verifySession=expectedSession,
@@ -41,7 +68,7 @@ export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=
   const api=createRefreshApi(runId,{token,key,fetcher,wait,random,now:()=>clock().getTime(),log});
   try {
     if(!token||!key)throw new Error('MISSING_REFRESH_CREDENTIALS');
-    const now=clock(),[tw,us]=await verifySessionPreflight(now,fetcher,verifySession,log);
+    const now=clock(),[tw,us]=await verifySessionPreflight(now,fetcher,verifySession,log,wait);
     log(JSON.stringify({event:'sessions_verified',TW:tw,US:us}));
     targets=await loadTargets();
     manifest={valuationVersion:DAILY_VALUATION_VERSION,targets:targets.map(({ticker,market})=>({ticker,market})),expectedSessions:{TW:tw.date,US:us.date},
@@ -64,7 +91,7 @@ export async function runDailyRefresh({token=process.env.WENYING_SITE_TOKEN,key=
     phase='prepare';const generation=prepareTaiwanRefreshGeneration(collected,runId);
     phase='batch';for(const records of refreshUploadBatches(generation,runId))await api({action:'batch',records});
     phase='finalize';await api({action:'finalize'});finalizeAcknowledged=true;
-    phase='readback';const status=assertRefreshReadback(await readRefreshStatus({token,fetcher,attempts:2,wait,random,now:()=>clock().getTime(),log}),runId,manifest.expectedSessions);
+    phase='readback';const status=assertRefreshReadback(await readRefreshStatus({token,fetcher,attempts:2,wait,random,now:()=>clock().getTime(),log}),runId,manifest.expectedSessions,manifest.valuationVersion);
     log(JSON.stringify({event:'published',publication:'financial',phase,...safePublishedResult(status,reasons,runId)}));
     let snapshotPublished=false;
     try {

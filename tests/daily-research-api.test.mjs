@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {fixedValuationClock} from './helpers/fixed-valuation-clock.mjs';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {DAILY_VALUATION_VERSION,dailyValuationState} from '../lib/daily-valuation-state.ts';
@@ -9,6 +10,7 @@ import {REFRESH_SCHEMA,handleDailyRead,handleRefreshWrite,researchCohortIntegrit
 import {analyzeTechnicalSetup} from '../lib/technical-analysis.ts';
 
 // Full synthetic cohorts exercise ordering and provenance, not price accuracy.
+fixedValuationClock('2026-10-02T12:00:00Z');
 const date='2026-10-01',runId='research_cohort_fixture',secret='synthetic-only-000000000000000000000';
 const base={name:'Synthetic issuer',sector:'Industrials',industry:'Synthetic devices',price:100,eps:10,bvps:40,
   fcfPerShare:9,revenueGrowth:20,roe:25,debtRatio:30,targetPe:15,targetPb:2,targetFcfMultiple:15,

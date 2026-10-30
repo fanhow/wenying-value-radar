@@ -1,4 +1,4 @@
-import {diagnosticErrorCode,safeCoverageDiagnostics} from './daily-refresh-diagnostics.mjs';
+import {diagnosticErrorCode,safeCoverageDiagnostics,safeFinalizeDiagnostics} from './daily-refresh-diagnostics.mjs';
 import {REFRESH_SITE_BASE_URL} from './daily-refresh-snapshot.mjs';
 
 const base=REFRESH_SITE_BASE_URL;
@@ -25,6 +25,7 @@ export class RefreshUploadError extends Error {
     super(`UPLOAD_${status}_${result?.error==null?'FAILED':diagnosticErrorCode(result.error)}`);
     this.name='RefreshUploadError';this.status=status;
     this.diagnostics=safeCoverageDiagnostics(result?.diagnostics);
+    this.finalize=safeFinalizeDiagnostics(result?.finalize);
     // Retain parsed numbers only, never arbitrary response-header text.
     if(typeof retryAfter==='string'&&/^\d+(?:\.\d+)?$/.test(retryAfter.trim())) {
       const seconds=Number(retryAfter.trim());
@@ -63,7 +64,7 @@ export function safeRefreshFailure(error) {
     :transportCodes.has(error?.cause?.code??error?.code)?'REFRESH_TRANSPORT_FAILED':null;
   return {error:nativeCode??diagnosticErrorCode(error?.message),
     errorName:knownName.has(error?.name)?error.name:'Error',
-    ...(error instanceof RefreshUploadError?{httpStatus:error.status}:{}),
+    ...(error instanceof RefreshUploadError?{httpStatus:error.status,...(error.finalize?{finalize:error.finalize}:{})}:{}),
     ...(error?.preserveRun?{outcome:'uncertain',preservedRun:true}:{})};
 }
 
@@ -87,9 +88,10 @@ export async function readRefreshStatus({token,fetcher=fetch,timeoutMs=15000,att
   }
 }
 
-export function assertRefreshReadback(status,runId,expectedSessions) {
+export function assertRefreshReadback(status,runId,expectedSessions,expectedValuationVersion) {
   if(!status||status.runId!==runId||!terminal.has(status.state)
-    ||expectedSessions&&['TW','US'].some(market=>status.expectedSessions?.[market]!==expectedSessions[market]))
+    ||expectedSessions&&['TW','US'].some(market=>status.expectedSessions?.[market]!==expectedSessions[market])
+    ||expectedValuationVersion&&status.valuationVersion!==expectedValuationVersion)
     throw new Error('READBACK_VERIFICATION_FAILED');
   return status;
 }
@@ -98,15 +100,19 @@ function validAck(body,result,runId) {
   if(body.action==='begin')return result?.runId===runId&&result.state==='running';
   if(body.action==='batch')return Array.isArray(body.records)&&result?.accepted===body.records.length;
   if(body.action==='fail')return ['failed','complete','partial'].includes(result?.state);
-  return result?.runId===runId&&terminal.has(result.state);
+  return result?.runId===runId&&terminal.has(result.state)
+    &&(!Object.hasOwn(result,'activeRunId')||result.activeRunId===runId)
+    &&(!Object.hasOwn(result,'finalize')||safeFinalizeDiagnostics(result.finalize)?.outcome==='published');
 }
 
 export function createRefreshApi(runId,{token,key,fetcher=fetch,wait=sleep,random=Math.random,now=Date.now,log=()=>{}}) {
+  // Capture the accepted begin payload, not later mutable caller objects.
+  let expectedSessions,expectedValuationVersion;
   async function reconcile(reason=new Error('REFRESH_ACK_STATE_MISMATCH')) {
     log(JSON.stringify({event:'refresh_finalize_reconcile',phase:'finalize',...safeRefreshFailure(reason)}));
     for(let attempt=0;attempt<2;attempt++) {
       try {
-        const status=assertRefreshReadback(await readRefreshStatus({token,fetcher}),runId);
+        const status=assertRefreshReadback(await readRefreshStatus({token,fetcher}),runId,expectedSessions,expectedValuationVersion);
         return {runId,state:status.state,coverage:status.coverage};
       }catch(error) {
         log(JSON.stringify({event:'refresh_finalize_readback_failed',phase:'finalize',attempt:attempt+1,...safeRefreshFailure(error)}));
@@ -139,13 +145,22 @@ export function createRefreshApi(runId,{token,key,fetcher=fetch,wait=sleep,rando
           if(requestBody.action==='finalize'&&!(result?.runId===runId&&result?.state==='failed'))return await reconcile();
           throw new Error('REFRESH_ACK_STATE_MISMATCH');
         }
+        if(requestBody.action==='begin') {
+          expectedSessions=requestBody.manifest?.expectedSessions;
+          expectedValuationVersion=requestBody.manifest?.valuationVersion;
+        }
+        if(requestBody.action==='finalize'&&Array.isArray(result.warnings)&&result.warnings.includes('FINALIZE_CLEANUP_DEFERRED'))
+          log(JSON.stringify({event:'refresh_finalize_warning',phase:'finalize',warning:'FINALIZE_CLEANUP_DEFERRED'}));
         return result;
       }catch(error) {
         if(error?.preserveRun)throw error;
         // A timeout or proxy error can arrive after finalization committed.
         // Reconcile the same head; never blindly resubmit this write or fail it.
         // An unknown client error after invoking fetch cannot prove non-delivery.
-        if(requestBody.action==='finalize'&&(isRetryableRefreshError(error)
+        const legacyUncertain400=error instanceof RefreshUploadError&&error.status===400
+          &&['UPLOAD_400_UNCLASSIFIED_ERROR','UPLOAD_400_GENERATION_HEAD_ACTIVATION_NOT_CONFIRMED',
+            'UPLOAD_400_FINALIZE_OUTCOME_UNCONFIRMED'].includes(error.message);
+        if(requestBody.action==='finalize'&&(isRetryableRefreshError(error)||legacyUncertain400
           ||!(error instanceof RefreshUploadError)&&error?.message!=='REFRESH_ACK_STATE_MISMATCH')) {
           if(error?.name==='AbortError')throw new RefreshFinalizeUncertainError();
           if(error instanceof RefreshUploadError&&('retryAfterSeconds' in error||'retryAfterAt' in error||error.retryAfterBeyondBudget)) {
