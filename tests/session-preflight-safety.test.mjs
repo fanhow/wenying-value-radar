@@ -22,7 +22,7 @@ const denied=async(p,code)=>{
 test('observed current TW retains exact existing third-reference success contract and original payload bytes',async()=>{
   const before=JSON.stringify(observedPayloads),f=sources(),result=await expectedSession('TW',now(),f.fetcher);
   assert.deepEqual(result,{date:'2026-10-16',source:'https://query1.finance.yahoo.com/v8/finance/chart/2330.TW?interval=1d&range=1mo',
-    calendarSource:'https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=json&queryYear=2026',
+    calendarSource:'https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=json&date=20260101',
     basis:'official exchange calendar checked against complete OHLC; fixed 0050.TW then ^TWII, with 2330.TW only after both expected closes are missing; exact date required',
     checkedAt:currentObservationClock,referenceChecks:[
       {symbol:'0050.TW',source:'https://query1.finance.yahoo.com/v8/finance/chart/0050.TW?interval=1d&range=1mo',latest:'2026-10-15',issue:'REFERENCE_EXPECTED_OHLC_MISSING'},

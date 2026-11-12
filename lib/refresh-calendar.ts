@@ -27,13 +27,18 @@ export function latestCalendarSession(market:'TW'|'US',now:Date,holidays:string[
 }
 export async function officialSession(market:'TW'|'US',now:Date,fetcher:typeof fetch=fetch) {
   const year=Number(new Intl.DateTimeFormat('en-CA',{timeZone:market==='TW'?'Asia/Taipei':'America/New_York',year:'numeric'}).format(now));
-  const source=market==='TW'?`https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=json&queryYear=${year}`:NYSE_CALENDAR;
+  const source=market==='TW'?`https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=json&date=${year}0101`:NYSE_CALENDAR;
   const r=await fetcher(source,{signal:AbortSignal.timeout(20000)});if(!r.ok)throw new Error('EXCHANGE_CALENDAR_FETCH_FAILED');
   const payload=market==='TW'?await r.json():await r.text();
   let holidays=market==='TW'?parseTwseHolidays(payload,year):parseNyseHolidays(payload,year);
   let date=latestCalendarSession(market,now,holidays);
   if(!date.startsWith(String(year))) {
-    const previous=market==='TW'?await(await fetcher(source.replace(String(year),String(year-1)),{signal:AbortSignal.timeout(20000)})).json():payload;
+    let previous=payload;
+    if(market==='TW') {
+      const priorResponse=await fetcher(source.replace(String(year),String(year-1)),{signal:AbortSignal.timeout(20000)});
+      if(!priorResponse.ok)throw new Error('EXCHANGE_CALENDAR_FETCH_FAILED');
+      previous=await priorResponse.json();
+    }
     holidays=holidays.concat(market==='TW'?parseTwseHolidays(previous,year-1):parseNyseHolidays(previous,year-1));
     date=latestCalendarSession(market,now,holidays);
   }

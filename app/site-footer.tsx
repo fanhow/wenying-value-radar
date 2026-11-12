@@ -2,9 +2,10 @@
 
 import { useLanguage } from "./language-context";
 
-const SITE_REVISION = "Rev. 2026.10.30.2";
+const SITE_REVISION = "Rev. 2026.11.12.1";
 
 const REVISION_ENTRIES = [
+  ["2026.11.12.1", "每日更新以證交所官方 date 參數明確指定日曆年度，避免誤讀預設的下一年日曆；跨年回查前一年時同樣檢查 HTTP 狀態。保留年份、日曆完整性、交易日與預檢安全停止，不變更估值公式或排名門檻。", "Select the exchange calendar year explicitly through TWSE’s official date parameter instead of accepting the default next-year calendar; also check HTTP status when reading the previous year. Preserve year, calendar-completeness, session and preflight fail-closed checks without changing valuation formulas or ranking gates."],
   ["2026.10.30.2", "每日更新確認財務批次啟用後，舊資料清理失敗改為維護警告；發布結果不明時只核對同一批次，不重送更新或降級已完成資料。保留交易日、來源、財務完整性與排名門檻。", "After confirming financial publication, report old-data cleanup failures as maintenance warnings. Reconcile uncertain publication against the exact batch without resubmitting updates or demoting completed data. Preserve session, source, financial-integrity and ranking gates."],
   ["2026.10.30.1", "每日選股報告將明示觀察時間傳入估值引擎，使外層財報新鮮度與內層信心使用同一時鐘；未指定時仍以當下時間判定，過期資料及其他正式排名門檻維持。歷史測試固定觀察日，不修改財報、估值公式或權重。", "Pass the daily selection report's explicit observation time into valuation so financial freshness and model confidence share one clock. Omitted observations still use current time; stale-data exclusions and all other formal ranking gates remain. Pin historical test observation dates without changing financial inputs, valuation formulas or weights."],
   ["2026.10.28.1", "每日更新遇到已確認交易日的暫時行情空值時，有限等待後重新檢查失敗市場；等待期間固定交易日，日期衝突、標的身分錯誤及不合法價格仍停止更新。檢查未通過時保留上一批有效資料。", "Daily updates retry failed markets after bounded waits when a verified trading session has empty quote fields. The session date stays fixed while waiting; date conflicts, reference identity errors and invalid prices stop the update. Failed checks preserve the previous valid data batch."],

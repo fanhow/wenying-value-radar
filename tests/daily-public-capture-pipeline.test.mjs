@@ -7,6 +7,17 @@ import {fileURLToPath} from 'node:url';
 import {validatePublicGeneration} from '../scripts/validate-taiwan-public-generation.mjs';
 
 const root=fileURLToPath(new URL('../outputs/local-validation/',import.meta.url));
+// This replays immutable 2026-10-02 captures, not today's production freshness.
+// Use the later source capture's actual observedAt; never rewrite source dates or values.
+const NativeDate=globalThis.Date;
+const replayObservedAt=NativeDate.parse('2026-10-02T08:10:49.855Z');
+test.before(()=>{
+  globalThis.Date=class extends NativeDate {
+    constructor(...args){super(...(args.length?args:[replayObservedAt]));}
+    static now(){return replayObservedAt;}
+  };
+});
+test.after(()=>{globalThis.Date=NativeDate;});
 async function present(t) {
   try {await access(join(root,'pcb-public-20261002/inputs.json'));await access(join(root,'memory-public-20261002/inputs.json'));return true;}
   catch {t.skip('NOT_RUN: fixed ignored 17-company public captures are absent; no synthetic substitution for true evidence.');return false;}
